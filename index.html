@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小粘自然 | 互動教學資源網</title>
+    <style>
+        /* --- 基礎設定 --- */
+        :root {
+            --primary-color: #557C55; /* 自然綠 */
+            --secondary-color: #A6CF98; /* 嫩芽綠 */
+            --accent-color: #F2E3DB; /* 米白背景 */
+            --text-color: #333;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+            background-color: var(--accent-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        /* --- 頂部導覽區 --- */
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 2rem 1rem;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            letter-spacing: 2px;
+        }
+
+        p.subtitle {
+            margin-top: 10px;
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        /* --- 搜尋與過濾區 --- */
+        .controls {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .search-bar {
+            width: 100%;
+            max-width: 500px;
+            padding: 12px 20px;
+            border: 2px solid var(--primary-color);
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .search-bar:focus {
+            box-shadow: 0 0 8px rgba(85, 124, 85, 0.5);
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            background: white;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-size: 0.9rem;
+        }
+
+        .btn:hover, .btn.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        /* --- 內容展示區 (Grid) --- */
+        .gallery {
+            max-width: 1200px;
+            margin: 0 auto 50px;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        /* --- 卡片設計 --- */
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            position: relative;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        /* 模擬縮圖區塊 (您可以換成真實圖片) */
+        .card-img {
+            height: 160px;
+            background-color: var(--secondary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3rem;
+        }
+
+        .card-content {
+            padding: 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+
+        .card-desc {
+            font-size: 0.95rem;
+            color: #666;
+            margin-bottom: 15px;
+            flex-grow: 1;
+        }
+
+        .tags {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            background-color: #f0f0f0;
+            color: #555;
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        /* --- 頁尾 --- */
+        footer {
+            text-align: center;
+            padding: 20px;
+            background-color: var(--primary-color);
+            color: white;
+            font-size: 0.9rem;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🌿 小粘自然</h1>
+    <p class="subtitle">探索自然的奧秘 · 互動式教學資源庫</p>
+</header>
+
+<section class="controls">
+    <input type="text" id="searchInput" class="search-bar" placeholder="🔍 搜尋教案、關鍵字...">
+    <div class="filter-buttons" id="filterContainer">
+        <button class="btn active" onclick="filterData('all')">全部顯示</button>
+        <button class="btn" onclick="filterData('physics')">物理與力學</button>
+        <button class="btn" onclick="filterData('biology')">生物與生態</button>
+        <button class="btn" onclick="filterData('earth')">地球科學</button>
+        <button class="btn" onclick="filterData('game')">趣味遊戲</button>
+    </div>
+</section>
+
+<main class="gallery" id="gallery">
+    </main>
+
+<footer>
+    &copy; 2025 小粘自然教學網 | Designed for Learning
+</footer>
+
+<script>
+    // --- 資料庫設定 ---
+    // 以後您只需要在這裡新增項目即可
+    const projects = [
+        {
+            title: "光合作用模擬器",
+            category: "biology",
+            desc: "調整光照強度與二氧化碳濃度，觀察植物產生氧氣的速率變化。",
+            tags: ["生物", "實驗", "國中"],
+            link: "photosynthesis.html", // 連結到您的互動網頁檔案
+            icon: "🌱"
+        },
+        {
+            title: "槓桿原理大挑戰",
+            category: "physics",
+            desc: "拖曳法碼到不同位置，看看誰能讓翹翹板保持平衡！",
+            tags: ["物理", "力學", "國小"],
+            link: "lever-game.html",
+            icon: "⚖️"
+        },
+        {
+            title: "太陽系運行軌道",
+            category: "earth",
+            desc: "3D 視覺化呈現八大行星繞行太陽的軌跡與速度差異。",
+            tags: ["地科", "天文", "3D"],
+            link: "solar-system.html",
+            icon: "🪐"
+        },
+        {
+            title: "食物鏈拼圖",
+            category: "biology",
+            desc: "將生產者、初級消費者與高級消費者正確排列，建立穩定的生態系。",
+            tags: ["生物", "遊戲"],
+            link: "food-chain.html",
+            icon: "🦁"
+        },
+        {
+            title: "水的循環動畫",
+            category: "earth",
+            desc: "互動式動畫展示蒸發、凝結、降水與逕流的過程。",
+            tags: ["地科", "水資源"],
+            link: "water-cycle.html",
+            icon: "💧"
+        },
+        {
+            title: "電路接接看",
+            category: "physics",
+            desc: "串聯還是並聯？嘗試接通電路讓燈泡發亮吧。",
+            tags: ["物理", "電學", "模擬"],
+            link: "circuit.html",
+            icon: "💡"
+        }
+    ];
+
+    const gallery = document.getElementById('gallery');
+    const searchInput = document.getElementById('searchInput');
+    const btns = document.querySelectorAll('.btn');
+
+    // --- 渲染卡片函數 ---
+    function renderCards(data) {
+        gallery.innerHTML = ''; // 清空現有內容
+        
+        if (data.length === 0) {
+            gallery.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #666;">找不到相關內容 🌱</p>';
+            return;
+        }
+
+        data.forEach(item => {
+            const card = document.createElement('a');
+            card.href = item.link; // 設定連結
+            card.className = 'card';
+            // 若連結是空或 #，防止跳轉（測試用）
+            if(item.link === "#" || !item.link) card.removeAttribute('href'); 
+
+            // 生成標籤 HTML
+            const tagsHtml = item.tags.map(tag => `<span class="tag">#${tag}</span>`).join('');
+
+            card.innerHTML = `
+                <div class="card-img">${item.icon}</div>
+                <div class="card-content">
+                    <div class="card-title">${item.title}</div>
+                    <div class="card-desc">${item.desc}</div>
+                    <div class="tags">${tagsHtml}</div>
+                </div>
+            `;
+            gallery.appendChild(card);
+        });
+    }
+
+    // --- 篩選邏輯 ---
+    function filterData(category) {
+        // 更新按鈕樣式
+        btns.forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        // 搜尋框清空（選擇性）
+        searchInput.value = '';
+
+        if (category === 'all') {
+            renderCards(projects);
+        } else {
+            const filtered = projects.filter(item => item.category === category);
+            renderCards(filtered);
+        }
+    }
+
+    // --- 搜尋邏輯 ---
+    searchInput.addEventListener('input', (e) => {
+        const keyword = e.target.value.toLowerCase();
+        
+        // 移除所有分類按鈕的 active 狀態
+        btns.forEach(btn => btn.classList.remove('active'));
+
+        const searchResult = projects.filter(item => {
+            return item.title.toLowerCase().includes(keyword) || 
+                   item.desc.toLowerCase().includes(keyword) ||
+                   item.tags.some(tag => tag.toLowerCase().includes(keyword));
+        });
+        renderCards(searchResult);
+    });
+
+    // --- 初始化 ---
+    renderCards(projects);
+
+</script>
+
+</body>
+</html>
