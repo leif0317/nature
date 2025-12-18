@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三角形三心互動演示</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: #2c3e50;
+            color: white;
+            width: 100%;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        #controls {
+            margin: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            user-select: none;
+            font-weight: bold;
+        }
+
+        /* Color Coding */
+        .c-centroid { color: #e67e22; border: 1px solid #e67e22; }
+        .c-circum { color: #2980b9; border: 1px solid #2980b9; }
+        .c-incenter { color: #27ae60; border: 1px solid #27ae60; }
+
+        input[type="checkbox"] {
+            cursor: pointer;
+            transform: scale(1.2);
+        }
+
+        #canvas-container {
+            flex-grow: 1;
+            width: 100%;
+            position: relative;
+            background: white;
+            cursor: crosshair;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .instruction {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px 15px;
+            border-radius: 20px;
+            pointer-events: none;
+            color: #555;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h2>三角形三心互動演示 (外心、內心、重心)</h2>
+</header>
+
+<div id="controls">
+    <label class="control-group c-centroid">
+        <input type="checkbox" id="showCentroid" checked> 重心 (G) / 中線
+    </label>
+    <label class="control-group c-circum">
+        <input type="checkbox" id="showCircum" checked> 外心 (O) / 外接圓
+    </label>
+    <label class="control-group c-incenter">
+        <input type="checkbox" id="showIncenter" checked> 內心 (I) / 內切圓
+    </label>
+</div>
+
+<div id="canvas-container">
+    <canvas id="geoCanvas"></canvas>
+    <div class="instruction">💡 拖曳 A, B, C 頂點來改變三角形形狀</div>
+</div>
+
+<script>
+    const canvas = document.getElementById('geoCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // State
+    let width, height;
+    let points = [
+        { x: 0, y: 0, label: 'A' },
+        { x: 0, y: 0, label: 'B' },
+        { x: 0, y: 0, label: 'C' }
+    ];
+    let dragIdx = -1;
+
+    // Configuration
+    const CONFIG = {
+        pointRadius: 6,
+        centerRadius: 5,
+        hitRadius: 20,
+        colors: {
+            triangle: '#34495e',
+            centroid: '#e67e22',
+            circum: '#2980b9',
+            incenter: '#27ae60',
+            grid: '#ecf0f1'
+        }
+    };
+
+    // Initialization
+    function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // Initial triangle position
+        const cx = width / 2;
+        const cy = height / 2;
+        points[0] = { x: cx, y: cy - 150, label: 'A' };
+        points[1] = { x: cx - 180, y: cy + 150, label: 'B' };
+        points[2] = { x: cx + 180, y: cy + 150, label: 'C' };
+
+        draw();
+    }
+
+    function resize() {
+        width = canvas.parentElement.clientWidth;
+        height = canvas.parentElement.clientHeight;
+        canvas.width = width;
+        canvas.height = height;
+        draw();
+    }
+
+    // Math Helpers
+    function dist(p1, p2) {
+        return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2);
+    }
+
+    function midpoint(p1, p2) {
+        return { x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2 };
+    }
+
+    // --- Calculation Functions ---
+
+    // 1. Centroid (重心): Average of vertices
+    function getCentroid(A, B, C) {
+        return {
+            x: (A.x + B.x + C.x) / 3,
+            y: (A.y + B.y + C.y) / 3
+        };
+    }
+
+    // 2. Incenter (內心): Weighted average by side lengths
+    function getIncenter(A, B, C) {
+        const a = dist(B, C);
+        const b = dist(A, C);
+        const c = dist(A, B);
+        const p = a + b + c;
+        
+        const x = (a * A.x + b * B.x + c * C.x) / p;
+        const y = (a * A.y + b * B.y + c * C.y) / p;
+        
+        // Radius calculation: Area / semi-perimeter
+        const s = p / 2;
+        const area = Math.sqrt(s * (s - a) * (s - b) * (s - c));
+        const r = area / s;
+
+        return { x, y, r };
+    }
+
+    // 3. Circumcenter (外心): Intersection of perpendicular bisectors
+    function getCircumcenter(A, B, C) {
+        const D = 2 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
+        
+        const Ux = (1 / D) * (
+            (A.x**2 + A.y**2) * (B.y - C.y) +
+            (B.x**2 + B.y**2) * (C.y - A.y) +
+            (C.x**2 + C.y**2) * (A.y - B.y)
+        );
+        
+        const Uy = (1 / D) * (
+            (A.x**2 + A.y**2) * (C.x - B.x) +
+            (B.x**2 + B.y**2) * (A.x - C.x) +
+            (C.x**2 + C.y**2) * (B.x - A.x)
+        );
+
+        const center = { x: Ux, y: Uy };
+        const r = dist(center, A);
+        
+        return { ...center, r };
+    }
+
+    // --- Drawing Functions ---
+
+    function drawPoint(p, color, label, isMainVertex = false) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, isMainVertex ? CONFIG.pointRadius : CONFIG.centerRadius, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#333';
+        ctx.font = isMainVertex ? 'bold 16px Arial' : 'bold 14px Arial';
+        ctx.fillText(label, p.x + 10, p.y - 10);
+    }
+
+    function drawLine(p1, p2, color, width = 1, dashed = false) {
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        if (dashed) ctx.setLineDash([5, 5]);
+        else ctx.setLineDash([]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    function drawCircle(center, r, color) {
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, r, 0, Math.PI * 2);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+        
+        // Draw Grid (Optional)
+        ctx.beginPath();
+        ctx.strokeStyle = CONFIG.colors.grid;
+        ctx.lineWidth = 1;
+        for(let i=0; i<width; i+=50) { ctx.moveTo(i,0); ctx.lineTo(i,height); }
+        for(let i=0; i<height; i+=50) { ctx.moveTo(0,i); ctx.lineTo(width,i); }
+        ctx.stroke();
+
+        const [A, B, C] = points;
+
+        // Draw Triangle Edges
+        ctx.beginPath();
+        ctx.moveTo(A.x, A.y);
+        ctx.lineTo(B.x, B.y);
+        ctx.lineTo(C.x, C.y);
+        ctx.closePath();
+        ctx.strokeStyle = CONFIG.colors.triangle;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = "rgba(52, 73, 94, 0.05)";
+        ctx.fill();
+
+        // 1. Draw Centroid Feature
+        if (document.getElementById('showCentroid').checked) {
+            const G = getCentroid(A, B, C);
+            const mAB = midpoint(A, B);
+            const mBC = midpoint(B, C);
+            const mCA = midpoint(C, A);
+            
+            // Medians
+            drawLine(A, mBC, CONFIG.colors.centroid, 1, true);
+            drawLine(B, mCA, CONFIG.colors.centroid, 1, true);
+            drawLine(C, mAB, CONFIG.colors.centroid, 1, true);
+            
+            drawPoint(G, CONFIG.colors.centroid, 'G');
+        }
+
+        // 2. Draw Circumcenter Feature
+        if (document.getElementById('showCircum').checked) {
+            const O = getCircumcenter(A, B, C);
+            
+            // Draw Perpendicular Bisectors (Visual aid: line from midpoint to O)
+            const mAB = midpoint(A, B);
+            const mBC = midpoint(B, C);
+            const mCA = midpoint(C, A);
+            
+            // Don't draw infinite lines, just connect midpoint to O to reduce clutter
+            ctx.globalAlpha = 0.4;
+            drawLine(mAB, O, CONFIG.colors.circum, 1, true);
+            drawLine(mBC, O, CONFIG.colors.circum, 1, true);
+            drawLine(mCA, O, CONFIG.colors.circum, 1, true);
+            ctx.globalAlpha = 1.0;
+
+            drawCircle(O, O.r, CONFIG.colors.circum);
+            drawPoint(O, CONFIG.colors.circum, 'O');
+        }
+
+        // 3. Draw Incenter Feature
+        if (document.getElementById('showIncenter').checked) {
+            const I = getIncenter(A, B, C);
+            
+            // Angle Bisectors (Visual aid: line from vertex to I)
+            ctx.globalAlpha = 0.4;
+            drawLine(A, I, CONFIG.colors.incenter, 1, true);
+            drawLine(B, I, CONFIG.colors.incenter, 1, true);
+            drawLine(C, I, CONFIG.colors.incenter, 1, true);
+            ctx.globalAlpha = 1.0;
+
+            drawCircle(I, I.r, CONFIG.colors.incenter);
+            drawPoint(I, CONFIG.colors.incenter, 'I');
+        }
+
+        // Draw Vertices
+        points.forEach(p => drawPoint(p, CONFIG.colors.triangle, p.label, true));
+    }
+
+    // --- Interaction ---
+
+    function getMousePos(evt) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: evt.clientX - rect.left,
+            y: evt.clientY - rect.top
+        };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        const pos = getMousePos(e);
+        points.forEach((p, index) => {
+            if (dist(pos, p) < CONFIG.hitRadius) {
+                dragIdx = index;
+            }
+        });
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        const pos = getMousePos(e);
+        
+        // Hover cursor effect
+        let hovering = false;
+        points.forEach(p => {
+            if (dist(pos, p) < CONFIG.hitRadius) hovering = true;
+        });
+        canvas.style.cursor = hovering ? 'pointer' : 'crosshair';
+
+        if (dragIdx !== -1) {
+            points[dragIdx].x = pos.x;
+            points[dragIdx].y = pos.y;
+            draw();
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        dragIdx = -1;
+    });
+
+    // Touch support (for mobile)
+    canvas.addEventListener('touchstart', (e) => {
+        const pos = getMousePos(e.touches[0]);
+        points.forEach((p, index) => {
+            if (dist(pos, p) < CONFIG.hitRadius) {
+                dragIdx = index;
+            }
+        });
+    }, {passive: false});
+
+    canvas.addEventListener('touchmove', (e) => {
+        if (dragIdx !== -1) {
+            e.preventDefault(); // prevent scrolling
+            const pos = getMousePos(e.touches[0]);
+            points[dragIdx].x = pos.x;
+            points[dragIdx].y = pos.y;
+            draw();
+        }
+    }, {passive: false});
+
+    // Inputs
+    document.getElementById('showCentroid').addEventListener('change', draw);
+    document.getElementById('showCircum').addEventListener('change', draw);
+    document.getElementById('showIncenter').addEventListener('change', draw);
+
+    // Run
+    init();
+
+</script>
+</body>
+</html>
