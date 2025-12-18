@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>電解硫酸銅模擬器 v4.0 (含濃度變化)</title>
+    <style>
+        :root {
+            --copper-color: #b87333;
+            --carbon-color: #333333;
+            --base-blue: 0, 150, 255; /* RGB for solution */
+            --wire-color: #555;
+            --bg-color: #f4f4f9;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        /* 署名水印 */
+        .watermark {
+            position: fixed;
+            top: 15px;
+            right: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #555;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 5px 12px;
+            border-radius: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+            pointer-events: none;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        h1 { margin-bottom: 10px; color: #2c3e50; }
+        .subtitle { color: #666; margin-bottom: 30px; }
+
+        .main-layout {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            justify-content: center;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            max-width: 1200px;
+        }
+
+        .panel-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            width: 280px;
+        }
+
+        .apparatus-container {
+            position: relative;
+            width: 400px;
+            height: 480px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        /* --- 實驗裝置元件 --- */
+
+        .beaker {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 250px;
+            height: 200px;
+            border-left: 3px solid #aaa;
+            border-right: 3px solid #aaa;
+            border-bottom: 3px solid #aaa;
+            border-radius: 0 0 10px 10px;
+            /* 初始顏色，透明度由 JS 控制 */
+            background-color: rgba(var(--base-blue), 0.4); 
+            overflow: hidden;
+            z-index: 1;
+            transition: background-color 0.5s; /* 顏色漸變動畫 */
+        }
+
+        .electrode {
+            position: absolute;
+            top: -60px;
+            width: 40px; 
+            height: 190px;
+            border: 1px solid rgba(0,0,0,0.2);
+            transition: background-color 0.5s;
+            z-index: 2;
+        }
+
+        .anode { left: 40px; transform-origin: center top; }
+        .cathode { right: 40px; transform-origin: center top; }
+
+        .mat-copper { background-color: var(--copper-color); }
+        .mat-carbon { background-color: var(--carbon-color); }
+
+        .coating {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--copper-color);
+            opacity: 0;
+            transition: opacity 1s;
+        }
+
+        .label {
+            position: absolute;
+            font-size: 14px;
+            font-weight: bold;
+            background: rgba(255,255,255,0.8);
+            padding: 2px 5px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        /* 導線 */
+        .circuit-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+        .wire { position: absolute; background-color: var(--wire-color); }
+        .wire-left-vert { width: 4px; height: 140px; left: 133px; top: 80px; }
+        .wire-right-vert { width: 4px; height: 140px; left: 263px; top: 80px; }
+        .wire-top-horz { height: 4px; width: 134px; left: 133px; top: 80px; }
+
+        .battery {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 40px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 24px;
+            z-index: 6;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        
+        .battery-symbol { display: flex; align-items: center; gap: 5px; }
+        .pole-long { width: 3px; height: 30px; background: black; }
+        .pole-short { width: 6px; height: 16px; background: black; }
+
+        /* 粒子 */
+        .electron {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: #ffeb3b;
+            border-radius: 50%;
+            border: 1px solid orange;
+            z-index: 10;
+            display: none;
+        }
+        .ion {
+            position: absolute;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            background: #0044cc;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            z-index: 4;
+        }
+        .bubble {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: white;
+            border: 1px solid #aaa;
+            border-radius: 50%;
+            opacity: 0.8;
+            z-index: 4;
+        }
+
+        /* 介面元素 */
+        .control-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="range"], select { width: 100%; padding: 5px; }
+        
+        button { width: 100%; padding: 10px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; transition: background 0.3s; }
+        .btn-start { background-color: #2ecc71; color: white; }
+        .btn-start:hover { background-color: #27ae60; }
+        .btn-stop { background-color: #e74c3c; color: white; display: none; }
+        .btn-reset { background-color: #95a5a6; color: white; margin-top: 10px;}
+
+        .reaction-box { margin-top: 10px; font-family: 'Courier New', Courier, monospace; background: #eee; padding: 10px; border-radius: 5px; font-size: 12px; }
+        
+        .stats-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px; }
+        .mass-change { font-weight: bold; }
+        .increase { color: green; }
+        .decrease { color: red; }
+        .section-title { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; color: #444; }
+
+        /* 顏色指示器 */
+        .color-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+            border: 1px solid #ccc;
+            background-color: rgba(0, 150, 255, 1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="watermark">小粘製作</div>
+
+    <h1>電解硫酸銅模擬器 v4.0</h1>
+    <div class="subtitle">互動式化學實驗：觀察濃度變化、電極與電子流向</div>
+
+    <div class="main-layout">
+        
+        <div class="panel-box">
+            <h3 class="section-title">即時數據</h3>
+            <div class="stats-row">
+                <span>經過時間:</span>
+                <span><span id="timer">0.0</span> 秒</span>
+            </div>
+            
+            <div style="margin-top: 15px;">
+                <strong>電極質量變化:</strong>
+                <div class="stats-row">
+                    <span>陽極 (左):</span>
+                    <span id="anode-mass" class="mass-change">0.00 g</span>
+                </div>
+                <div class="stats-row">
+                    <span>陰極 (右):</span>
+                    <span id="cathode-mass" class="mass-change increase">0.00 g</span>
+                </div>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <strong>溶液狀態 ([Cu<sup>2+</sup>]):</strong>
+                <div class="stats-row">
+                    <span>顏色:</span>
+                    <div style="display:flex; align-items:center;">
+                        <span id="color-dot" class="color-indicator"></span>
+                        <span id="solution-status" style="font-weight:bold; color:#0055aa;">深藍色</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; font-size: 13px; color: #666; background: #f9f9f9; padding: 10px; border-radius: 5px;">
+                <strong>現象觀察提示：</strong>
+                <ul style="padding-left: 20px; margin: 5px 0;">
+                    <li>切換碳棒時，注意溶液顏色是否變淺。</li>
+                    <li>觀察導線上電子的流向。</li>
+                    <li>留意陰極逐漸變粗與陽極的變化。</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="apparatus-container">
+            <div class="circuit-layer">
+                <div class="wire wire-left-vert"></div>
+                <div class="wire wire-right-vert"></div>
+                <div class="wire wire-top-horz"></div>
+            </div>
+
+            <div class="battery">
+                <div style="position:absolute; left:-15px; top:5px; font-size:16px;">+</div>
+                <div class="battery-symbol">
+                    <div class="pole-long"></div>
+                    <div class="pole-short"></div>
+                </div>
+                <div style="position:absolute; right:-15px; top:5px; font-size:16px;">-</div>
+            </div>
+
+            <div class="label" style="left: 115px; top: 200px;">陽極 (+)</div>
+            <div class="label" style="right: 115px; top: 200px;">陰極 (-)</div>
+
+            <div id="electron-layer"></div>
+
+            <div class="beaker" id="beaker">
+                <div class="electrode anode mat-copper" id="anode-rod"></div>
+                <div class="electrode cathode mat-copper" id="cathode-rod">
+                    <div class="coating" id="cathode-coating"></div>
+                </div>
+                <div id="particle-container"></div>
+                <div style="position: absolute; bottom: 10px; width: 100%; text-align: center; color: #003366; font-weight: bold; opacity: 0.7;">
+                    CuSO<sub>4</sub>(aq)
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-box">
+            <h3 class="section-title">實驗控制</h3>
+            <div class="control-group">
+                <label for="electrodeSelect">電極材質:</label>
+                <select id="electrodeSelect">
+                    <option value="copper">銅棒 (Cu)</option>
+                    <option value="carbon">碳棒 (C)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="currentSlider">電流強度: <span id="currentVal">1.0</span> A</label>
+                <input type="range" id="currentSlider" min="0.5" max="5.0" step="0.5" value="1.0">
+            </div>
+            <button id="btn-toggle" class="btn-start">開始反應 (ON)</button>
+            <button id="btn-reset" class="btn-reset">重置實驗</button>
+
+            <div style="margin-top: 20px;">
+                <h4 style="margin-bottom: 5px;">化學反應式</h4>
+                <div style="font-size: 13px;">
+                    <strong>陽極 (+):</strong>
+                    <div class="reaction-box" id="anode-reaction-text">
+                        Cu → Cu<sup>2+</sup> + 2e<sup>-</sup>
+                    </div>
+                </div>
+                <div style="font-size: 13px; margin-top: 10px;">
+                    <strong>陰極 (-):</strong>
+                    <div class="reaction-box">
+                        Cu<sup>2+</sup> + 2e<sup>-</sup> → Cu
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 變數與常數 ---
+        let isRunning = false;
+        let timer = 0;
+        let intervalId = null;
+        let animationFrameId = null;
+        let electrodeType = 'copper'; 
+
+        let current = 1.0;
+        const electroChemicalEquivalent = 0.000329; 
+        let totalMassChangeCathode = 0;
+        let totalMassChangeAnode = 0;
+
+        // 濃度模擬常數
+        const initialOpacity = 0.4; // 初始透明度
+        let currentConcentration = 1.0; // 1.0 = 100%
+
+        // --- DOM 元素 ---
+        const btnToggle = document.getElementById('btn-toggle');
+        const btnReset = document.getElementById('btn-reset');
+        const slider = document.getElementById('currentSlider');
+        const selectElectrode = document.getElementById('electrodeSelect');
+        const currentValDisplay = document.getElementById('currentVal');
+        const timerDisplay = document.getElementById('timer');
+        const anodeMassDisplay = document.getElementById('anode-mass');
+        const cathodeMassDisplay = document.getElementById('cathode-mass');
+        const solutionStatusDisplay = document.getElementById('solution-status');
+        const colorDot = document.getElementById('color-dot');
+        const beaker = document.getElementById('beaker');
+        
+        const anodeRod = document.getElementById('anode-rod');
+        const cathodeRod = document.getElementById('cathode-rod');
+        const cathodeCoating = document.getElementById('cathode-coating');
+        const electronLayer = document.getElementById('electron-layer');
+        const particleContainer = document.getElementById('particle-container');
+        const anodeReactionText = document.getElementById('anode-reaction-text');
+
+        // --- 事件監聽 ---
+        slider.addEventListener('input', (e) => {
+            current = parseFloat(e.target.value);
+            currentValDisplay.textContent = current.toFixed(1);
+        });
+
+        selectElectrode.addEventListener('change', (e) => {
+            resetExperiment();
+            electrodeType = e.target.value;
+            updateElectrodeAppearance();
+            updateReactionInfo();
+        });
+
+        btnToggle.addEventListener('click', toggleExperiment);
+        btnReset.addEventListener('click', resetExperiment);
+
+        // --- 功能函數 ---
+
+        function updateElectrodeAppearance() {
+            anodeRod.className = `electrode anode mat-${electrodeType}`;
+            cathodeRod.className = `electrode cathode mat-${electrodeType}`;
+            
+            if (electrodeType === 'carbon') {
+                cathodeCoating.style.opacity = 0;
+            } else {
+                cathodeCoating.style.opacity = 0;
+            }
+        }
+
+        function updateReactionInfo() {
+            if (electrodeType === 'copper') {
+                anodeReactionText.innerHTML = "Cu(s) → Cu<sup>2+</sup>(aq) + 2e<sup>-</sup>";
+            } else {
+                anodeReactionText.innerHTML = "2H<sub>2</sub>O → O<sub>2</sub> + 4H<sup>+</sup> + 4e<sup>-</sup>";
+            }
+        }
+
+        function toggleExperiment() {
+            if (isRunning) {
+                isRunning = false;
+                btnToggle.textContent = "繼續反應 (ON)";
+                btnToggle.className = "btn-start";
+                clearInterval(intervalId);
+                cancelAnimationFrame(animationFrameId);
+                particleContainer.innerHTML = ''; 
+                electronLayer.innerHTML = '';
+            } else {
+                isRunning = true;
+                btnToggle.textContent = "暫停反應 (OFF)";
+                btnToggle.className = "btn-stop";
+                btnToggle.style.display = "block";
+                intervalId = setInterval(updateData, 100);
+                animationLoop();
+            }
+        }
+
+        function updateData() {
+            timer += 0.1;
+            timerDisplay.textContent = timer.toFixed(1);
+
+            let delta = electroChemicalEquivalent * current * 10; 
+            totalMassChangeCathode += delta;
+
+            // --- 陽極變化 ---
+            if (electrodeType === 'copper') {
+                totalMassChangeAnode += delta;
+                let scale = Math.max(0.1, 1 - (totalMassChangeAnode / 5)); 
+                anodeRod.style.transform = `scaleX(${scale})`;
+
+                anodeMassDisplay.textContent = "-" + totalMassChangeAnode.toFixed(2) + " g";
+                anodeMassDisplay.className = "mass-change decrease";
+                
+                // 銅棒：濃度不變，重設為 100%
+                updateSolutionColor(1.0);
+            } else {
+                anodeMassDisplay.textContent = "0.00 g";
+                anodeMassDisplay.className = "mass-change"; 
+                
+                // 碳棒：濃度下降
+                // 假設 8g 銅析出後溶液幾乎無色 (模擬係數)
+                let depletionRatio = totalMassChangeCathode / 8.0;
+                let newConcentration = Math.max(0, 1.0 - depletionRatio);
+                updateSolutionColor(newConcentration);
+            }
+
+            // --- 陰極變化 ---
+            let cathodeScale = 1 + (totalMassChangeCathode / 5);
+            cathodeRod.style.transform = `scaleX(${cathodeScale})`;
+
+            if (electrodeType === 'carbon') {
+                let opacity = Math.min(1, totalMassChangeCathode * 2); 
+                cathodeCoating.style.opacity = opacity;
+            }
+
+            cathodeMassDisplay.textContent = "+" + totalMassChangeCathode.toFixed(2) + " g";
+        }
+
+        function updateSolutionColor(concentration) {
+            currentConcentration = concentration;
+            
+            // 計算新的透明度 (0 ~ 0.4)
+            let newOpacity = initialOpacity * concentration;
+            beaker.style.backgroundColor = `rgba(0, 150, 255, ${newOpacity})`;
+            
+            // 更新文字與色點
+            colorDot.style.backgroundColor = `rgba(0, 150, 255, ${Math.max(0.1, concentration)})`; // 保持一點顏色以便辨識
+            
+            if (concentration > 0.8) {
+                solutionStatusDisplay.textContent = "深藍色";
+                solutionStatusDisplay.style.color = "#0055aa";
+            } else if (concentration > 0.4) {
+                solutionStatusDisplay.textContent = "藍色";
+                solutionStatusDisplay.style.color = "#4488cc";
+            } else if (concentration > 0.1) {
+                solutionStatusDisplay.textContent = "淡藍色";
+                solutionStatusDisplay.style.color = "#88bbdd";
+            } else {
+                solutionStatusDisplay.textContent = "接近無色";
+                solutionStatusDisplay.style.color = "#aaa";
+            }
+        }
+
+        // --- 動畫系統 ---
+        let lastElectronTime = 0;
+        let lastParticleTime = 0;
+
+        function animationLoop(timestamp) {
+            if (!isRunning) return;
+
+            const spawnRate = 800 / current;
+
+            if (!lastElectronTime) lastElectronTime = timestamp;
+            if (!lastParticleTime) lastParticleTime = timestamp;
+
+            if (timestamp - lastElectronTime > spawnRate) {
+                createElectron();
+                lastElectronTime = timestamp;
+            }
+
+            if (timestamp - lastParticleTime > spawnRate) {
+                if (electrodeType === 'copper') {
+                    createCopperIon();
+                } else {
+                    createOxygenBubble();
+                    // 碳棒模式下，濃度越低，溶液中的離子越少，生成機率降低
+                    if(Math.random() < currentConcentration) {
+                        createSolutionIon(); 
+                    }
+                }
+                lastParticleTime = timestamp;
+            }
+
+            animationFrameId = requestAnimationFrame(animationLoop);
+        }
+
+        function createElectron() {
+            const el = document.createElement('div');
+            el.className = 'electron';
+            electronLayer.appendChild(el);
+            
+            const animation = el.animate([
+                { left: '131px', top: '220px', opacity: 1 },
+                { left: '131px', top: '78px', opacity: 1, offset: 0.3 },
+                { left: '261px', top: '78px', opacity: 1, offset: 0.7 },
+                { left: '261px', top: '220px', opacity: 0 }
+            ], {
+                duration: 2000 / current,
+                easing: 'linear'
+            });
+            
+            el.style.display = 'block';
+            animation.onfinish = () => el.remove();
+        }
+
+        function createCopperIon() {
+            const ion = document.createElement('div');
+            ion.className = 'ion';
+            ion.innerHTML = "Cu<sup>2+</sup>";
+            particleContainer.appendChild(ion);
+
+            const startY = Math.random() * 120 + 30;
+            const endY = Math.random() * 120 + 30;
+
+            const animation = ion.animate([
+                { left: '40px', top: `${startY}px`, opacity: 0, transform: 'scale(0.5)' },
+                { left: '50px', top: `${startY}px`, opacity: 1, transform: 'scale(1)' },
+                { left: '180px', top: `${(startY+endY)/2}px`, opacity: 1, transform: 'scale(1)' },
+                { left: '200px', top: `${endY}px`, opacity: 0, transform: 'scale(0.5)' }
+            ], {
+                duration: 3000 / current,
+                easing: 'ease-in-out'
+            });
+            animation.onfinish = () => ion.remove();
+        }
+
+        function createOxygenBubble() {
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            particleContainer.appendChild(bubble);
+
+            const startX = Math.random() * 30 + 45;
+            const startY = Math.random() * 100 + 50;
+
+            const animation = bubble.animate([
+                { left: `${startX}px`, top: `${startY}px`, opacity: 0 },
+                { left: `${startX}px`, top: `${startY}px`, opacity: 1, offset: 0.1 },
+                { left: `${startX + (Math.random()*10-5)}px`, top: '0px', opacity: 0 }
+            ], {
+                duration: 2500,
+                easing: 'ease-in'
+            });
+            animation.onfinish = () => bubble.remove();
+        }
+
+        function createSolutionIon() {
+            const ion = document.createElement('div');
+            ion.className = 'ion';
+            ion.innerHTML = "Cu<sup>2+</sup>";
+            particleContainer.appendChild(ion);
+            
+            const startY = Math.random() * 150 + 20;
+            const endY = Math.random() * 150 + 20;
+
+            const animation = ion.animate([
+                { left: '125px', top: `${startY}px`, opacity: 0 },
+                { left: '125px', top: `${startY}px`, opacity: 1, offset: 0.2 },
+                { left: '200px', top: `${endY}px`, opacity: 0, transform: 'scale(0.5)' }
+            ], {
+                duration: 2500 / current,
+                easing: 'ease-out'
+            });
+            animation.onfinish = () => ion.remove();
+        }
+
+        function resetExperiment() {
+            isRunning = false;
+            btnToggle.textContent = "開始反應 (ON)";
+            btnToggle.className = "btn-start";
+            clearInterval(intervalId);
+            cancelAnimationFrame(animationFrameId);
+            particleContainer.innerHTML = '';
+            electronLayer.innerHTML = '';
+
+            timer = 0;
+            totalMassChangeCathode = 0;
+            totalMassChangeAnode = 0;
+            timerDisplay.textContent = "0.0";
+            anodeMassDisplay.textContent = "0.00 g";
+            cathodeMassDisplay.textContent = "0.00 g";
+            anodeMassDisplay.className = "mass-change decrease";
+            
+            anodeRod.style.transform = "scaleX(1)";
+            cathodeRod.style.transform = "scaleX(1)";
+            cathodeCoating.style.opacity = 0;
+
+            // 重置顏色
+            updateSolutionColor(1.0);
+        }
+    </script>
+</body>
+</html>

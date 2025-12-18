@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>靜電感應 (平均分佈修正版) - 小粘製作</title>
+    <style>
+        body {
+            font-family: 'Microsoft JhengHei', sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .credit {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: #555;
+            border: 1px solid #ccc;
+            pointer-events: none;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        #canvas-area {
+            position: relative;
+        }
+
+        canvas {
+            border: 2px solid #eee;
+            border-radius: 10px;
+            background: #fff;
+            cursor: crosshair;
+        }
+
+        .controls {
+            width: 260px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        h3 { margin: 0 0 10px 0; color: #333; font-size: 18px; text-align: center;}
+        
+        select, button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button#toggleGround {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            transition: 0.3s;
+        }
+        button#toggleGround.active { background-color: #28a745; }
+        button#toggleGround:hover { opacity: 0.9; }
+
+        button#resetBtn { background-color: #6c757d; color: white; border: none; }
+        
+        .status {
+            margin-top: 5px;
+            color: #d63384;
+            font-weight: bold;
+            font-size: 13px;
+            line-height: 1.5;
+            min-height: 80px;
+            background: #fff0f5;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .info { font-size: 13px; color: #666; margin-bottom: 10px;}
+    </style>
+</head>
+<body>
+
+    <div class="credit">小粘製作 (修正版)</div>
+
+    <div class="container">
+        <div id="canvas-area">
+            <canvas id="simCanvas" width="800" height="500"></canvas>
+        </div>
+
+        <div class="controls">
+            <div class="panel">
+                <h3>控制面板</h3>
+                <div class="info">
+                    <strong>修正重點：</strong><br>
+                    現在當帶電棒移入無作用區時，電子會因為「電荷平衡」機制自動流回並<strong>均勻分佈</strong>於導體表面。
+                </div>
+                <label>1. 帶電棒狀態</label>
+                <select id="rodSelect">
+                    <option value="0">電中性 (無電)</option>
+                    <option value="1">帶正電 (+)</option>
+                    <option value="-1">帶負電 (-)</option>
+                </select>
+
+                <label>2. 操作</label>
+                <button id="toggleGround">接地開關 (手觸摸)</button>
+                <button id="resetBtn">重置位置</button>
+            </div>
+            
+            <div id="statusText" class="status"></div>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('statusText');
+    
+    // --- 參數設定 ---
+    const DEAD_ZONE_X = 180; // 無作用區邊界
+    
+    let rod = { x: 80, y: 250, charge: 0, dragging: false };
+    const sphere = { x: 500, y: 250, r: 100 };
+    const groundPoint = { x: sphere.x + sphere.r, y: sphere.y };
+    
+    let isGrounded = false;
+    let particles = []; 
+    const numPairs = 24; 
+    const ELECTRON_SPACING = 22; // 稍微增加間距讓分佈更鬆散
+    
+    // 初始化
+    function init() {
+        particles = [];
+        const goldenAngle = Math.PI * (3 - Math.sqrt(5)); 
+        for(let i=0; i<numPairs; i++) {
+            let r = sphere.r * 0.85 * Math.sqrt((i + 0.5) / numPairs);
+            let theta = i * goldenAngle;
+            let px = sphere.x + r * Math.cos(theta);
+            let py = sphere.y + r * Math.sin(theta);
+
+            particles.push({ x: px, y: py, type: 1, id: i }); 
+
+            particles.push({ 
+                x: px, y: py, 
+                type: -1, 
+                state: 'normal',
+                targetId: i, 
+                isNeutralizer: false, 
+                tx: px, ty: py 
+            });
+        }
+        updateStatus();
+    }
+
+    function update() {
+        
+        // 1. 計算影響力 (Influence Logic)
+        let dist = Math.sqrt((rod.x - sphere.x)**2 + (rod.y - sphere.y)**2);
+        let influence = 0;
+        let inDeadZone = (rod.x < DEAD_ZONE_X);
+
+        if (!inDeadZone && rod.charge !== 0) {
+            if (dist < 450) {
+                influence = 1 - (dist - 130) / 320;
+                if (influence < 0) influence = 0;
+                if (influence > 1) influence = 1;
+            }
+        } else {
+            influence = 0;
+        }
+
+        // 2. 接地邏輯
+        if (isGrounded) handleGrounding(influence);
+
+        // --- 修正核心：計算電子重心 (Center of Electron Mass) ---
+        // 用於在無感應時，將偏心的電子群拉回中心
+        let activeElectrons = particles.filter(p => p.type === -1 && p.state === 'normal');
+        let avgX = 0, avgY = 0;
+        if (activeElectrons.length > 0) {
+            activeElectrons.forEach(p => { avgX += p.x; avgY += p.y; });
+            avgX /= activeElectrons.length;
+            avgY /= activeElectrons.length;
+        }
+        // 計算重心偏移向量
+        let driftX = (sphere.x - avgX) * 0.05; // 恢復係數
+        let driftY = (sphere.y - avgY) * 0.05;
+
+
+        // 3. 設定電子目標位置
+        particles.forEach(p => {
+            if (p.type === 1) return; // 正電荷不動
+
+            // A. 流出模式
+            if (p.state === 'flowing_out') {
+                p.tx = groundPoint.x; 
+                p.ty = groundPoint.y + 250;
+            } 
+            // B. 正常模式
+            else {
+                // --- 無感應 (棒子在無作用區 OR 斷電) ---
+                if (influence === 0) {
+                    p.isNeutralizer = false;
+                    
+                    // [修正] 不再強迫找「最近」的質子，而是找「目標」質子並疊加全局恢復力
+                    let host = findNearestProton(p); 
+                    if (!host) host = {x: sphere.x, y: sphere.y};
+
+                    // 基礎目標是質子（保持晶格結構）
+                    p.tx = host.x;
+                    p.ty = host.y;
+
+                    // [關鍵修正] 如果電子分佈不均（重心偏移），疊加一個全域的漂移力
+                    // 這模擬了長程庫倫斥力，將電子推向空曠處
+                    p.tx += driftX * 15; 
+                    p.ty += driftY * 15;
+
+                    // [裝飾] 加入微小的隨機抖動 (熱運動)，幫助打破死結
+                    p.tx += (Math.random() - 0.5) * 5;
+                    p.ty += (Math.random() - 0.5) * 5;
+                }
+                // --- 有感應 ---
+                else {
+                    let host = findNearestProton(p);
+                    if (!host) host = {x: sphere.x, y: sphere.y};
+                    let originX = host.x;
+                    let originY = host.y;
+
+                    if (rod.charge > 0) {
+                        // 棒(+)
+                        if (p.isNeutralizer) {
+                            let targetProton = particles.find(h => h.id === p.targetId && h.type === 1);
+                            if(!targetProton) targetProton = {x: sphere.x + 50, y: sphere.y};
+                            p.tx = targetProton.x;
+                            p.ty = targetProton.y;
+                        } else {
+                            let leftWallX = sphere.x - sphere.r + 15;
+                            p.tx = originX * (1 - influence) + leftWallX * influence;
+                            p.ty = originY; 
+                        }
+
+                    } else if (rod.charge < 0) {
+                        // 棒(-)
+                        let rightWallX = sphere.x + sphere.r - 15;
+                        p.tx = originX * (1 - influence) + rightWallX * influence;
+                        p.ty = originY;
+                    }
+                }
+            }
+        });
+
+        // 4. 移動
+        particles.forEach(p => {
+            if (p.type === 1) return;
+            let speed = (p.state === 'flowing_in') ? 0.3 : 0.12;
+            p.x += (p.tx - p.x) * speed;
+            p.y += (p.ty - p.y) * speed;
+
+            if (p.state === 'flowing_in' && Math.hypot(p.x-p.tx, p.y-p.ty) < 10) p.state = 'normal';
+        });
+
+        // 5. 全域互斥 (平均分佈的核心)
+        applySpacingConstraints();
+
+        // 6. 邊界與清理
+        particles.forEach(p => {
+            if (p.type === -1 && p.state !== 'flowing_out') {
+                let dFromCenter = Math.hypot(p.x - sphere.x, p.y - sphere.y);
+                // 稍微放寬邊界，讓過剩電荷可以貼在表面
+                let limitR = sphere.r - 6; 
+                if (dFromCenter > limitR) {
+                    let angle = Math.atan2(p.y - sphere.y, p.x - sphere.x);
+                    p.x = sphere.x + limitR * Math.cos(angle);
+                    p.y = sphere.y + limitR * Math.sin(angle);
+                }
+            }
+        });
+        
+        particles = particles.filter(p => p.y < canvas.height + 20);
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    // --- 接地邏輯 ---
+    function handleGrounding(influence) {
+        if (Math.random() > 0.3) return; 
+
+        if (influence === 0) {
+            let totalProtons = particles.filter(p => p.type === 1).length;
+            let totalElectrons = particles.filter(p => p.type === -1 && p.state !== 'flowing_out').length;
+            let incoming = particles.filter(p => p.state === 'flowing_in').length;
+            
+            if (totalProtons > totalElectrons + incoming) {
+                 particles.push({
+                    x: groundPoint.x, y: groundPoint.y + 150,
+                    type: -1, state: 'flowing_in',
+                    targetId: -1, 
+                    isNeutralizer: false, 
+                    tx: sphere.x, ty: sphere.y 
+                });
+            }
+            else if (totalElectrons > totalProtons) {
+                let candidates = particles.filter(p => p.type === -1 && p.state !== 'flowing_out');
+                candidates.sort((a,b) => b.x - a.x);
+                if(candidates.length > 0) {
+                    let v = candidates[0];
+                    if(v.x > sphere.x + sphere.r - 30) v.state = 'flowing_out';
+                }
+            }
+            return;
+        }
+
+        let rightProtons = particles.filter(p => p.type === 1 && p.x > sphere.x);
+        let rightElectrons = particles.filter(p => p.type === -1 && p.x > sphere.x && p.state !== 'flowing_out');
+        let incoming = particles.filter(p => p.state === 'flowing_in');
+
+        if (rod.charge > 0) {
+            let deficit = rightProtons.length - (rightElectrons.length + incoming.length);
+            if (deficit > 0) {
+                let target = findLonelyRightProton(rightProtons);
+                particles.push({
+                    x: groundPoint.x, y: groundPoint.y + 150,
+                    type: -1, state: 'flowing_in',
+                    targetId: target.id, isNeutralizer: true,
+                    tx: target.x, ty: target.y
+                });
+            }
+        } 
+        else if (rod.charge < 0) {
+            let excess = rightElectrons.length - rightProtons.length;
+            if (excess > 0) {
+                let candidates = rightElectrons.sort((a,b) => b.x - a.x);
+                if (candidates.length > 0) {
+                    let victim = candidates[0];
+                    if (victim.x > sphere.x + sphere.r - 25) victim.state = 'flowing_out';
+                }
+            }
+        }
+        updateStatus();
+    }
+
+    // --- 空間約束 (平均分佈) ---
+    function applySpacingConstraints() {
+        let electrons = particles.filter(p => p.type === -1 && p.state !== 'flowing_out');
+        // 增加迭代次數，讓推擠更滑順
+        for(let iter=0; iter<10; iter++) {
+            for(let i=0; i<electrons.length; i++) {
+                for(let j=i+1; j<electrons.length; j++) {
+                    let p1 = electrons[i];
+                    let p2 = electrons[j];
+                    let dx = p2.x - p1.x;
+                    let dy = p2.y - p1.y;
+                    let distSq = dx*dx + dy*dy;
+                    
+                    // 如果距離太近，用力推開
+                    if (distSq < ELECTRON_SPACING * ELECTRON_SPACING && distSq > 0.1) {
+                        let dist = Math.sqrt(distSq);
+                        let overlap = ELECTRON_SPACING - dist;
+                        let nx = dx/dist; let ny = dy/dist;
+                        let force = 0.6; // 推力係數
+                        p1.x -= nx * overlap * force; p1.y -= ny * overlap * force;
+                        p2.x += nx * overlap * force; p2.y += ny * overlap * force;
+                    }
+                }
+            }
+        }
+    }
+
+    function findNearestProton(e) {
+        let minD = 9999, target = null;
+        particles.filter(p => p.type === 1).forEach(p => { 
+            let d = Math.hypot(e.x - p.x, e.y - p.y); 
+            if (d < minD) { minD = d; target = p; }
+        });
+        return target;
+    }
+
+    function findLonelyRightProton(protons) {
+        for(let p of protons) {
+            let has = particles.some(e => e.type === -1 && e.state !== 'flowing_out' && Math.hypot(e.x - p.x, e.y - p.y) < 25);
+            let coming = particles.some(e => e.state === 'flowing_in' && e.targetId === p.id);
+            if (!has && !coming) return p;
+        }
+        return protons.length > 0 ? protons[0] : {x:sphere.x+50,y:sphere.y, id:-1};
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 畫無作用區
+        ctx.fillStyle = "#e9ecef"; ctx.fillRect(0, 0, DEAD_ZONE_X, canvas.height);
+        ctx.beginPath(); ctx.moveTo(DEAD_ZONE_X, 0); ctx.lineTo(DEAD_ZONE_X, canvas.height);
+        ctx.setLineDash([5, 5]); ctx.strokeStyle = "#adb5bd"; ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = "#6c757d"; ctx.font = "bold 16px Arial"; ctx.fillText("無作用區", 50, 40);
+
+        // 底座
+        ctx.fillStyle = "#aaa"; ctx.fillRect(sphere.x-10, sphere.y+sphere.r, 20, 140); ctx.fillRect(sphere.x-40, 490, 80, 10);
+        
+        // 接地線
+        if (isGrounded) {
+            let gx=groundPoint.x+40, gy=groundPoint.y+150;
+            ctx.beginPath(); ctx.moveTo(sphere.x+sphere.r-2, sphere.y); ctx.lineTo(gx, sphere.y); ctx.lineTo(gx, gy);
+            ctx.strokeStyle="#444"; ctx.lineWidth=4; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(gx-20, gy); ctx.lineTo(gx+20, gy);
+            ctx.moveTo(gx-14, gy+6); ctx.lineTo(gx+14, gy+6);
+            ctx.moveTo(gx-7, gy+12); ctx.lineTo(gx+7, gy+12); ctx.stroke();
+        }
+
+        // 金屬球
+        ctx.beginPath(); ctx.arc(sphere.x, sphere.y, sphere.r, 0, Math.PI*2);
+        let grad = ctx.createRadialGradient(sphere.x-30, sphere.y-30, 10, sphere.x, sphere.y, sphere.r);
+        grad.addColorStop(0, "#fff"); grad.addColorStop(1, "#dde");
+        ctx.fillStyle = grad; ctx.fill(); ctx.strokeStyle = "#889"; ctx.lineWidth = 3; ctx.stroke();
+
+        // 粒子
+        particles.forEach(p => {
+            ctx.font = "bold 20px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            if (p.type === 1) {
+                ctx.fillStyle = "rgba(220, 60, 60, 0.4)"; ctx.fillText("+", p.x, p.y);
+            } else {
+                ctx.fillStyle = "#0056b3"; 
+                if (p.state !== 'normal') { ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill(); }
+                else { ctx.fillText("-", p.x, p.y - 1); }
+            }
+        });
+
+        // 帶電棒
+        ctx.save(); ctx.translate(rod.x, rod.y);
+        ctx.fillStyle = rod.charge === 0 ? "#ccc" : (rod.charge > 0 ? "#ff6b6b" : "#4dabf7");
+        ctx.fillRect(-20, -100, 40, 200); ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.strokeRect(-20, -100, 40, 200);
+        ctx.fillStyle = "white"; let sym = rod.charge > 0 ? "+" : (rod.charge < 0 ? "-" : "");
+        if(sym) for(let i=0; i<5; i++) ctx.fillText(sym, 0, -60 + i*30);
+        ctx.fillStyle = "#8b5a2b"; ctx.fillRect(-10, 100, 20, 50); ctx.restore();
+    }
+
+    function updateStatus() {
+        let eCount = particles.filter(p => p.type === -1).length;
+        let pCount = particles.filter(p => p.type === 1).length;
+        let diff = pCount - eCount;
+        let chargeState = diff > 0 ? "帶正電" : (diff < 0 ? "帶負電" : "電中性");
+        
+        let inZone = rod.x < DEAD_ZONE_X;
+        let dist = Math.sqrt((rod.x - sphere.x)**2 + (rod.y - sphere.y)**2);
+        let influence = (!inZone && dist < 450 && rod.charge !== 0) ? Math.round((1 - (dist - 130) / 320)*100) : 0;
+        
+        let txt = `位置: ${inZone ? '<span style="color:red">無作用區</span>' : '感應區'} (靜電力: ${influence}%)<br>`;
+        txt += isGrounded ? "狀態: <strong>接地中</strong>" : "狀態: 絕緣中";
+        txt += `<br>球體總電量: ${chargeState} (正:${pCount} 負:${eCount})`;
+        
+        statusText.innerHTML = txt;
+    }
+
+    function handleStart(x, y) { if (Math.abs(x - rod.x) < 50 && Math.abs(y - rod.y) < 130) rod.dragging = true; }
+    function handleMove(x, y) { 
+        if(rod.dragging) {
+            rod.x = Math.max(50, Math.min(x, sphere.x - sphere.r - 30));
+            updateStatus();
+        }
+    }
+    canvas.addEventListener('mousedown', e => { let r=canvas.getBoundingClientRect(); handleStart(e.clientX-r.left, e.clientY-r.top); });
+    window.addEventListener('mouseup', () => rod.dragging = false);
+    canvas.addEventListener('mousemove', e => { let r=canvas.getBoundingClientRect(); handleMove(e.clientX-r.left, e.clientY-r.top); });
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); let r=canvas.getBoundingClientRect(); handleStart(e.touches[0].clientX-r.left, e.touches[0].clientY-r.top); }, {passive:false});
+    window.addEventListener('touchend', () => rod.dragging = false);
+    canvas.addEventListener('touchmove', e => { e.preventDefault(); let r=canvas.getBoundingClientRect(); handleMove(e.touches[0].clientX-r.left, e.touches[0].clientY-r.top); }, {passive:false});
+
+    document.getElementById('rodSelect').addEventListener('change', function() { rod.charge = parseInt(this.value); updateStatus(); });
+    document.getElementById('toggleGround').addEventListener('click', function() { isGrounded = !isGrounded; this.classList.toggle('active'); updateStatus(); });
+    document.getElementById('resetBtn').addEventListener('click', function() { rod.x = 80; rod.charge = 0; document.getElementById('rodSelect').value = "0"; isGrounded = false; document.getElementById('toggleGround').classList.remove('active'); init(); });
+
+    init(); update();
+</script>
+</body>
+</html>

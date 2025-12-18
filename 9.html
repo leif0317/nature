@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>全能光學實驗室 (左右分欄版)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; font-family: "Microsoft JhengHei", sans-serif; }
+        canvas { display: block; }
+
+        /* 通用面板樣式 */
+        .panel {
+            position: absolute;
+            background: rgba(40, 40, 40, 0.95);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #666;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.7);
+            user-select: none;
+            width: 260px;
+        }
+
+        /* 左上角：控制區 */
+        #control-panel {
+            top: 20px;
+            left: 20px;
+        }
+
+        /* 右上角：數據區 */
+        #info-panel {
+            top: 20px;
+            right: 20px;
+        }
+
+        h2 { margin: 0 0 15px 0; border-bottom: 2px solid #00eebb; padding-bottom: 8px; text-align: center; font-size: 1.3rem; }
+        h3 { margin: 0 0 10px 0; border-bottom: 1px dashed #666; padding-bottom: 5px; text-align: center; font-size: 1.1rem; color: #ddd; }
+        
+        /* 控制元件 */
+        label { display: block; margin-bottom: 8px; color: #ccc; font-size: 0.95rem; }
+        select { width: 100%; padding: 10px; background: #333; color: #fff; border: 1px solid #00eebb; border-radius: 4px; font-size: 1rem; cursor: pointer; }
+        select:focus { outline: none; border-color: #ffdd00; }
+        
+        optgroup { color: #aaa; font-style: italic; }
+        option { color: #fff; font-style: normal; }
+
+        .hint { margin-top: 15px; font-size: 0.9rem; color: #aaa; text-align: center; }
+        .highlight { color: #ff6666; font-weight: bold; }
+
+        /* 數據顯示 */
+        .info-row { margin-bottom: 8px; display: flex; justify-content: space-between; font-size: 1rem; }
+        .val { font-weight: bold; color: #00eebb; }
+        
+        #image-desc {
+            margin-top: 15px; padding: 12px;
+            background: rgba(0,0,0,0.3); border-radius: 6px;
+            text-align: center; font-weight: bold; font-size: 1.1rem;
+            color: #ffcc00; border: 1px dashed #555;
+        }
+
+        /* 署名樣式 (加大) */
+        #author { 
+            margin-top: 20px; 
+            text-align: right; 
+            font-size: 1.2rem; /* 加大 */
+            font-weight: bold; 
+            color: #888; 
+            font-style: italic;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="control-panel" class="panel">
+        <h2>光學成像實驗室</h2>
+        
+        <label>選擇光學元件：</label>
+        <select id="optic-select">
+            <optgroup label="面鏡 (反射)">
+                <option value="concave-mirror">凹面鏡 (聚光)</option>
+                <option value="convex-mirror">凸面鏡 (發散)</option>
+                <option value="plane-mirror">平面鏡 (等大)</option>
+            </optgroup>
+            <optgroup label="透鏡 (折射)">
+                <option value="convex-lens">凸透鏡 (聚光)</option>
+                <option value="concave-lens">凹透鏡 (發散)</option>
+            </optgroup>
+        </select>
+
+        <p class="hint">請拖曳 <span class="highlight">機器貓</span> 移動位置</p>
+    </div>
+
+    <div id="info-panel" class="panel">
+        <h3>成像數據</h3>
+        <div class="info-row"><span>物距 (p):</span> <span id="val-p" class="val">--</span></div>
+        <div class="info-row"><span>像距 (q):</span> <span id="val-q" class="val">--</span></div>
+        <div class="info-row"><span>放大率 (m):</span> <span id="val-m" class="val">--</span></div>
+        
+        <div id="image-desc">初始化中...</div>
+        
+        <div id="author">小粘製作</div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let w, h, cx, cy;
+
+        // --- 物理參數 ---
+        let opticType = 'concave-mirror'; 
+        let isLens = false;               
+        
+        const F_MAG = 120; // 焦距
+        let f = 120;       
+        
+        let objX = -240;   
+        const OBJ_H = 60;  
+
+        // --- 互動狀態 ---
+        let isDragging = false;
+        let dragOffset = 0;
+
+        // --- 初始化 ---
+        function init() {
+            window.addEventListener('resize', resize);
+            canvas.addEventListener('mousedown', onDown);
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+            canvas.addEventListener('touchstart', (e) => onDown(e.touches[0]));
+            window.addEventListener('touchmove', (e) => onMove(e.touches[0]));
+            window.addEventListener('touchend', onUp);
+
+            document.getElementById('optic-select').addEventListener('change', (e) => {
+                opticType = e.target.value;
+                updateParams();
+                draw();
+            });
+            
+            resize();
+        }
+
+        function updateParams() {
+            isLens = false;
+            switch(opticType) {
+                case 'concave-mirror': f = F_MAG; break;
+                case 'convex-mirror':  f = -F_MAG; break;
+                case 'plane-mirror':   f = Infinity; break;
+                case 'convex-lens':    f = F_MAG; isLens = true; break;
+                case 'concave-lens':   f = -F_MAG; isLens = true; break;
+            }
+        }
+
+        function resize() {
+            w = canvas.width = window.innerWidth;
+            h = canvas.height = window.innerHeight;
+            cx = w / 2; 
+            cy = h / 2;
+            draw();
+        }
+
+        // --- 互動邏輯 ---
+        function onDown(e) {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left - cx;
+            const my = e.clientY - rect.top - cy;
+            if (mx > objX - 40 && mx < objX + 40 && my > -OBJ_H - 40 && my < 10) {
+                isDragging = true;
+                dragOffset = mx - objX;
+                document.body.style.cursor = 'grabbing';
+            }
+        }
+
+        function onMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left - cx;
+            const my = e.clientY - rect.top - cy;
+
+            if (isDragging) {
+                let newX = mx - dragOffset;
+                if (newX > -10) newX = -10; 
+                if (newX < -w/2 + 20) newX = -w/2 + 20;
+                objX = newX;
+                draw();
+            } else {
+                if (mx > objX - 40 && mx < objX + 40 && my > -OBJ_H - 40 && my < 10) {
+                    document.body.style.cursor = 'grab';
+                } else {
+                    document.body.style.cursor = 'default';
+                }
+            }
+        }
+
+        function onUp() {
+            isDragging = false;
+            document.body.style.cursor = 'default';
+        }
+
+        // --- 繪圖核心 ---
+        function draw() {
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.save();
+            ctx.translate(cx, cy); 
+
+            drawAxis();
+            drawOpticElement(); 
+            drawFocalPoints();
+
+            // --- 計算成像 ---
+            const p = -objX; 
+            let q = Infinity;
+            let m = 1;
+            let imgH = 0;
+            let imgX = 0;
+            let hasImage = true;
+
+            if (opticType === 'plane-mirror') {
+                q = -p; m = 1; imgH = OBJ_H; 
+                imgX = -q; 
+                updateInfo(p, q, m);
+            } else {
+                if (Math.abs(p - f) < 1 && f > 0) {
+                    hasImage = false;
+                    updateInfo(p, Infinity, Infinity);
+                } else {
+                    q = (p * f) / (p - f);
+                    m = -q / p; 
+                    imgH = OBJ_H * m;
+                    imgX = isLens ? q : -q; 
+                    updateInfo(p, q, m);
+                }
+            }
+
+            // 4. 畫像
+            if (hasImage) {
+                ctx.globalAlpha = 0.5;
+                ctx.save();
+                ctx.translate(imgX, 0);
+                let flipY = (m < 0) ? -1 : 1;
+                let scaleFactor = Math.abs(m);
+                ctx.scale(scaleFactor, flipY * scaleFactor);
+                if(opticType === 'plane-mirror') ctx.scale(-1, 1);
+                
+                drawDoraemon();
+                ctx.restore();
+                ctx.globalAlpha = 1.0;
+            }
+
+            // 5. 畫光路
+            drawRays(p, OBJ_H, q, imgH, hasImage, imgX);
+
+            // 6. 畫物體
+            ctx.save();
+            ctx.translate(objX, 0);
+            drawDoraemon(); 
+            ctx.restore();
+
+            ctx.restore();
+        }
+
+        // --- 繪圖組件 ---
+
+        function drawAxis() {
+            ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(-w, 0); ctx.lineTo(w, 0); ctx.stroke();
+        }
+
+        function drawOpticElement() {
+            ctx.lineWidth = 4;
+            
+            if (isLens) {
+                ctx.fillStyle = "rgba(100, 200, 255, 0.2)";
+                ctx.strokeStyle = "#00eebb";
+                ctx.beginPath();
+                if (opticType === 'convex-lens') {
+                    ctx.ellipse(0, 0, 15, 150, 0, 0, Math.PI*2);
+                } else {
+                    ctx.moveTo(-10, -150); ctx.quadraticCurveTo(5, 0, -10, 150);
+                    ctx.lineTo(10, 150); ctx.quadraticCurveTo(-5, 0, 10, -150);
+                    ctx.closePath();
+                }
+                ctx.fill(); ctx.stroke();
+                ctx.lineWidth = 1; ctx.strokeStyle="rgba(255,255,255,0.3)";
+                ctx.beginPath(); ctx.moveTo(0,-150); ctx.lineTo(0,150); ctx.stroke();
+            } else {
+                ctx.strokeStyle = '#00aaff';
+                ctx.beginPath();
+                if (opticType === 'concave-mirror') {
+                    ctx.arc(-2 * F_MAG, 0, 2 * F_MAG, -Math.PI/6, Math.PI/6, false);
+                } else if (opticType === 'convex-mirror') {
+                    ctx.arc(2 * F_MAG, 0, 2 * F_MAG, Math.PI - Math.PI/6, Math.PI + Math.PI/6, false);
+                } else {
+                    ctx.moveTo(0, -150); ctx.lineTo(0, 150);
+                }
+                ctx.stroke();
+                
+                ctx.save();
+                ctx.strokeStyle = '#444'; ctx.lineWidth = 2; ctx.beginPath();
+                let isPlane = opticType === 'plane-mirror';
+                let isConvex = opticType === 'convex-mirror';
+                for(let y=-120; y<120; y+=10) {
+                    let x = 0;
+                    if(!isPlane) {
+                        let R = 2*F_MAG;
+                        x = (y*y)/(2*R); 
+                        if(isConvex) x = 2*F_MAG - Math.sqrt(R*R - y*y); 
+                    }
+                    ctx.moveTo(x, y); ctx.lineTo(x+10, y+10);
+                }
+                ctx.stroke(); ctx.restore();
+            }
+        }
+
+        function drawFocalPoints() {
+            if(opticType === 'plane-mirror') return;
+            const colF = '#ffdd00';
+            const col2F = '#ffaa00';
+
+            if (isLens) {
+                drawPoint(F_MAG, "F'", colF);
+                drawPoint(-F_MAG, "F", colF);
+                drawPoint(2*F_MAG, "2F'", col2F);
+                drawPoint(-2*F_MAG, "2F", col2F);
+            } else {
+                let fPos = (opticType === 'concave-mirror') ? -F_MAG : F_MAG;
+                let txt = (opticType === 'concave-mirror') ? 'F' : 'F(虛)';
+                drawPoint(fPos, txt, colF);
+                drawPoint(fPos * 2, 'C', col2F);
+            }
+        }
+
+        function drawDoraemon() {
+            ctx.fillStyle = '#0099ff'; ctx.beginPath(); ctx.ellipse(0, -35, 25, 28, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(0, -40, 20, 18, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle='#fff'; ctx.strokeStyle='#000'; ctx.lineWidth=1;
+            ctx.beginPath(); ctx.ellipse(-6,-52,6,7,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(-4,-52,1.5,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+            ctx.fillStyle='#fff'; 
+            ctx.beginPath(); ctx.ellipse(6,-52,6,7,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(4,-52,1.5,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+            ctx.fillStyle='#ff0000'; ctx.beginPath(); ctx.arc(0,-45,4,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0,-41); ctx.lineTo(0,-32); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0,-32,12,0,Math.PI,false); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-5,-40); ctx.lineTo(-20,-35); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(5,-40); ctx.lineTo(20,-35); ctx.stroke();
+            ctx.strokeStyle='#ff0000'; ctx.lineWidth=3;
+            ctx.beginPath(); ctx.moveTo(-18,-22); ctx.quadraticCurveTo(0,-18,18,-22); ctx.stroke();
+            ctx.fillStyle='#ffcc00'; ctx.lineWidth=1; ctx.strokeStyle='#000';
+            ctx.beginPath(); ctx.arc(0,-20,5,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,-12,12,0,Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(0,-12,10,0,Math.PI,false); ctx.stroke(); 
+            ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(-10,0,10,4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(10,0,10,4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        }
+
+        function drawPoint(x, label, color) {
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(x, 0, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#ccc'; ctx.font = '14px Arial'; ctx.fillText(label, x - 10, 25);
+        }
+
+        // --- 光路繪製 ---
+        function drawRays(p, oh, q, ih, hasImage, imgX) {
+            const ox = -p;
+            const oy = -oh;
+            const iy = (hasImage) ? -ih : 0; 
+            const isVirtual = (isLens) ? (q < 0) : (q < 0); 
+            const farDist = 600;
+
+            // 1. 紅線：平行入射
+            ctx.strokeStyle = '#ff4444'; ctx.lineWidth = 2; ctx.setLineDash([]);
+            ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(0, oy); ctx.stroke();
+            
+            ctx.beginPath(); ctx.moveTo(0, oy);
+            if (isLens) {
+                let fx = (opticType === 'convex-lens') ? F_MAG : -F_MAG;
+                let slope = (0 - oy) / (fx - 0);
+                ctx.lineTo(farDist, oy + slope * farDist);
+                ctx.stroke();
+
+                if (isVirtual) {
+                    ctx.setLineDash([5, 5]); ctx.strokeStyle = '#ffaaaa';
+                    ctx.beginPath(); ctx.moveTo(0, oy); 
+                    if(opticType === 'concave-lens') ctx.lineTo(-F_MAG, 0);
+                    ctx.lineTo(imgX, iy); 
+                    ctx.stroke();
+                }
+            } else {
+                if (opticType === 'plane-mirror') {
+                    ctx.lineTo(ox - 200, oy);
+                } else if (opticType === 'concave-mirror') {
+                    let slope = (0 - oy) / (-F_MAG - 0);
+                    let targetX = (isVirtual) ? ox - 100 : Math.min(ox, -q) - 100;
+                    ctx.lineTo(targetX, oy + slope * targetX);
+                } else {
+                    let slope = (oy - 0) / (0 - F_MAG);
+                    ctx.lineTo(ox - 200, oy + slope * (ox - 200));
+                }
+                ctx.stroke();
+
+                if (isVirtual || opticType === 'convex-mirror') {
+                    ctx.setLineDash([5, 5]); ctx.strokeStyle = '#ffaaaa';
+                    ctx.beginPath(); ctx.moveTo(0, oy); 
+                    if (opticType === 'convex-mirror') ctx.lineTo(F_MAG, 0); 
+                    else ctx.lineTo(imgX, iy); 
+                    ctx.stroke();
+                }
+            }
+
+            // 2. 綠線：過焦點入射 -> 平行出射
+            if (opticType !== 'plane-mirror') {
+                ctx.setLineDash([]); ctx.strokeStyle = '#00ff00';
+                
+                let aimF = 0;
+                if(opticType === 'concave-mirror') aimF = -F_MAG;
+                if(opticType === 'convex-mirror') aimF = F_MAG;
+                if(opticType === 'convex-lens') aimF = -F_MAG;
+                if(opticType === 'concave-lens') aimF = F_MAG;
+
+                let yHit = oy * aimF / (aimF - ox);
+
+                ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(0, yHit); ctx.stroke();
+                
+                ctx.beginPath(); ctx.moveTo(0, yHit);
+                if (isLens) ctx.lineTo(farDist, yHit); 
+                else ctx.lineTo(ox - 200, yHit);       
+                ctx.stroke();
+
+                if (isVirtual || opticType === 'convex-mirror' || opticType === 'concave-lens') {
+                    ctx.setLineDash([5, 5]); ctx.strokeStyle = '#aaffaa';
+                    ctx.beginPath(); ctx.moveTo(0, yHit);
+                    if (hasImage) ctx.lineTo(imgX, iy);
+                    if (opticType === 'convex-mirror' || opticType === 'concave-lens') {
+                         ctx.moveTo(0, yHit); ctx.lineTo(aimF, 0);
+                    }
+                    ctx.stroke();
+                }
+            }
+
+            // 3. 藍線：過鏡心/光心
+            ctx.strokeStyle = '#4488ff'; ctx.setLineDash([]);
+            ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(0, 0); ctx.stroke();
+            
+            ctx.beginPath(); ctx.moveTo(0, 0);
+            if (isLens) {
+                let slope = (0 - oy) / (0 - ox);
+                ctx.lineTo(farDist, slope * farDist);
+            } else {
+                let slope = - (oy / ox);
+                ctx.lineTo(ox - 200, (ox-200) * slope); 
+            }
+            ctx.stroke();
+
+            if (isVirtual && hasImage) {
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(imgX, iy); ctx.stroke();
+            }
+        }
+
+        function updateInfo(p, q, m) {
+            const elP = document.getElementById('val-p');
+            const elQ = document.getElementById('val-q');
+            const elM = document.getElementById('val-m');
+            const elDesc = document.getElementById('image-desc');
+
+            elP.innerText = p.toFixed(0);
+            
+            let desc = "";
+            let color = "";
+
+            if (!isFinite(q)) {
+                elQ.innerText = "∞"; elM.innerText = "∞";
+                desc = "不成像 (光線平行)"; color = "#ccc";
+            } else {
+                elQ.innerText = Math.abs(q).toFixed(0);
+                elM.innerText = Math.abs(m).toFixed(2) + "x";
+
+                let isReal = (q > 0);
+                if (isReal) { 
+                    let size = Math.abs(m) > 1.05 ? "放大" : (Math.abs(m) < 0.95 ? "縮小" : "相等");
+                    desc = `${size} 倒立 實像`; color = "#ffcc00"; 
+                } else { 
+                    let size = "";
+                    if(Math.abs(m) > 1.05) size = "放大";
+                    else if(Math.abs(m) < 0.95) size = "縮小";
+                    else size = "相等"; 
+                    
+                    desc = `${size} 正立 虛像`; color = "#00aaff"; 
+                }
+            }
+            elDesc.innerText = desc;
+            elDesc.style.color = color;
+            elDesc.style.borderColor = color;
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>電學與水力學類比互動實驗</title>
+    <style>
+        :root {
+            --flow-speed: 2s;      
+            --glow-opacity: 0.5;   
+            --wheel-speed: 2s;     
+            --pipe-color: #3498db; 
+            --wire-color: #f1c40f; 
+            --bg-color: #2c3e50;
+            --panel-color: #34495e;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: white;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            overflow: hidden; /* 防止捲動 */
+        }
+
+        /* --- 屬名水印 --- */
+        .watermark {
+            position: fixed;
+            top: 20px;
+            right: 25px;
+            font-size: 1.2em;
+            color: rgba(255, 255, 255, 0.4);
+            font-family: 'KaiTi', '楷體', serif; /* 手寫感字體 */
+            z-index: 1000;
+            pointer-events: none; /* 讓滑鼠點擊穿透 */
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        /* --- 左側控制欄 --- */
+        .sidebar {
+            width: 120px;
+            background: #202d3a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 10px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        .slider-container {
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        /* 垂直滑桿樣式 */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 250px; /* 這裡的寬度其實是垂直時的高度 */
+            height: 15px;
+            background: #4a6278;
+            border-radius: 10px;
+            outline: none;
+            /* 旋轉使其垂直 */
+            transform: rotate(-90deg);
+            cursor: pointer;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #f39c12;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .control-label {
+            text-align: center;
+            font-size: 0.9em;
+            color: #bdc3c7;
+            margin-bottom: 10px;
+        }
+        
+        .val-display {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #f1c40f;
+            margin-top: 10px;
+        }
+
+        /* --- 主內容區 --- */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        h1 { margin: 0 0 40px 0; font-size: 2.2em; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+
+        /* --- 模擬面板 (維持原樣) --- */
+        .simulation-card {
+            background: var(--panel-color);
+            padding: 20px;
+            border-radius: 15px;
+            width: 320px;
+            height: 420px;
+            position: relative;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .label {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+            border-bottom: 2px solid #555;
+            padding-bottom: 5px;
+            width: 100%;
+        }
+
+        .system-box {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            margin: 20px 0;
+        }
+
+        /* --- 動畫與材質 (維持修正後的正確邏輯) --- */
+        .flow-h { background: repeating-linear-gradient(90deg, transparent, transparent 10px, var(--color) 10px, var(--color) 20px); background-size: 40px 100%; }
+        .flow-v { background: repeating-linear-gradient(180deg, transparent, transparent 10px, var(--color) 10px, var(--color) 20px); background-size: 100% 40px; }
+
+        @keyframes flow-forward { from { background-position: 0 0; } to { background-position: 40px 0; } }
+        @keyframes flow-reverse { from { background-position: 0 0; } to { background-position: -40px 0; } }
+        @keyframes flow-down { from { background-position: 0 0; } to { background-position: 0 40px; } }
+        @keyframes flow-up { from { background-position: 0 0; } to { background-position: 0 -40px; } }
+
+        .path { position: absolute; background-color: #444; overflow: hidden; }
+        
+        .path-top { top: 0; left: 0; width: 100%; height: 12px; }
+        .path-top::after { content: ''; position: absolute; top:0; left:0; right:0; bottom:0; animation: flow-forward var(--flow-speed) linear infinite; }
+
+        .path-right { top: 0; right: 0; width: 12px; height: 100%; }
+        .path-right::after { content: ''; position: absolute; top:0; left:0; right:0; bottom:0; animation: flow-down var(--flow-speed) linear infinite; }
+
+        .path-bottom { bottom: 0; left: 0; width: 100%; height: 12px; }
+        .path-bottom::after { content: ''; position: absolute; top:0; left:0; right:0; bottom:0; animation: flow-reverse var(--flow-speed) linear infinite; }
+
+        .path-left { top: 0; left: 0; width: 12px; height: 100%; }
+        .path-left::after { content: ''; position: absolute; top:0; left:0; right:0; bottom:0; animation: flow-up var(--flow-speed) linear infinite; }
+
+        .circuit .path::after { --color: var(--wire-color); }
+        .circuit .path-top::after, .circuit .path-bottom::after { @extend .flow-h; background: repeating-linear-gradient(90deg, transparent, transparent 10px, var(--wire-color) 10px, var(--wire-color) 20px); }
+        .circuit .path-right::after, .circuit .path-left::after { @extend .flow-v; background: repeating-linear-gradient(180deg, transparent, transparent 10px, var(--wire-color) 10px, var(--wire-color) 20px); }
+
+        .water .path { border: 2px solid #5d6d7e; height: 20px; width: 20px; border-radius: 2px; }
+        .water .path-top { width: 100%; } .water .path-bottom { width: 100%; }
+        .water .path-right { height: 100%; } .water .path-left { height: 100%; }
+        
+        .water .path::after { --color: var(--pipe-color); opacity: 0.7; }
+        .water .path-top::after, .water .path-bottom::after { background: repeating-linear-gradient(90deg, transparent, transparent 10px, var(--pipe-color) 10px, var(--pipe-color) 20px); }
+        .water .path-right::after, .water .path-left::after { background: repeating-linear-gradient(180deg, transparent, transparent 10px, var(--pipe-color) 10px, var(--pipe-color) 20px); }
+
+        /* 元件樣式 */
+        .battery { position: absolute; left: -15px; top: 50%; transform: translateY(-50%); width: 40px; height: 70px; background: #2c3e50; border: 2px solid #95a5a6; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .battery-symbol { position: relative; width: 30px; height: 40px; }
+        .battery-pos { position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: #e74c3c; box-shadow: 0 0 5px red;} 
+        .battery-neg { position: absolute; bottom: 0; left: 5px; width: calc(100% - 10px); height: 4px; background: #3498db; } 
+        .plus-sign { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); font-weight: bold; color: #e74c3c; font-size: 14px;}
+
+        .pump { position: absolute; left: -20px; top: 50%; transform: translateY(-50%); width: 60px; height: 60px; background: #e67e22; border-radius: 50%; border: 4px solid #d35400; z-index: 5; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; font-size: 12px; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .pump::after { content: '泵'; font-size: 16px; }
+        .pump-arrow { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); color: #f39c12; font-size: 20px; font-weight: bold; }
+
+        .bulb-container { position: absolute; right: -20px; top: 50%; transform: translateY(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; }
+        .bulb { width: 40px; height: 40px; background: #95a5a6; border-radius: 50%; transition: background 0.1s; }
+        .bulb.active { background: #f1c40f; box-shadow: 0 0 30px calc(30px * var(--glow-opacity)) #f1c40f; }
+        .resistor-symbol { font-size: 10px; color: #aaa; margin-top: 5px; }
+
+        .wheel-container { position: absolute; right: -25px; top: 50%; transform: translateY(-50%); z-index: 5; }
+        .water-wheel { width: 70px; height: 70px; animation: spin var(--wheel-speed) linear infinite; }
+        .wheel-rim { width: 100%; height: 100%; border-radius: 50%; border: 4px solid #8e44ad; position: relative; background: rgba(142, 68, 173, 0.2); overflow: hidden; }
+        .blade { position: absolute; top: 50%; left: 50%; width: 100%; height: 4px; background: #8e44ad; }
+        .blade:nth-child(1) { transform: translate(-50%, -50%) rotate(0deg); }
+        .blade:nth-child(2) { transform: translate(-50%, -50%) rotate(90deg); }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .arrow { position: absolute; color: rgba(255,255,255,0.8); font-size: 14px; font-weight: bold; }
+        .arrow-top { top: -20px; left: 50%; transform: translateX(-50%); }
+        .arrow-bottom { bottom: -20px; left: 50%; transform: translateX(-50%); }
+
+        .status-text { text-align: left; padding-left: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="watermark">小粘製作</div>
+
+    <aside class="sidebar">
+        <div class="control-label">能量源強度<br>(電壓 / 水壓)</div>
+        <div class="val-display" id="val-display">5</div>
+        
+        <div class="slider-container">
+            <input type="range" id="controlRange" min="0" max="10" value="5" step="1">
+        </div>
+
+        <div class="control-label" style="margin-top:0;">Max</div>
+        <div style="flex-grow: 1;"></div>
+        <div class="control-label">Off</div>
+    </aside>
+
+    <main class="main-content">
+        <h1>電路 vs 水路 類比實驗</h1>
+
+        <div class="container">
+            <div class="simulation-card circuit">
+                <div class="label">電路 (Electricity)</div>
+                <div class="system-box">
+                    <div class="path path-top"></div>
+                    <div class="path path-right"></div>
+                    <div class="path path-bottom"></div>
+                    <div class="path path-left"></div>
+
+                    <div class="battery">
+                        <div class="plus-sign">+</div>
+                        <div class="battery-symbol">
+                            <div class="battery-pos"></div>
+                            <div class="battery-neg"></div>
+                        </div>
+                    </div>
+
+                    <div class="bulb-container">
+                        <div class="bulb active" id="bulb"></div>
+                        <div class="resistor-symbol">負載 (Load)</div>
+                    </div>
+
+                    <div class="arrow arrow-top">電流 (I) &rarr;</div>
+                    <div class="arrow arrow-bottom">&larr; 迴路</div>
+                </div>
+                <div class="status-text">
+                    <p>電壓 (V): <span id="volts-display">5</span>V</p>
+                    <p>狀態: <span id="elec-status">正常運作</span></p>
+                </div>
+            </div>
+
+            <div class="simulation-card water">
+                <div class="label">水路 (Hydraulics)</div>
+                <div class="system-box">
+                    <div class="path path-top"></div>
+                    <div class="path path-right"></div>
+                    <div class="path path-bottom"></div>
+                    <div class="path path-left"></div>
+
+                    <div class="pump">
+                        <div class="pump-arrow">&uarr;</div>
+                    </div>
+
+                    <div class="wheel-container">
+                        <div class="water-wheel" id="wheel">
+                            <div class="wheel-rim">
+                                <div class="blade"></div>
+                                <div class="blade"></div>
+                            </div>
+                        </div>
+                    </div>
+                     <div class="arrow arrow-top">高壓水流 &rarr;</div>
+                     <div class="arrow arrow-bottom">&larr; 低壓回流</div>
+                </div>
+                <div class="status-text">
+                    <p>水壓 (P): <span id="pressure-display">5</span> Bar</p>
+                    <p>狀態: <span id="water-status">正常運作</span></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const slider = document.getElementById('controlRange');
+        const valDisplay = document.getElementById('val-display');
+        const root = document.documentElement;
+        
+        const vDisplay = document.getElementById('volts-display');
+        const pDisplay = document.getElementById('pressure-display');
+        const eStatus = document.getElementById('elec-status');
+        const wStatus = document.getElementById('water-status');
+
+        function updateSystem(val) {
+            let numericVal = parseInt(val);
+            
+            // 更新顯示數值
+            valDisplay.innerText = numericVal;
+            vDisplay.innerText = numericVal;
+            pDisplay.innerText = numericVal;
+
+            if (numericVal === 0) {
+                // 停止狀態
+                document.querySelectorAll('.path, .water-wheel').forEach(el => {
+                    el.style.animationPlayState = 'paused';
+                });
+                root.style.setProperty('--glow-opacity', '0');
+                eStatus.innerText = "斷路 (無電流)";
+                wStatus.innerText = "泵浦關閉";
+                return;
+            } else {
+                 document.querySelectorAll('.path, .water-wheel').forEach(el => {
+                    el.style.animationPlayState = 'running';
+                });
+            }
+
+            // 計算動畫速度
+            const speed = (3 / numericVal) + 's';
+            const brightness = numericVal / 10;
+
+            root.style.setProperty('--flow-speed', speed);
+            root.style.setProperty('--wheel-speed', speed);
+            root.style.setProperty('--glow-opacity', brightness);
+
+            eStatus.innerText = "導通";
+            wStatus.innerText = "流動中";
+        }
+
+        slider.addEventListener('input', (e) => {
+            updateSystem(e.target.value);
+        });
+
+        // 初始化
+        updateSystem(5);
+    </script>
+</body>
+</html>

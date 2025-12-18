@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全元素原子模擬器 V3.1 (小粘製作)</title>
+    <style>
+        /* --- 基礎設定 --- */
+        :root {
+            --proton-color: #e74c3c;
+            --neutron-color: #95a5a6;
+            --electron-color: #3498db;
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --dark-bg: #2c3e50;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", "Segoe UI", sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            color: #333;
+        }
+
+        .atom-simulator {
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            padding: 30px;
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            position: relative; 
+        }
+
+        /* --- 署名樣式 --- */
+        .signature {
+            position: absolute;
+            top: 15px;
+            right: 25px;
+            font-family: "KaiTi", "BiauKai", "Microsoft JhengHei", serif;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #bdc3c7;
+            letter-spacing: 2px;
+            z-index: 10;
+        }
+
+        h2 { text-align: center; color: var(--dark-bg); margin: 0 0 10px 0; }
+
+        /* --- 上半部：動畫與符號並排區 --- */
+        .top-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        /* 1. 動態視窗 */
+        .canvas-container {
+            position: relative;
+            width: 350px;
+            height: 350px;
+            background: radial-gradient(circle at center, #2b3a42 0%, #1c2833 100%);
+            border-radius: 50%;
+            border: 5px solid #bdc3c7;
+            box-shadow: inset 0 0 30px #000;
+        }
+        canvas { display: block; }
+
+        /* 2. 符號顯示區 */
+        .display-panel {
+            flex: 1;
+            min-width: 280px;
+            background: #ecf0f1;
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .chem-symbol-container {
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            font-family: 'Times New Roman', serif;
+            margin-bottom: 10px;
+        }
+
+        .left-numbers {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            margin-right: 10px;
+            line-height: 1.1;
+        }
+        .mass-number { font-size: 1.8rem; color: #8e44ad; } 
+        .atomic-number { font-size: 1.8rem; color: var(--proton-color); }
+        .element-symbol { font-size: 5.5rem; color: var(--dark-bg); line-height: 1; min-width: 120px; text-align: center;}
+        .charge-number {
+            align-self: flex-start;
+            font-size: 2rem;
+            color: var(--electron-color);
+            margin-left: 5px;
+            min-width: 50px;
+        }
+
+        .element-info { text-align: center; }
+        .element-name { font-size: 1.4rem; font-weight: bold; color: #555; }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: white;
+            margin-top: 8px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        /* --- 下半部：控制區 --- */
+        .controls-area {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .control-group {
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        .control-group:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .group-p { border-top: 4px solid var(--proton-color); }
+        .group-p .control-header { color: var(--proton-color); }
+        
+        .group-n { border-top: 4px solid var(--neutron-color); }
+        .group-n .control-header { color: var(--neutron-color); }
+        
+        .group-e { border-top: 4px solid var(--electron-color); }
+        .group-e .control-header { color: var(--electron-color); }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        input[type="number"] {
+            width: 60px;
+            padding: 5px;
+            font-size: 1.2rem;
+            text-align: center;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            cursor: pointer;
+            accent-color: #555;
+        }
+        
+        #slider-p { accent-color: var(--proton-color); }
+        #slider-n { accent-color: var(--neutron-color); }
+        #slider-e { accent-color: var(--electron-color); }
+
+        .hint-text {
+            font-size: 0.85rem;
+            color: #888;
+            line-height: 1.4;
+            background: #f9f9f9;
+            padding: 8px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+
+        /* --- 新增：同位素標籤樣式 --- */
+        .isotope-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            justify-content: center;
+            margin-top: 8px;
+        }
+        
+        .iso-tag {
+            background: #ecf0f1;
+            color: #7f8c8d;
+            border: 1px solid #bdc3c7;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .iso-tag:hover {
+            background: #dfe6e9;
+            transform: scale(1.05);
+        }
+
+        .iso-tag.active {
+            background: var(--neutron-color);
+            color: white;
+            border-color: var(--neutron-color);
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="atom-simulator">
+    <div class="signature">小粘製作</div>
+
+    <h2>⚛️ 全元素原子模擬器 V3.1</h2>
+
+    <div class="top-section">
+        <div class="canvas-container">
+            <canvas id="atomCanvas" width="350" height="350"></canvas>
+        </div>
+
+        <div class="display-panel">
+            <div class="chem-symbol-container">
+                <div class="left-numbers">
+                    <span class="mass-number" id="disp-mass">1</span>
+                    <span class="atomic-number" id="disp-atomic">1</span>
+                </div>
+                <div class="element-symbol" id="disp-symbol">H</div>
+                <div class="charge-number" id="disp-charge"></div>
+            </div>
+            <div class="element-info">
+                <div class="element-name" id="disp-name">氫 (Hydrogen)</div>
+                <div class="status-badge" id="disp-status" style="background:#2ecc71;">中性原子</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls-area">
+        <div class="control-group group-p">
+            <div class="control-header">
+                <span>質子 (Proton)</span>
+                <span>p⁺</span>
+            </div>
+            <div class="input-row">
+                <input type="number" id="num-p" value="1" min="1" max="118" oninput="syncInputs('p', 'num')">
+                <input type="range" id="slider-p" value="1" min="1" max="118" oninput="syncInputs('p', 'slider')">
+            </div>
+            <div class="hint-text">1 ~ 118 號元素<br>拖動滑桿探索週期表</div>
+        </div>
+
+        <div class="control-group group-n">
+            <div class="control-header">
+                <span>中子 (Neutron)</span>
+                <span>n⁰</span>
+            </div>
+            <div class="input-row">
+                <input type="number" id="num-n" value="0" min="0" max="200" oninput="syncInputs('n', 'num')">
+                <input type="range" id="slider-n" value="0" min="0" max="200" oninput="syncInputs('n', 'slider')">
+            </div>
+            <div class="hint-text" style="border-bottom: 1px dashed #ccc; padding-bottom: 5px;">常見同位素 (點擊切換):</div>
+            <div id="isotope-hints" class="isotope-panel"></div>
+        </div>
+
+        <div class="control-group group-e">
+            <div class="control-header">
+                <span>電子 (Electron)</span>
+                <span>e⁻</span>
+            </div>
+            <div class="input-row">
+                <input type="number" id="num-e" value="1" min="0" max="118" oninput="syncInputs('e', 'num')">
+                <input type="range" id="slider-e" value="1" min="0" max="118" oninput="syncInputs('e', 'slider')">
+            </div>
+            <div class="hint-text">改變帶電量<br>觀察電子軌域填充</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 完整 1-118 號元素資料庫 (壓縮版) ---
+    const rawData = [
+        "n|中子|1", // 0 placeholder
+        "H|氫 (Hydrogen)|1", "He|氦 (Helium)|4", 
+        "Li|鋰 (Lithium)|7", "Be|鈹 (Beryllium)|9", "B|硼 (Boron)|11", "C|碳 (Carbon)|12", "N|氮 (Nitrogen)|14", "O|氧 (Oxygen)|16", "F|氟 (Fluorine)|19", "Ne|氖 (Neon)|20",
+        "Na|鈉 (Sodium)|23", "Mg|鎂 (Magnesium)|24", "Al|鋁 (Aluminum)|27", "Si|矽 (Silicon)|28", "P|磷 (Phosphorus)|31", "S|硫 (Sulfur)|32", "Cl|氯 (Chlorine)|35", "Ar|氬 (Argon)|40",
+        "K|鉀 (Potassium)|39", "Ca|鈣 (Calcium)|40", "Sc|鈧 (Scandium)|45", "Ti|鈦 (Titanium)|48", "V|釩 (Vanadium)|51", "Cr|鉻 (Chromium)|52", "Mn|錳 (Manganese)|55", "Fe|鐵 (Iron)|56", "Co|鈷 (Cobalt)|59", "Ni|鎳 (Nickel)|59", "Cu|銅 (Copper)|64", "Zn|鋅 (Zinc)|65",
+        "Ga|鎵 (Gallium)|70", "Ge|鍺 (Germanium)|73", "As|砷 (Arsenic)|75", "Se|硒 (Selenium)|79", "Br|溴 (Bromine)|80", "Kr|氪 (Krypton)|84",
+        "Rb|銣 (Rubidium)|85", "Sr|鍶 (Strontium)|88", "Y|釔 (Yttrium)|89", "Zr|鋯 (Zirconium)|91", "Nb|鈮 (Niobium)|93", "Mo|鉬 (Molybdenum)|96", "Tc|鎝 (Technetium)|98", "Ru|釕 (Ruthenium)|101", "Rh|銠 (Rhodium)|103", "Pd|鈀 (Palladium)|106", "Ag|銀 (Silver)|108", "Cd|鎘 (Cadmium)|112",
+        "In|銦 (Indium)|115", "Sn|錫 (Tin)|119", "Sb|銻 (Antimony)|122", "Te|碲 (Tellurium)|128", "I|碘 (Iodine)|127", "Xe|氙 (Xenon)|131",
+        "Cs|銫 (Cesium)|133", "Ba|鋇 (Barium)|137", "La|鑭 (Lanthanum)|139", "Ce|鈰 (Cerium)|140", "Pr|鐠 (Praseodymium)|141", "Nd|釹 (Neodymium)|144", "Pm|鉕 (Promethium)|145", "Sm|釤 (Samarium)|150", "Eu|銪 (Europium)|152", "Gd|釓 (Gadolinium)|157", "Tb|鋱 (Terbium)|159", "Dy|鏑 (Dysprosium)|163", "Ho|鈥 (Holmium)|165", "Er|鉺 (Erbium)|167", "Tm|銩 (Thulium)|169", "Yb|鐿 (Ytterbium)|173", "Lu|鎦 (Lutetium)|175",
+        "Hf|鉿 (Hafnium)|178", "Ta|鉭 (Tantalum)|181", "W|鎢 (Tungsten)|184", "Re|錸 (Rhenium)|186", "Os|鋨 (Osmium)|190", "Ir|銥 (Iridium)|192", "Pt|鉑 (Platinum)|195", "Au|金 (Gold)|197", "Hg|汞 (Mercury)|201", "Tl|鉈 (Thallium)|204", "Pb|鉛 (Lead)|207", "Bi|鉍 (Bismuth)|209", "Po|釙 (Polonium)|209", "At|砹 (Astatine)|210", "Rn|氡 (Radon)|222",
+        "Fr|鍅 (Francium)|223", "Ra|鐳 (Radium)|226", "Ac|錒 (Actinium)|227", "Th|釷 (Thorium)|232", "Pa|鏷 (Protactinium)|231", "U|鈾 (Uranium)|238", "Np|錼 (Neptunium)|237", "Pu|鈽 (Plutonium)|244", "Am|鋂 (Americium)|243", "Cm|鋦 (Curium)|247", "Bk|錇 (Berkelium)|247", "Cf|鉲 (Californium)|251", "Es|鑀 (Einsteinium)|252", "Fm|鐨 (Fermium)|257", "Md|鍆 (Mendelevium)|258", "No|鍩 (Nobelium)|259", "Lr|鐒 (Lawrencium)|262",
+        "Rf|鑪 (Rutherfordium)|267", "Db|𨧀 (Dubnium)|268", "Sg|𨭎 (Seaborgium)|271", "Bh|𨨏 (Bohrium)|272", "Hs|𨭆 (Hassium)|270", "Mt|䥑 (Meitnerium)|276", "Ds|鐽 (Darmstadtium)|281", "Rg|錀 (Roentgenium)|280", "Cn|鎶 (Copernicium)|285", "Nh|鉨 (Nihonium)|284", "Fl|鈇 (Flerovium)|289", "Mc|鏌 (Moscovium)|288", "Lv|鉝 (Livermorium)|293", "Ts|?? (Tennessine)|294", "Og|?? (Oganesson)|294"
+    ];
+
+    const elementsData = rawData.map(item => {
+        const [sym, name, mass] = item.split('|');
+        return { sym, name, mass: parseInt(mass) };
+    });
+
+    // --- 教學用：常見同位素清單 (原子序: [質量數1, 質量數2...]) ---
+    const knownIsotopes = {
+        1: [1, 2, 3], // H
+        2: [3, 4],    // He
+        3: [6, 7],    // Li
+        5: [10, 11],  // B
+        6: [12, 13, 14], // C
+        7: [14, 15],  // N
+        8: [16, 17, 18], // O
+        9: [19],      // F
+        10: [20, 21, 22], // Ne
+        11: [23],     // Na
+        12: [24, 25, 26], // Mg
+        17: [35, 37], // Cl (原子量35.5的來源)
+        18: [36, 38, 40], // Ar
+        19: [39, 40, 41], // K
+        26: [54, 56, 57, 58], // Fe
+        29: [63, 65], // Cu
+        35: [79, 81], // Br
+        47: [107, 109], // Ag
+        53: [127, 131], // I (I-131 醫療用)
+        79: [197],    // Au
+        82: [206, 207, 208], // Pb
+        92: [235, 238] // U (核能)
+    };
+
+    // 同位素別名 (選填)
+    const isotopeNames = {
+        "1-1": "Protium", "1-2": "Deuterium", "1-3": "Tritium",
+        "6-14": "Radiocarbon",
+        "92-235": "Uranium-235"
+    };
+
+    let currentP = 1;
+    let currentN = 0;
+    let currentE = 1;
+
+    function syncInputs(type, source) {
+        const numInput = document.getElementById(`num-${type}`);
+        const sliderInput = document.getElementById(`slider-${type}`);
+        let val = 0;
+
+        if (source === 'num') {
+            val = parseInt(numInput.value);
+            if (val > parseInt(numInput.max)) val = parseInt(numInput.max);
+            if (val < parseInt(numInput.min)) val = parseInt(numInput.min);
+            sliderInput.value = val;
+        } else {
+            val = parseInt(sliderInput.value);
+            numInput.value = val;
+        }
+
+        if (type === 'p') {
+            currentP = val;
+            // 切換元素時，預設選取最常見的同位素
+            const standardMass = elementsData[currentP].mass;
+            currentN = Math.max(0, standardMass - currentP);
+            
+            updateControlUI('n', currentN);
+            
+            // 電子預設中性
+            currentE = currentP;
+            updateControlUI('e', currentE);
+
+            // 更新同位素提示
+            renderIsotopeHints();
+
+        } else if (type === 'n') {
+            currentN = val;
+            renderIsotopeHints(); // 為了更新 active 狀態
+        } else if (type === 'e') {
+            currentE = val;
+        }
+
+        updateDisplay();
+        drawAtom();
+    }
+
+    // 輔助函式：更新數值與滑桿
+    function updateControlUI(type, value) {
+        document.getElementById(`num-${type}`).value = value;
+        document.getElementById(`slider-${type}`).value = value;
+    }
+
+    // --- 新功能：渲染同位素提示按鈕 ---
+    function renderIsotopeHints() {
+        const container = document.getElementById('isotope-hints');
+        container.innerHTML = ""; // 清空
+        
+        const isotopes = knownIsotopes[currentP];
+        
+        // 如果這個元素沒有被特別定義同位素清單，就顯示預設那個
+        const list = isotopes ? isotopes : [elementsData[currentP].mass];
+
+        list.forEach(mass => {
+            const neutrons = mass - currentP;
+            const sym = elementsData[currentP].sym;
+            
+            // 檢查是否有別名
+            const key = `${currentP}-${mass}`;
+            const alias = isotopeNames[key];
+            const label = alias ? `${sym}-${mass} (${alias})` : `${sym}-${mass}`;
+
+            const tag = document.createElement('div');
+            tag.className = `iso-tag ${neutrons === currentN ? 'active' : ''}`;
+            tag.innerText = label;
+            
+            // 點擊事件：直接設定中子數
+            tag.onclick = () => {
+                currentN = neutrons;
+                updateControlUI('n', currentN);
+                syncInputs('n', 'click'); // 觸發更新
+            };
+
+            container.appendChild(tag);
+        });
+    }
+
+    function updateDisplay() {
+        const atomicNum = currentP;
+        const massNum = currentP + currentN;
+        const charge = currentP - currentE;
+        const data = elementsData[atomicNum];
+
+        document.getElementById('disp-atomic').innerText = atomicNum;
+        document.getElementById('disp-mass').innerText = massNum;
+        document.getElementById('disp-symbol').innerText = data.sym;
+        document.getElementById('disp-name').innerText = data.name;
+
+        const symbolEl = document.getElementById('disp-symbol');
+        symbolEl.style.fontSize = data.sym.length > 2 ? "3.5rem" : "6rem";
+
+        let chargeText = "";
+        if (charge > 0) chargeText = (charge === 1 ? "" : charge) + "+";
+        if (charge < 0) chargeText = (Math.abs(charge) === 1 ? "" : Math.abs(charge)) + "-";
+        document.getElementById('disp-charge').innerText = chargeText;
+
+        const badge = document.getElementById('disp-status');
+        if (charge === 0) {
+            badge.innerText = "中性原子";
+            badge.style.background = "#2ecc71";
+        } else if (charge > 0) {
+            badge.innerText = "陽離子";
+            badge.style.background = "#e74c3c";
+        } else {
+            badge.innerText = "陰離子";
+            badge.style.background = "#3498db";
+        }
+    }
+
+    // Canvas 繪圖與自動縮放邏輯 (維持 V3.0)
+    const canvas = document.getElementById('atomCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    function drawAtom() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const time = Date.now() * 0.002;
+
+        const totalParticles = currentP + currentN;
+        let scaleFactor = 1;
+        if (totalParticles > 200) scaleFactor = 0.5;
+        else if (totalParticles > 80) scaleFactor = 0.7;
+        else if (totalParticles > 20) scaleFactor = 0.85;
+
+        // 畫原子核
+        function drawNucleusParticle(count, color, seedOffset) {
+            for (let i = 0; i < count; i++) {
+                const angle = (i * 137.5) * (Math.PI / 180); 
+                const dist = (6 * Math.sqrt(i) + 2) * scaleFactor;
+                
+                const x = centerX + Math.cos(angle + seedOffset) * dist;
+                const y = centerY + Math.sin(angle + seedOffset) * dist;
+
+                ctx.beginPath();
+                ctx.arc(x, y, 6 * scaleFactor, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = "rgba(0,0,0,0.3)";
+                ctx.stroke();
+            }
+        }
+
+        drawNucleusParticle(currentN, "#95a5a6", 0);   
+        drawNucleusParticle(currentP, "#e74c3c", 2);   
+
+        // 畫電子
+        let eRemaining = currentE;
+        const shells = [2, 8, 8, 18, 18, 32, 32]; 
+        const baseRadii = [60, 90, 120, 150, 180, 210, 240]; 
+
+        for (let s = 0; s < shells.length; s++) {
+            if (eRemaining <= 0) break;
+            
+            const countInShell = Math.min(eRemaining, shells[s]);
+            const radius = baseRadii[s] * scaleFactor;
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(255,255,255,0.2)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            const speed = (5 - s * 0.5) * 0.2; 
+            for (let i = 0; i < countInShell; i++) {
+                const angle = (time * speed) + (i * (Math.PI * 2 / countInShell));
+                const ex = centerX + Math.cos(angle) * radius;
+                const ey = centerY + Math.sin(angle) * radius;
+
+                ctx.beginPath();
+                ctx.arc(ex, ey, 5 * scaleFactor, 0, Math.PI * 2);
+                ctx.fillStyle = "#3498db";
+                ctx.fill();
+                ctx.shadowBlur = 5 * scaleFactor;
+                ctx.shadowColor = "#3498db";
+                ctx.fill();
+                ctx.shadowBlur = 0; 
+            }
+            eRemaining -= countInShell;
+        }
+
+        requestAnimationFrame(drawAtom);
+    }
+
+    // 初始化
+    renderIsotopeHints();
+    updateDisplay();
+    drawAtom();
+</script>
+
+</body>
+</html>

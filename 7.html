@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>電磁感應模擬實驗終極版</title>
+    <style>
+        /* --- 基礎設定 --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #263238; /* 深藍灰背景 */
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 屬名 */
+        #attribution {
+            position: absolute;
+            top: 15px;
+            right: 25px;
+            color: #90a4ae;
+            font-size: 0.9rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        h2 { margin-bottom: 5px; color: #eceff1; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        /* 移除多餘文字，只保留基本操作說明 */
+        .instruction { color: #b0bec5; margin-bottom: 20px; font-size: 0.9rem; }
+
+        /* --- 控制區 --- */
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            z-index: 100;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+        button:active { transform: scale(0.96); }
+
+        #flip-btn { background-color: #546e7a; color: white; box-shadow: 0 4px 0 #37474f; }
+        #switch-btn { background-color: #ffb74d; color: #333; box-shadow: 0 4px 0 #f57c00; }
+
+        /* --- 實驗桌 --- */
+        #workbench {
+            position: relative;
+            width: 900px;
+            height: 520px;
+            background: #37474f;
+            border-radius: 15px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+            border: 4px solid #455a64;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- 導線系統 --- */
+        #circuit-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 5; 
+            pointer-events: none;
+        }
+
+        .wire-base {
+            fill: none;
+            stroke: #212121;
+            stroke-width: 10;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* 電流動畫線 */
+        .wire-flow {
+            fill: none;
+            stroke: #ffea00; 
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-dasharray: 15 25; /* 調整虛線間距讓流動感更好 */
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        /* 定義流動方向動畫：這兩個動畫方向是相反的 */
+        /* flowForward: 順著路徑繪製方向移動 (在SVG中是從上往下) */
+        @keyframes flowForward { to { stroke-dashoffset: -40; } }
+        /* flowBackward: 逆著路徑繪製方向移動 (在SVG中是從下往上) */
+        @keyframes flowBackward { to { stroke-dashoffset: 40; } }
+
+        /* --- 磁鐵 --- */
+        #magnet {
+            width: 180px; height: 60px;
+            display: flex;
+            cursor: grab;
+            position: absolute;
+            left: 50px; top: 320px;
+            filter: drop-shadow(0 15px 15px rgba(0,0,0,0.5));
+            z-index: 50;
+            transition: transform 0.1s;
+        }
+        #magnet:active { cursor: grabbing; transform: scale(1.02); }
+
+        .pole {
+            width: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 28px; color: white;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+        }
+        .n-pole { background: linear-gradient(to bottom, #d32f2f, #b71c1c); border-radius: 5px 0 0 5px; }
+        .s-pole { background: linear-gradient(to bottom, #1976d2, #0d47a1); border-radius: 0 5px 5px 0; }
+
+        /* --- 裝置插槽 --- */
+        #device-slot {
+            position: absolute;
+            top: 30px; left: 500px;
+            width: 300px; height: 160px;
+            display: flex; justify-content: center; align-items: flex-end;
+            z-index: 20;
+        }
+        .connection-point {
+            position: absolute; bottom: 5px; width: 14px; height: 14px;
+            background: #111; border: 2px solid #777; border-radius: 50%; z-index: 10;
+        }
+
+        /* 檢流計 */
+        #galvanometer {
+            width: 200px; height: 120px;
+            background: #eceff1;
+            border: 8px solid #455a64; border-bottom: none;
+            border-radius: 15px 15px 0 0;
+            position: relative; overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+        #scale { width: 100%; height: 100%; position: relative; }
+        .tick { position: absolute; bottom: 0; left: 50%; width: 2px; height: 12px; background: #666; transform-origin: bottom center; }
+        .tick.long { height: 22px; width: 3px; background: #333; }
+        #needle {
+            position: absolute; bottom: 5px; left: 50%;
+            width: 5px; height: 85px; background: #d32f2f;
+            transform-origin: bottom center; 
+            transform: translateX(-50%) rotate(0deg);
+            z-index: 2; border-radius: 3px;
+            transition: transform 0.1s cubic-bezier(0.1, 0.9, 0.2, 1);
+        }
+        #needle-pivot { position: absolute; bottom: -5px; left: 50%; width: 16px; height: 16px; background: #333; border-radius: 50%; transform: translateX(-50%); z-index: 3; }
+
+        /* 燈泡 */
+        #bulb-wrapper { position: relative; display: flex; flex-direction: column; align-items: center; }
+        #bulb {
+            width: 100px; height: 100px; background-color: #333;
+            border-radius: 50%; border: 3px solid #555;
+            box-shadow: inset -5px -5px 20px rgba(0,0,0,0.8);
+            z-index: 2; transition: background-color 0.05s;
+        }
+        #bulb-base {
+            width: 60px; height: 30px; background: #78909c;
+            border: 3px solid #455a64; border-top: none;
+            border-radius: 0 0 8px 8px; position: relative;
+        }
+
+        /* --- 線圈組件 --- */
+        #coil-container {
+            position: absolute; left: 450px; top: 280px;
+            width: 400px; height: 180px; z-index: 10;
+        }
+        .induced-pole {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            width: 40px; height: 100px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 36px; font-weight: 900; color: #fff;
+            border-radius: 8px; opacity: 0;
+            transition: opacity 0.1s; z-index: 15;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+        }
+        #ind-left { left: -10px; }
+        #ind-right { right: 10px; }
+        .ind-n { background-color: rgba(211, 47, 47, 0.85); box-shadow: 0 0 25px rgba(211, 47, 47, 0.6); }
+        .ind-s { background-color: rgba(25, 118, 210, 0.85); box-shadow: 0 0 25px rgba(25, 118, 210, 0.6); }
+    </style>
+</head>
+<body>
+    <div id="attribution">小粘製作</div>
+
+    <h2>電磁感應模擬實驗</h2>
+    <div class="instruction">快速移動磁鐵以產生感應電流。</div>
+
+    <div class="controls">
+        <button id="flip-btn">切換磁極 (Flip)</button>
+        <button id="switch-btn">裝置：檢流計</button>
+    </div>
+
+    <div id="workbench">
+        <svg id="circuit-layer" viewBox="0 0 900 520">
+            <defs>
+                <path id="path-left" d="M560,190 C560,250 490,250 490,320" />
+                <path id="path-right" d="M740,190 C740,250 810,250 810,320" />
+            </defs>
+            <use href="#path-left" class="wire-base" />
+            <use href="#path-right" class="wire-base" />
+            <use id="flow-left" href="#path-left" class="wire-flow" />
+            <use id="flow-right" href="#path-right" class="wire-flow" />
+        </svg>
+
+        <div id="magnet">
+            <div class="pole n-pole" id="pole-left">N</div>
+            <div class="pole s-pole" id="pole-right">S</div>
+        </div>
+
+        <div id="device-slot">
+            <div id="galvanometer">
+                <div class="connection-point" style="left: 20px;"></div>
+                <div class="connection-point" style="right: 20px;"></div>
+                <div id="scale">
+                    <div class="tick long" style="transform: translateX(-50%) rotate(0deg)"></div>
+                    <div class="tick" style="transform: translateX(-50%) rotate(20deg)"></div>
+                    <div class="tick long" style="transform: translateX(-50%) rotate(40deg)"></div>
+                    <div class="tick" style="transform: translateX(-50%) rotate(-20deg)"></div>
+                    <div class="tick long" style="transform: translateX(-50%) rotate(-40deg)"></div>
+                </div>
+                <div id="needle"></div>
+                <div id="needle-pivot"></div>
+            </div>
+            <div id="bulb-wrapper" style="display: none;">
+                <div id="bulb"></div>
+                <div id="bulb-base">
+                     <div class="connection-point" style="left: -5px;"></div>
+                     <div class="connection-point" style="right: -5px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="coil-container">
+            <div id="ind-left" class="induced-pole">N</div>
+            <svg id="coil-svg" viewBox="0 0 400 180" style="overflow: visible;">
+                <defs>
+                    <linearGradient id="copper" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style="stop-color:#d84315" />
+                        <stop offset="50%" style="stop-color:#ffab91" />
+                        <stop offset="100%" style="stop-color:#bf360c" />
+                    </linearGradient>
+                </defs>
+                <path d="M40,90 L40,40" stroke="#212121" stroke-width="10" stroke-linecap="round" />
+                <path d="M360,90 L360,40" stroke="#212121" stroke-width="10" stroke-linecap="round" />
+                <g stroke="url(#copper)" stroke-width="16" fill="none" opacity="0.6">
+                    <path d="M60,90 Q80,10 100,90" />
+                    <path d="M100,90 Q120,10 140,90" />
+                    <path d="M140,90 Q160,10 180,90" />
+                    <path d="M180,90 Q200,10 220,90" />
+                    <path d="M220,90 Q240,10 260,90" />
+                    <path d="M260,90 Q280,10 300,90" />
+                    <path d="M300,90 Q320,10 340,90" />
+                </g>
+                <rect x="50" y="30" width="300" height="120" rx="20" fill="rgba(255,255,255,0.05)" />
+                <g stroke="url(#copper)" stroke-width="16" fill="none">
+                    <path d="M40,90 Q60,170 100,90" />
+                    <path d="M100,90 Q120,170 140,90" />
+                    <path d="M140,90 Q160,170 180,90" />
+                    <path d="M180,90 Q200,170 220,90" />
+                    <path d="M220,90 Q240,170 260,90" />
+                    <path d="M260,90 Q280,170 300,90" />
+                    <path d="M300,90 Q320,170 340,90" />
+                    <path d="M340,90 Q360,170 360,90" />
+                </g>
+            </svg>
+            <div id="ind-right" class="induced-pole">S</div>
+        </div>
+    </div>
+
+    <script>
+        const magnet = document.getElementById('magnet');
+        const galvanometer = document.getElementById('galvanometer');
+        const bulbWrapper = document.getElementById('bulb-wrapper');
+        const needle = document.getElementById('needle');
+        const bulb = document.getElementById('bulb');
+        const flowLeft = document.getElementById('flow-left');
+        const flowRight = document.getElementById('flow-right');
+        
+        const indLeft = document.getElementById('ind-left');
+        const indRight = document.getElementById('ind-right');
+        const poleLeft = document.getElementById('pole-left');
+        const poleRight = document.getElementById('pole-right');
+
+        const flipBtn = document.getElementById('flip-btn');
+        const switchBtn = document.getElementById('switch-btn');
+
+        let mode = 'galvanometer'; 
+        let isFlipped = false; 
+        
+        let magnetX = 50; 
+        let startX = 0;
+        let isDragging = false;
+        
+        let velocity = 0;
+        let prevMagnetX = 50;
+        let inducedCurrent = 0;
+
+        const coilEntranceX = 450; 
+        const magnetWidth = 180;
+
+        // --- 控制 ---
+        switchBtn.addEventListener('click', () => {
+            if (mode === 'galvanometer') {
+                mode = 'bulb';
+                galvanometer.style.display = 'none';
+                bulbWrapper.style.display = 'flex';
+                switchBtn.textContent = '裝置：燈泡';
+            } else {
+                mode = 'galvanometer';
+                bulbWrapper.style.display = 'none';
+                galvanometer.style.display = 'block';
+                switchBtn.textContent = '裝置：檢流計';
+            }
+        });
+
+        flipBtn.addEventListener('click', () => {
+            isFlipped = !isFlipped;
+            if (isFlipped) {
+                poleLeft.textContent = 'S'; poleLeft.className = 'pole s-pole';
+                poleRight.textContent = 'N'; poleRight.className = 'pole n-pole';
+            } else {
+                poleLeft.textContent = 'N'; poleLeft.className = 'pole n-pole';
+                poleRight.textContent = 'S'; poleRight.className = 'pole s-pole';
+            }
+            inducedCurrent = 0;
+        });
+
+        // --- 拖曳 ---
+        const start = (x) => { isDragging = true; startX = x - magnetX; magnet.style.cursor = 'grabbing'; };
+        const move = (x) => {
+            if(!isDragging) return;
+            let newX = x - startX;
+            if(newX < 0) newX = 0;
+            if(newX > 680) newX = 680;
+            magnetX = newX;
+            magnet.style.left = magnetX + 'px';
+        };
+        const end = () => { isDragging = false; magnet.style.cursor = 'grab'; };
+
+        magnet.addEventListener('mousedown', e => start(e.clientX));
+        document.addEventListener('mousemove', e => { if(isDragging) { e.preventDefault(); move(e.clientX); }});
+        document.addEventListener('mouseup', end);
+        magnet.addEventListener('touchstart', e => start(e.touches[0].clientX), {passive:false});
+        document.addEventListener('touchmove', e => { if(isDragging) { e.preventDefault(); move(e.touches[0].clientX); }}, {passive:false});
+        document.addEventListener('touchend', end);
+
+        // --- 核心物理 ---
+        function simulate() {
+            velocity = magnetX - prevMagnetX;
+            prevMagnetX = magnetX;
+
+            let magnetFront = magnetX + magnetWidth;
+            let distance = coilEntranceX - magnetFront;
+
+            let proximity = 0;
+            if (Math.abs(distance) < 300) {
+                proximity = Math.exp(-Math.abs(distance) / 120); 
+            }
+
+            let rawCurrent = velocity * proximity * 15;
+
+            if (isFlipped) rawCurrent *= -1;
+            inducedCurrent = inducedCurrent * 0.8 + rawCurrent * 0.2;
+
+            updateVisuals(inducedCurrent, velocity, proximity);
+            requestAnimationFrame(simulate);
+        }
+
+        function updateVisuals(current, vel, prox) {
+            let absCurrent = Math.abs(current);
+
+            // A. 更新儀器
+            if (mode === 'galvanometer') {
+                let angle = -current * 8; 
+                if(angle > 60) angle = 60; 
+                if(angle < -60) angle = -60;
+                needle.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+            } else {
+                let brightness = Math.min(1, absCurrent * 5);
+                if (brightness < 0.05) {
+                    bulb.style.backgroundColor = '#333';
+                    bulb.style.boxShadow = 'inset -5px -5px 20px rgba(0,0,0,0.8)';
+                } else {
+                    let r = 255; 
+                    let g = 255 - Math.floor((1-brightness)*120);
+                    bulb.style.backgroundColor = `rgb(${r}, ${g}, 80)`;
+                    bulb.style.boxShadow = `0 0 ${brightness*60}px ${brightness*30}px rgba(255, ${g}, 0, ${brightness})`;
+                }
+            }
+
+            // B. 更新導線動畫 (核心修正：迴路與速度)
+            if (absCurrent > 0.1) {
+                flowLeft.style.opacity = Math.min(1, absCurrent * 1.5); 
+                flowRight.style.opacity = Math.min(1, absCurrent * 1.5);
+
+                // 速度計算修正：讓流速整體變慢
+                // 分子加大，分母倍率減小 -> 時間變長 -> 速度變慢
+                let duration = 2.5 / (absCurrent * 1.5); 
+                // 限制最快和最慢速度
+                if (duration < 0.4) duration = 0.4; // 最快速度變慢了
+                if (duration > 3.0) duration = 3.0; // 最慢速度也變慢了
+
+                // 迴路方向邏輯：
+                // SVG路徑都是從上往下畫。
+                // flowForward = 向下流, flowBackward = 向上流
+                // 為了形成迴路，左右兩邊必須一個向上，一個向下。
+                let leftAnim, rightAnim;
+                if (current > 0) {
+                    // 假設正電流代表：左邊向上流，右邊向下流 (順時針迴路)
+                    leftAnim = 'flowBackward';
+                    rightAnim = 'flowForward';
+                } else {
+                    // 負電流代表：左邊向下流，右邊向上流 (逆時針迴路)
+                    leftAnim = 'flowForward';
+                    rightAnim = 'flowBackward';
+                }
+                
+                flowLeft.style.animation = `${leftAnim} ${duration}s linear infinite`;
+                flowRight.style.animation = `${rightAnim} ${duration}s linear infinite`;
+            } else {
+                flowLeft.style.opacity = 0;
+                flowRight.style.opacity = 0;
+                flowLeft.style.animation = 'none';
+                flowRight.style.animation = 'none';
+            }
+
+            // C. 楞次定律磁極
+            let facingPole = isFlipped ? 'N' : 'S'; 
+            let coilPole = null;
+
+            if (Math.abs(vel) > 0.2 && prox > 0.05) {
+                if (vel > 0) { coilPole = facingPole; } else { coilPole = (facingPole === 'N') ? 'S' : 'N'; }
+            }
+
+            if (coilPole) {
+                indLeft.textContent = coilPole;
+                indLeft.className = `induced-pole ${coilPole === 'N' ? 'ind-n' : 'ind-s'}`;
+                indLeft.style.opacity = 1;
+                let oppPole = coilPole === 'N' ? 'S' : 'N';
+                indRight.textContent = oppPole;
+                indRight.className = `induced-pole ${oppPole === 'N' ? 'ind-n' : 'ind-s'}`;
+                indRight.style.opacity = 1;
+            } else {
+                indLeft.style.opacity = 0;
+                indRight.style.opacity = 0;
+            }
+        }
+
+        requestAnimationFrame(simulate);
+    </script>
+</body>
+</html>

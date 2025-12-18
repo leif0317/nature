@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>互動式化學平衡 - 自動縮放單行版</title>
+    <style>
+        :root {
+            --bg: #2c3e50;
+            --card-bg: #34495e;
+            --text-color: #ecf0f1;
+            --neon-green: #00ff00;   /* 綠燈 */
+            --neon-red: #ff0033;     /* 紅燈 */
+            --neon-off: #bdc3c7;     /* 熄燈 */
+            --btn-active: #f39c12;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-color);
+            display: flex; flex-direction: column; align-items: center;
+            padding: 10px 0; margin: 0;
+            min-height: 100vh;
+            overflow-x: hidden; /* 禁止整體橫向捲動 */
+        }
+
+        .header-sign {
+            width: 100%; text-align: center;
+            padding: 10px; font-size: 1rem; color: #95a5a6;
+            border-bottom: 1px solid #455a64; margin-bottom: 15px;
+            font-weight: bold; letter-spacing: 1px;
+        }
+
+        select {
+            padding: 12px; font-size: 1.1rem; border-radius: 10px;
+            margin-bottom: 5px; cursor: pointer; width: 90%; max-width: 400px;
+            background: #fff; border: none; outline: none;
+        }
+
+        /* ★★★ 縮放容器 (Wrapper) ★★★ */
+        /* 用來限制寬度，並作為縮放的基準點 */
+        .scale-wrapper {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            overflow: hidden; /* 隱藏溢出，確保不捲動 */
+            margin-bottom: 20px;
+            padding: 10px 0;
+        }
+
+        /* ★★★ 方程式本體 ★★★ */
+        .equation-box {
+            background: var(--card-bg);
+            padding: 20px 15px; border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            
+            /* 關鍵：強制一行，內容撐開寬度 */
+            display: inline-flex; 
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap; /* 文字不換行 */
+            flex-wrap: nowrap;   /* Flex不換行 */
+            
+            width: auto;         /* 寬度由內容決定 */
+            min-width: min-content;
+            
+            /* 縮放變形原點：上方置中 */
+            transform-origin: top center;
+            transition: transform 0.3s ease; /* 平滑縮放動畫 */
+        }
+
+        .group { 
+            display: flex; flex-direction: row; align-items: center; 
+            margin: 0 2px; position: relative;
+            background: rgba(0,0,0,0.15); padding: 5px 8px; border-radius: 8px;
+            flex-shrink: 0; /* 禁止壓縮 */
+        }
+
+        .input-wrapper {
+            display: flex; flex-direction: column; 
+            align-items: center; margin-right: 5px;
+        }
+
+        /* 恢復原本大小，依靠外層縮放來控制 */
+        input {
+            width: 55px; height: 45px; text-align: center; font-size: 1.4rem;
+            border: 2px solid #555; border-radius: 6px; outline: none;
+            background: #fff; color: #333; font-weight: bold;
+            font-family: monospace; margin-bottom: 3px;
+        }
+        input:focus { border-color: #3498db; }
+
+        .reset-btn {
+            width: 55px; height: 24px;
+            background: #e74c3c; color: white;
+            border-radius: 4px;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; font-size: 0.8rem; font-weight: bold;
+            user-select: none; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .reset-btn:active { transform: scale(0.95); }
+
+        .formula {
+            font-size: 2rem; font-weight: bold;
+            display: flex; align-items: baseline;
+            letter-spacing: 0.5px;
+            color: var(--neon-off);
+        }
+
+        .op { 
+            font-size: 2rem; color: #aaa; margin: 0 8px; 
+            flex-shrink: 0;
+        }
+        
+        .note { font-size: 1rem; color: #aaa; margin-left: 3px; font-weight: normal; }
+
+        /* 燈號樣式 */
+        .atom-txt {
+            transition: all 0.3s; padding: 0 1px;
+            color: var(--neon-off);
+        }
+        .atom-txt.glowing-green {
+            color: var(--neon-green) !important;
+            text-shadow: 0 0 10px var(--neon-green);
+        }
+        .atom-txt.glowing-red {
+            color: var(--neon-red) !important;
+            text-shadow: 0 0 10px var(--neon-red);
+        }
+
+        .selector-box {
+            display: flex; gap: 8px; justify-content: center;
+            margin-bottom: 20px; flex-wrap: wrap; width: 95%;
+        }
+        .ele-btn {
+            padding: 8px 20px;
+            background: #444; color: #ccc;
+            border: 2px solid #666; border-radius: 50px;
+            font-size: 1.1rem; font-weight: bold;
+            cursor: pointer; transition: all 0.2s;
+            user-select: none;
+        }
+        .ele-btn.active {
+            background: var(--btn-active);
+            color: white; border-color: white;
+            box-shadow: 0 0 15px var(--btn-active);
+            transform: scale(1.1);
+        }
+
+        .success {
+            display: none; position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--neon-green); color: #000; padding: 20px 40px;
+            border-radius: 50px; font-size: 1.5rem; z-index: 100; font-weight: bold;
+            box-shadow: 0 0 30px var(--neon-green); text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-sign">小粘製作</div>
+
+    <select id="levelSelect" onchange="initLevel()"></select>
+
+    <div class="scale-wrapper">
+        <div class="equation-box" id="eqBox"></div>
+    </div>
+
+    <div class="selector-box" id="eleBox"></div>
+
+    <div class="success" id="successMsg">🎉 平衡成功！</div>
+
+    <script>
+        const colors = { 
+            'H': '#ecf0f1', 'O': '#e74c3c', 'N': '#3498db', 'C': '#7f8c8d',
+            'Na': '#9b59b6', 'S': '#f1c40f', 'Cu': '#d35400', 'Fe': '#e67e22', 'Cl': '#2ecc71'
+        };
+
+        const levels = [
+            {
+                name: "1. 水的合成 (Synthesis of Water)",
+                reactants: [
+                    { html: '<span class="atom-txt type-H">H<sub>2</sub></span>', comp: {H:2} },
+                    { html: '<span class="atom-txt type-O">O<sub>2</sub></span>', comp: {O:2} }
+                ],
+                products: [
+                    { html: '<span class="atom-txt type-H">H<sub>2</sub></span><span class="atom-txt type-O">O</span>', comp: {H:2, O:1} }
+                ]
+            },
+            {
+                name: "2. 氨的合成 (Synthesis of Ammonia)",
+                reactants: [
+                    { html: '<span class="atom-txt type-N">N<sub>2</sub></span>', comp: {N:2} },
+                    { html: '<span class="atom-txt type-H">H<sub>2</sub></span>', comp: {H:2} }
+                ],
+                products: [
+                    { html: '<span class="atom-txt type-N">N</span><span class="atom-txt type-H">H<sub>3</sub></span>', comp: {N:1, H:3} }
+                ]
+            },
+            {
+                name: "3. 甲烷燃燒 (Combustion of Methane)",
+                reactants: [
+                    { html: '<span class="atom-txt type-C">C</span><span class="atom-txt type-H">H<sub>4</sub></span>', comp: {C:1, H:4} },
+                    { html: '<span class="atom-txt type-O">O<sub>2</sub></span>', comp: {O:2} }
+                ],
+                products: [
+                    { html: '<span class="atom-txt type-C">C</span><span class="atom-txt type-O">O<sub>2</sub></span>', comp: {C:1, O:2} },
+                    { html: '<span class="atom-txt type-H">H<sub>2</sub></span><span class="atom-txt type-O">O</span>', comp: {H:2, O:1} }
+                ]
+            },
+            {
+                name: "4. 碳燃燒 (Combustion of Carbon)",
+                reactants: [
+                    { html: '<span class="atom-txt type-C">C</span>', comp: {C:1} },
+                    { html: '<span class="atom-txt type-O">O<sub>2</sub></span>', comp: {O:2} }
+                ],
+                products: [
+                    { html: '<span class="atom-txt type-C">C</span><span class="atom-txt type-O">O<sub>2</sub></span>', comp: {C:1, O:2} }
+                ]
+            },
+            {
+                name: "5. 二氧化氮溶於水",
+                reactants: [
+                    { html: '<span class="atom-txt type-N">N</span><span class="atom-txt type-O">O<sub>2</sub></span><span class="note">(紅棕)</span>', comp: {N:1, O:2} },
+                    { html: '<span class="atom-txt type-H">H<sub>2</sub></span><span class="atom-txt type-O">O</span>', comp: {H:2, O:1} }
+                ],
+                products: [
+                    { html: '<span class="atom-txt type-H">H</span><span class="atom-txt type-N">N</span><span class="atom-txt type-O">O<sub>3</sub></span><span class="note">(硝酸)</span>', comp: {H:1, N:1, O:3} },
+                    { html: '<span class="atom-txt type-N">N</span><span class="atom-txt type-O">O</span>', comp: {N:1, O:1} }
+                ]
+            },
+            {
+                name: "6. 氫氧化鈉 + 硫酸銅",
+                reactants: [
+                    { html: '<span class="atom-txt type-Na">Na</span><span class="atom-txt type-O">O</span><span class="atom-txt type-H">H</span>', comp: {Na:1, O:1, H:1} },
+                    { html: '<span class="atom-txt type-Cu">Cu</span><span class="atom-txt type-S">S</span><span class="atom-txt type-O">O<sub>4</sub></span>', comp: {Cu:1, S:1, O:4} }
+                ],
+                products: [
+                    { html: '<span class="atom-txt type-Cu">Cu</span>(<span class="atom-txt type-O">O</span><span class="atom-txt type-H">H</span>)<sub>2</sub><span class="note">↓</span>', comp: {Cu:1, O:2, H:2} },
+                    { html: '<span class="atom-txt type-Na">Na<sub>2</sub></span><span class="atom-txt type-S">S</span><span class="atom-txt type-O">O<sub>4</sub></span>', comp: {Na:2, S:1, O:4} }
+                ]
+            },
+            {
+                name: "7. 氧化鐵 + 鹽酸 (除鏽反應)",
+                reactants: [
+                    { html: '<span class="atom-txt type-Fe">Fe<sub>2</sub></span><span class="atom-txt type-O">O<sub>3</sub></span>', comp: {Fe:2, O:3} },
+                    { html: '<span class="atom-txt type-H">H</span><span class="atom-txt type-Cl">Cl</span>', comp: {H:1, Cl:1} }
+                ],
+                products: [
+                    { html: '<span class="atom-txt type-Fe">Fe</span><span class="atom-txt type-Cl">Cl<sub>3</sub></span>', comp: {Fe:1, Cl:3} },
+                    { html: '<span class="atom-txt type-H">H<sub>2</sub></span><span class="atom-txt type-O">O</span>', comp: {H:2, O:1} }
+                ]
+            },
+            {
+                name: "8. 銅 + 濃硝酸",
+                reactants: [
+                    { html: '<span class="atom-txt type-Cu">Cu</span>', comp: {Cu:1} },
+                    { html: '<span class="atom-txt type-H">H</span><span class="atom-txt type-N">N</span><span class="atom-txt type-O">O<sub>3</sub></span>', comp: {H:1, N:1, O:3} }
+                ],
+                products: [
+                    { html: '<span class="atom-txt type-Cu">Cu</span>(<span class="atom-txt type-N">N</span><span class="atom-txt type-O">O<sub>3</sub></span>)<sub>2</sub>', comp: {Cu:1, N:2, O:6} },
+                    { html: '<span class="atom-txt type-H">H<sub>2</sub></span><span class="atom-txt type-O">O</span>', comp: {H:2, O:1} },
+                    { html: '<span class="atom-txt type-N">N</span><span class="atom-txt type-O">O<sub>2</sub></span><span class="note">(紅棕)</span>', comp: {N:1, O:2} }
+                ]
+            },
+            {
+                name: "9. 銅 + 稀硝酸",
+                reactants: [
+                    { html: '<span class="atom-txt type-Cu">Cu</span>', comp: {Cu:1} },
+                    { html: '<span class="atom-txt type-H">H</span><span class="atom-txt type-N">N</span><span class="atom-txt type-O">O<sub>3</sub></span>', comp: {H:1, N:1, O:3} }
+                ],
+                products: [
+                    { html: '<span class="atom-txt type-Cu">Cu</span>(<span class="atom-txt type-N">N</span><span class="atom-txt type-O">O<sub>3</sub></span>)<sub>2</sub>', comp: {Cu:1, N:2, O:6} },
+                    { html: '<span class="atom-txt type-H">H<sub>2</sub></span><span class="atom-txt type-O">O</span>', comp: {H:2, O:1} },
+                    { html: '<span class="atom-txt type-N">N</span><span class="atom-txt type-O">O</span>', comp: {N:1, O:1} }
+                ]
+            }
+        ];
+
+        let curIdx = 0;
+        let activeAtom = null;
+
+        window.onload = () => {
+            const sel = document.getElementById('levelSelect');
+            levels.forEach((l, i) => {
+                const opt = document.createElement('option');
+                opt.value = i; opt.text = l.name;
+                sel.add(opt);
+            });
+            initLevel();
+            // 加入螢幕旋轉/縮放監聽
+            window.addEventListener('resize', adjustLayout);
+        };
+
+        function initLevel() {
+            curIdx = document.getElementById('levelSelect').value;
+            const data = levels[curIdx];
+            const eqBox = document.getElementById('eqBox');
+            const eleBox = document.getElementById('eleBox');
+            
+            eqBox.innerHTML = '';
+            eleBox.innerHTML = '';
+            activeAtom = null;
+
+            const buildGroup = (mol, type, i) => {
+                const div = document.createElement('div');
+                div.className = 'group';
+                const inputId = `${type}_${i}`;
+                div.innerHTML = `
+                    <div class="input-wrapper">
+                        <input type="text" inputmode="text" value="0" id="${inputId}" oninput="calc()" autocomplete="off">
+                        <div class="reset-btn" onclick="resetInput('${inputId}')">CLR</div>
+                    </div>
+                    <div class="formula">${mol.html}</div>
+                `;
+                return div;
+            };
+
+            data.reactants.forEach((m, i) => {
+                if(i>0) eqBox.innerHTML += '<div class="op">+</div>';
+                eqBox.appendChild(buildGroup(m, 'reac', i));
+            });
+            eqBox.innerHTML += '<div class="op">→</div>';
+            data.products.forEach((m, i) => {
+                if(i>0) eqBox.innerHTML += '<div class="op">+</div>';
+                eqBox.appendChild(buildGroup(m, 'prod', i));
+            });
+
+            // 建立按鈕
+            let atoms = new Set();
+            [...data.reactants, ...data.products].forEach(mol => {
+                for(let a in mol.comp) atoms.add(a);
+            });
+            
+            atoms.forEach(atom => {
+                const btn = document.createElement('div');
+                btn.className = 'ele-btn';
+                btn.innerText = atom;
+                btn.style.borderColor = colors[atom] || '#888';
+                btn.onclick = () => toggleAtom(atom, btn);
+                eleBox.appendChild(btn);
+            });
+            
+            calc();
+            // 載入後立即執行一次排版調整
+            setTimeout(adjustLayout, 50);
+        }
+
+        // ★★★ 自動縮放核心邏輯 ★★★
+        function adjustLayout() {
+            const box = document.getElementById('eqBox');
+            // 先重置 scale 才能量測真實寬度
+            box.style.transform = 'scale(1)';
+            box.style.marginBottom = '0px'; 
+            
+            const screenWidth = window.innerWidth;
+            const contentWidth = box.scrollWidth;
+            const padding = 20; // 邊距緩衝
+
+            // 如果內容比螢幕寬，就縮小
+            if (contentWidth > (screenWidth - padding)) {
+                const scale = (screenWidth - padding) / contentWidth;
+                box.style.transform = `scale(${scale})`;
+                
+                // 修正縮放後下方留白過多的問題
+                // 因為 transform scale 不會改變 DOM 佔據的空間，需要手動調整 margin
+                const height = box.scrollHeight;
+                const reduceHeight = height * (1 - scale);
+                box.style.marginBottom = `-${reduceHeight}px`;
+            }
+        }
+
+        function toggleAtom(atom, btnElement) {
+            const allBtns = document.querySelectorAll('.ele-btn');
+            if (activeAtom === atom) {
+                activeAtom = null;
+                allBtns.forEach(b => b.classList.remove('active'));
+            } else {
+                activeAtom = atom;
+                allBtns.forEach(b => b.classList.remove('active'));
+                btnElement.classList.add('active');
+            }
+            calc();
+        }
+
+        function resetInput(id) {
+            document.getElementById(id).value = 0;
+            calc();
+        }
+
+        function parseVal(val) {
+            if (!val) return 0;
+            let str = val.toString().toLowerCase().trim();
+            if (!str || str === '0') return 0;
+
+            try {
+                str = str.replace(/(\d)x/g, '$1*x');
+                str = str.replace(/x/g, '200'); // X = 200
+                if (/^[0-9+\-*/.() ]+$/.test(str)) {
+                    const result = new Function('return ' + str)();
+                    if (isFinite(result)) return result;
+                }
+            } catch (e) {}
+
+            const num = parseFloat(val);
+            if (isNaN(num)) return 0;
+            return num;
+        }
+
+        function calc() {
+            const data = levels[curIdx];
+            const rVals = data.reactants.map((_, i) => parseVal(document.getElementById(`reac_${i}`).value));
+            const pVals = data.products.map((_, i) => parseVal(document.getElementById(`prod_${i}`).value));
+
+            let L = {}, R = {}, atoms = new Set();
+            
+            data.reactants.forEach((mol, i) => {
+                for(let a in mol.comp) {
+                    L[a] = (L[a]||0) + mol.comp[a] * rVals[i];
+                    atoms.add(a);
+                }
+            });
+            data.products.forEach((mol, i) => {
+                for(let a in mol.comp) {
+                    R[a] = (R[a]||0) + mol.comp[a] * pVals[i];
+                    atoms.add(a);
+                }
+            });
+
+            let allBalanced = true;
+            let hasInput = false;
+            document.querySelectorAll('input').forEach(inp => {
+                if(inp.value !== '' && inp.value !== '0') hasInput = true;
+            });
+
+            atoms.forEach(a => {
+                let lNum = L[a]||0;
+                let rNum = R[a]||0;
+                
+                let isBalanced = (Math.abs(lNum - rNum) < 0.000001);
+                let hasAtoms = (Math.abs(lNum) > 0.000001); 
+
+                let hasZeroCoefficient = false;
+                data.reactants.forEach((mol, i) => {
+                    if (mol.comp[a] && rVals[i] === 0) hasZeroCoefficient = true;
+                });
+                data.products.forEach((mol, i) => {
+                    if (mol.comp[a] && pVals[i] === 0) hasZeroCoefficient = true;
+                });
+
+                let showGreen = isBalanced && hasAtoms && !hasZeroCoefficient;
+
+                if (!showGreen) allBalanced = false;
+
+                const targets = document.querySelectorAll(`.type-${a}`);
+                targets.forEach(el => {
+                    el.classList.remove('glowing-green', 'glowing-red');
+                    
+                    if (showGreen) {
+                        el.classList.add('glowing-green');
+                    } else if (activeAtom === a) {
+                        el.classList.add('glowing-red');
+                    }
+                });
+            });
+
+            const succ = document.getElementById('successMsg');
+            if(allBalanced && hasInput) {
+                succ.style.display = 'block';
+                setTimeout(()=>succ.style.display='none', 2000);
+            } else {
+                succ.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
