@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>日食與月食 - 參數校準版</title>
+<style>
+  body {
+    margin: 0;
+    background: #0b0b15;
+    color: white;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+  }
+
+  .top-ui {
+    position: absolute;
+    top: 10px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    z-index: 10;
+  }
+  
+  .mode-switch {
+    pointer-events: auto;
+    background: rgba(30, 30, 30, 0.8);
+    padding: 6px;
+    border-radius: 30px;
+    border: 1px solid #555;
+    display: flex;
+    gap: 10px;
+  }
+  
+  .mode-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #aaa;
+    padding: 6px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s;
+  }
+  
+  .mode-btn.active {
+    background: #2E86C1;
+    color: white;
+    border-color: #4aa3df;
+  }
+
+  .signature {
+    margin-top: 8px;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    letter-spacing: 1px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+
+  .legend-box {
+    margin-top: 8px;
+    font-size: 12px;
+    display: flex;
+    gap: 10px;
+    background: rgba(0,0,0,0.7);
+    padding: 8px 15px;
+    border-radius: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .legend-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .rect-box { width: 12px; height: 12px; border-radius: 2px; }
+  .circle-box { width: 12px; height: 12px; border-radius: 50%; }
+
+  /* 底部參數控制 */
+  .controls-panel {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 95%;
+    max-width: 600px;
+    background: rgba(20, 20, 20, 0.95);
+    padding: 12px 15px;
+    border-radius: 16px;
+    backdrop-filter: blur(5px);
+    border: 1px solid #444;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .main-control {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .sub-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: space-between;
+    border-top: 1px solid #555;
+    padding-top: 8px;
+  }
+
+  .row { display: flex; align-items: center; font-size: 13px; color: #ccc; flex: 1; min-width: 140px;}
+  .row label { width: 60px; text-align: right; margin-right: 8px; font-weight: bold; }
+  input[type=range] { flex: 1; cursor: pointer; accent-color: #2E86C1; }
+  
+  .data-val {
+    width: 35px;
+    text-align: right;
+    margin-left: 8px;
+    color: #4aa3df;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 14px;
+  }
+
+  .status-dashboard {
+    font-size: 12px;
+    color: #888;
+    background: rgba(0,0,0,0.3);
+    padding: 6px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+  }
+  .status-item { color: #ddd; }
+  .status-highlight { color: #FFD700; font-weight: bold; }
+
+  #angleControl { width: 100%; height: 10px; accent-color: #e74c3c; }
+
+  /* 地球視角小視窗 */
+  .earth-view-container {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 280px;
+    height: 280px;
+    background: rgba(0, 0, 0, 0.9);
+    border: 2px solid #666;
+    border-radius: 12px;
+    overflow: hidden;
+    z-index: 20;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.9);
+  }
+  
+  .view-title {
+    position: absolute;
+    top: 5px;
+    left: 10px;
+    font-size: 14px;
+    color: #fff;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px black;
+    pointer-events: none;
+    z-index: 21;
+  }
+
+  canvas { display: block; }
+  #loading { position: absolute; top:50%; left:50%; transform:translate(-50%,-50%); }
+</style>
+</head>
+<body>
+
+<div id="loading">正在加載紋理...</div>
+
+<div class="earth-view-container">
+  <div class="view-title">👀 地球視角 (模擬天空)</div>
+  <canvas id="viewCanvas"></canvas>
+</div>
+
+<div class="top-ui">
+  <div class="mode-switch">
+    <button onclick="setMode('solar')" id="btnSolar" class="mode-btn">🌞 日食模式</button>
+    <button onclick="setMode('lunar')" id="btnLunar" class="mode-btn active">🌙 月食模式</button>
+  </div>
+  <div class="signature">小粘製作</div>
+  
+  <div class="legend-box" id="lunarLegend">
+    <div class="legend-item"><div class="rect-box" style="background:rgba(144, 238, 144, 0.5)"></div>半影</div>
+    <div class="legend-item"><div class="rect-box" style="background:rgba(0, 0, 0, 0.9)"></div>本影</div>
+    <div class="legend-item" style="border-left:1px solid #555; padding-left:10px;"><div class="circle-box" style="background:#555"></div>偏食</div>
+    <div class="legend-item"><div class="circle-box" style="background:#800000"></div>全食</div>
+  </div>
+</div>
+
+<canvas id="c"></canvas>
+
+<div class="controls-panel">
+  <div class="main-control">
+    <div style="width:100%; display:flex; justify-content:space-between; margin-bottom:5px;">
+        <span>🔄 軌道位置</span>
+        <span id="angleVal" style="color:#e74c3c; font-weight:bold;">0°</span>
+    </div>
+    <input type="range" id="angleControl" step="0.2">
+  </div>
+
+  <div class="sub-controls">
+    <div class="row">
+      <label>地球半徑</label>
+      <input type="range" id="rEarth" min="20" max="50" value="38">
+      <span class="data-val" id="valEarth">38</span>
+    </div>
+    <div class="row">
+      <label>月球半徑</label>
+      <input type="range" id="rMoon" min="8" max="25" value="14">
+      <span class="data-val" id="valMoon">14</span>
+    </div>
+    <div class="row">
+      <label>月地距離</label>
+      <input type="range" id="dist" min="80" max="300" value="100">
+      <span class="data-val" id="valDist">100</span>
+    </div>
+  </div>
+
+  <div class="status-dashboard">
+    <div class="status-item">視角比例(月/日): <span id="ratioVal" class="status-highlight">1.00</span></div>
+    <div class="status-item">預測現象: <span id="phenomenonVal" class="status-highlight">日全食</span></div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const vCanvas = document.getElementById("viewCanvas");
+const vCtx = vCanvas.getContext("2d");
+
+let mode = "lunar";
+let w, h, cx, cy, scale;
+
+// 物理參數 (預設值依照您的要求修改)
+let p = {
+  earthR: 38,
+  moonR: 14,   // 修改：14
+  orbitR: 100, // 修改：100
+  sunR: 55,
+  angleDeg: 0,
+  rawSliderVal: 0 
+};
+
+// --- 紋理加載 ---
+const earthImg = new Image();
+const moonImg = new Image();
+earthImg.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/600px-The_Earth_seen_from_Apollo_17.jpg';
+moonImg.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/FullMoon2010.jpg/600px-FullMoon2010.jpg';
+
+let imagesLoaded = 0;
+function onImageLoad() {
+  imagesLoaded++;
+  if (imagesLoaded === 2) {
+    document.getElementById('loading').style.display = 'none';
+    resize();
+    vCanvas.width = 280 * (window.devicePixelRatio || 1);
+    vCanvas.height = 280 * (window.devicePixelRatio || 1);
+    vCtx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+    setMode('lunar'); 
+  }
+}
+earthImg.onload = onImageLoad;
+moonImg.onload = onImageLoad;
+
+// UI 綁定
+const els = {
+  angle: document.getElementById("angleControl"),
+  angleVal: document.getElementById("angleVal"),
+  earth: document.getElementById("rEarth"),
+  moon: document.getElementById("rMoon"),
+  dist: document.getElementById("dist"),
+  valEarth: document.getElementById("valEarth"),
+  valMoon: document.getElementById("valMoon"),
+  valDist: document.getElementById("valDist"),
+  ratioVal: document.getElementById("ratioVal"),
+  phenoVal: document.getElementById("phenomenonVal"),
+  legend: document.getElementById("lunarLegend")
+};
+
+function updateParams() {
+  p.earthR = parseInt(els.earth.value);
+  p.moonR = parseInt(els.moon.value);
+  p.orbitR = parseInt(els.dist.value);
+  
+  els.valEarth.innerText = p.earthR;
+  els.valMoon.innerText = p.moonR;
+  els.valDist.innerText = p.orbitR;
+
+  let val = parseFloat(els.angle.value);
+  p.rawSliderVal = val;
+  p.angleDeg = val % 360; 
+  let displayAngle = p.angleDeg;
+  if (displayAngle > 359) displayAngle = 0;
+  els.angleVal.innerText = displayAngle.toFixed(1) + "°";
+
+  analyzeData();
+  requestAnimationFrame(render);
+}
+
+// 數據分析邏輯 (包含校準後的計算)
+function analyzeData() {
+  if (mode === 'solar') {
+      // 太陽視角半徑 (固定)
+      const viewSunR = p.sunR * 0.8; 
+      
+      // 月球視角半徑計算
+      // 您的校準條件：當 MoonR=14 且 Dist=100 時，比例為 1.0 (等大)
+      const baseDist = 100; // 基準距離
+      const calibrationScale = viewSunR / 14; // 基準半徑 (14)
+      
+      const viewMoonR = (p.moonR * calibrationScale) * (baseDist / p.orbitR);
+      
+      const ratio = viewMoonR / viewSunR;
+      els.ratioVal.innerText = ratio.toFixed(2);
+
+      if (ratio >= 0.99) { // 給一點點誤差寬容度
+          els.phenoVal.innerText = "日全食 (Total)";
+          els.phenoVal.style.color = "#FFD700"; 
+      } else {
+          els.phenoVal.innerText = "日環食 (Annular)";
+          els.phenoVal.style.color = "#e74c3c"; 
+      }
+  } else {
+      els.ratioVal.innerText = "-";
+      if (p.earthR > 30) {
+          els.phenoVal.innerText = "月全食條件佳";
+          els.phenoVal.style.color = "#800000"; 
+      } else {
+          els.phenoVal.innerText = "月食時間較短";
+          els.phenoVal.style.color = "#ccc";
+      }
+  }
+}
+
+[els.angle, els.earth, els.moon, els.dist].forEach(e => {
+    e.addEventListener("input", updateParams);
+});
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  w = window.innerWidth;
+  h = window.innerHeight;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+  ctx.scale(dpr, dpr);
+  cx = w / 2;
+  cy = h / 2 * 0.9;
+  scale = Math.min(w/900, h/600);
+  if(w < 600) scale = w/550;
+  render();
+}
+window.addEventListener("resize", resize);
+
+function setMode(m) {
+  mode = m;
+  document.getElementById("btnSolar").className = `mode-btn ${m==='solar'?'active':''}`;
+  document.getElementById("btnLunar").className = `mode-btn ${m==='lunar'?'active':''}`;
+  els.legend.style.display = (mode === 'lunar') ? 'flex' : 'none';
+  
+  if(m === 'solar') {
+      els.angle.min = 160;
+      els.angle.max = 200;
+      els.angle.value = 180;
+  } else {
+      els.angle.min = 320;
+      els.angle.max = 400; 
+      els.angle.value = 360; 
+  }
+  updateParams();
+}
+
+// --- 幾何計算 ---
+function getShadowPoly(sunX, sunY, sunR, bX, bY, bR) {
+    const extendDist = 3000 * scale; 
+    const distSB = Math.sqrt((bX - sunX)**2 + (bY - sunY)**2);
+    const umbraLen = (distSB * bR) / (sunR - bR);
+    const vertexX = bX + umbraLen; 
+    const angleOuter = Math.asin((sunR - bR) / distSB);
+    
+    const penPoly = [
+        {x: bX, y: bY - bR},
+        {x: w + 500, y: bY - bR - Math.tan(angleOuter) * extendDist},
+        {x: w + 500, y: bY + bR + Math.tan(angleOuter) * extendDist},
+        {x: bX, y: bY + bR}
+    ];
+
+    const umbPoly = [
+        {x: bX, y: bY - bR},
+        {x: vertexX, y: bY},
+        {x: bX, y: bY + bR}
+    ];
+
+    return { penPoly, umbPoly, umbraLen, bX, bY };
+}
+
+function drawPoly(ctxTarget, pts) {
+    if(pts.length < 2) return;
+    ctxTarget.moveTo(pts[0].x, pts[0].y);
+    for(let i=1; i<pts.length; i++) ctxTarget.lineTo(pts[i].x, pts[i].y);
+    ctxTarget.closePath();
+}
+
+function drawRays(sX, sY, sR, bX, bY, bR) {
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(255, 255, 50, 0.4)";
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(sX, sY-sR); ctx.lineTo(bX, bY-bR); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sX, sY+sR); ctx.lineTo(bX, bY+bR); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sX, sY-sR); ctx.lineTo(bX, bY+bR); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sX, sY+sR); ctx.lineTo(bX, bY-bR); ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawShadowCones(polys) {
+    ctx.beginPath(); drawPoly(ctx, polys.penPoly); ctx.fillStyle = "rgba(144, 238, 144, 0.25)"; ctx.fill();
+    ctx.beginPath(); drawPoly(ctx, polys.umbPoly); ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.fill();
+}
+
+function isFullEclipse(moonX, moonY, moonR, shadowData) {
+    const dx = moonX - shadowData.bX;
+    if (dx < 0 || dx > shadowData.umbraLen) return false; 
+    const currentUmbraR = p.earthR * scale * (1 - dx / shadowData.umbraLen);
+    const dy = Math.abs(moonY - shadowData.bY);
+    return (dy + moonR) < currentUmbraR;
+}
+
+// ----------------------------------------------------
+// 🌍 地球視角繪製邏輯 (Earth View) - 精確校正版
+// ----------------------------------------------------
+function drawEarthView(moonX, moonY, moonR, shadowData) {
+    const vw = 280;
+    const vh = 280;
+    const vcx = vw / 2;
+    const vcy = vh / 2;
+
+    vCtx.clearRect(0, 0, vw, vh);
+
+    if (mode === 'solar') {
+        // --- 日食視角 ---
+        vCtx.fillStyle = "#87CEEB"; 
+        vCtx.fillRect(0, 0, vw, vh);
+
+        // 1. 太陽
+        const viewSunR = p.sunR * 0.8; 
+        vCtx.beginPath();
+        vCtx.arc(vcx, vcy, viewSunR, 0, Math.PI*2);
+        vCtx.fillStyle = "#FFD700";
+        vCtx.shadowBlur = 20; vCtx.shadowColor = "orange";
+        vCtx.fill();
+        vCtx.shadowBlur = 0;
+
+        // 2. 月球
+        const degDiff = p.angleDeg - 180;
+        
+        if (Math.abs(degDiff) < 30) {
+            const viewMoonX = vcx - degDiff * 6; 
+            
+            // 校準邏輯 (您的新需求)：
+            // 基準：當 orbitR=100, moonR=14 時，視角大小相等 (ratio=1)
+            const baseDist = 100;
+            const calibrationScale = viewSunR / 14; 
+            
+            const viewMoonR = (moonR * calibrationScale) * (baseDist / p.orbitR);
+
+            vCtx.beginPath();
+            vCtx.arc(viewMoonX, vcy, viewMoonR, 0, Math.PI*2);
+            vCtx.fillStyle = "black";
+            vCtx.fill();
+            
+            if (Math.abs(viewMoonX - vcx) < 2 && viewMoonR < viewSunR - 1) {
+                vCtx.fillStyle = "#333";
+                vCtx.font = "bold 14px sans-serif";
+                vCtx.fillText("日環食 (Annular)", 10, vh - 10);
+            }
+        }
+
+    } else {
+        // --- 月食視角 ---
+        vCtx.fillStyle = "#111"; 
+        vCtx.fillRect(0, 0, vw, vh);
+        
+        const viewUmbraR = (p.earthR * 0.7) * 2.5; 
+        vCtx.beginPath();
+        vCtx.arc(vcx, vcy, viewUmbraR, 0, Math.PI*2);
+        vCtx.strokeStyle = "rgba(255,255,255,0.3)";
+        vCtx.setLineDash([5,5]);
+        vCtx.stroke();
+        vCtx.setLineDash([]);
+
+        const degDiff = p.rawSliderVal - 360; 
+        const viewMoonX = vcx - degDiff * 6;
+        const viewMoonR = moonR * 2.5;
+
+        vCtx.save();
+        vCtx.beginPath(); vCtx.arc(viewMoonX, vcy, viewMoonR, 0, Math.PI*2); vCtx.clip();
+        vCtx.drawImage(moonImg, viewMoonX - viewMoonR, vcy - viewMoonR, viewMoonR*2, viewMoonR*2);
+        vCtx.restore();
+
+        const dist = Math.hypot(viewMoonX - vcx, 0); 
+        
+        if (dist < viewUmbraR + viewMoonR) {
+            vCtx.save();
+            vCtx.beginPath(); 
+            vCtx.arc(viewMoonX, vcy, viewMoonR, 0, Math.PI*2); 
+            vCtx.clip(); 
+
+            vCtx.beginPath();
+            vCtx.arc(vcx, vcy, viewUmbraR, 0, Math.PI*2);
+            
+            if (dist + viewMoonR <= viewUmbraR) {
+                vCtx.globalCompositeOperation = "multiply";
+                vCtx.fillStyle = "rgba(180, 20, 20, 0.9)";
+            } else {
+                vCtx.fillStyle = "rgba(0, 0, 0, 0.9)";
+            }
+            vCtx.fill();
+            vCtx.restore();
+        }
+    }
+}
+
+function render() {
+  ctx.clearRect(0, 0, w, h);
+
+  // 縮短太陽與地球距離 (更緊湊)
+  const sunX = cx - 220 * scale; 
+  const sunY = cy; const sR = p.sunR * scale;
+  
+  const earthX = cx + 100 * scale; 
+  const earthY = cy; const eR = p.earthR * scale;
+  
+  const orbR = p.orbitR * scale; const mR = p.moonR * scale;
+  
+  const rad = p.angleDeg * Math.PI / 180;
+  const moonX = earthX + Math.cos(-rad) * orbR;
+  const moonY = earthY + Math.sin(-rad) * orbR;
+
+  // 1. 畫太陽
+  ctx.beginPath(); ctx.arc(sunX, sunY, sR, 0, Math.PI*2);
+  ctx.fillStyle = "#FFD700"; ctx.shadowBlur=40; ctx.shadowColor="orange"; ctx.fill(); ctx.shadowBlur=0;
+
+  let shadowData;
+
+  // 2. 計算背景陰影
+  if (mode === 'solar') {
+      shadowData = getShadowPoly(sunX, sunY, sR, moonX, moonY, mR);
+      drawRays(sunX, sunY, sR, moonX, moonY, mR);
+      ctx.save(); ctx.beginPath(); ctx.rect(moonX, 0, w, h); ctx.clip();
+      drawShadowCones(shadowData);
+      ctx.restore();
+  } else {
+      shadowData = getShadowPoly(sunX, sunY, sR, earthX, earthY, eR);
+      drawRays(sunX, sunY, sR, earthX, earthY, eR);
+      ctx.save(); ctx.beginPath(); ctx.rect(earthX, 0, w, h); ctx.clip();
+      drawShadowCones(shadowData);
+      ctx.restore();
+  }
+
+  // 3. 畫地球
+  ctx.save();
+  ctx.beginPath(); ctx.arc(earthX, earthY, eR, 0, Math.PI*2); ctx.clip();
+  ctx.drawImage(earthImg, earthX - eR, earthY - eR, eR * 2, eR * 2);
+  ctx.restore();
+  
+  // 4. 畫月球 (上帝視角)
+  drawMoon(moonX, moonY, mR, {x: earthX, y: earthY}, shadowData);
+
+  // 5. 畫地球視角
+  drawEarthView(moonX, moonY, mR, shadowData);
+}
+
+// 上帝視角月球繪製
+function drawMoon(moonX, moonY, moonR, earthData, shadowPolys) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, Math.PI*2); ctx.clip();
+    ctx.drawImage(moonImg, moonX - moonR, moonY - moonR, moonR * 2, moonR * 2);
+    ctx.restore();
+
+    if (mode === 'solar') return; 
+    if (moonX < earthData.x) return;
+
+    const isTotal = isFullEclipse(moonX, moonY, moonR, shadowPolys);
+
+    if (isTotal) {
+        ctx.save();
+        ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, Math.PI*2);
+        ctx.globalCompositeOperation = "multiply"; 
+        ctx.fillStyle = "rgba(180, 20, 20, 0.85)"; 
+        ctx.fill();
+        ctx.restore();
+    } else {
+        ctx.save();
+        ctx.beginPath(); drawPoly(ctx, shadowPolys.penPoly); ctx.clip();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.3)"; 
+        ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.beginPath(); drawPoly(ctx, shadowPolys.umbPoly); ctx.clip();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; 
+        ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+    }
+}
+</script>
+</body>
+</html>

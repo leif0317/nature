@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式月相變化模擬器 - 小粘製作</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #e2e8f0;
+            --sun-color: #f59e0b;
+            --earth-color: #3b82f6;
+            --moon-color: #e2e8f0;
+            --panel-bg: #1e293b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* 署名右上角 */
+        .signature {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 14px;
+            color: #64748b;
+            font-weight: bold;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        /* 主容器：左右兩欄 */
+        .main-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 40px;
+            justify-content: center;
+            align-items: flex-start; /* 頂部對齊 */
+            max-width: 1200px;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        /* 左欄：太空視角 */
+        .left-column {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 右欄：地球視角 + 控制區 */
+        .right-column {
+            flex: 0 0 320px; /* 固定寬度 */
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* 上下間距 */
+        }
+
+        /* ----- 左側：太空視角樣式 ----- */
+        .orbit-view {
+            position: relative;
+            width: 450px; /* 稍微加大視野 */
+            height: 450px;
+            border: 1px solid #334155;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 70%);
+            margin-top: 10px;
+        }
+
+        /* 太陽光箭頭群 */
+        .sun-arrows-container {
+            position: absolute;
+            right: -80px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            color: var(--sun-color);
+            font-weight: bold;
+            font-size: 20px;
+            align-items: flex-start;
+        }
+        
+        .sun-arrow-item {
+            display: flex;
+            align-items: center;
+        }
+        
+        .sun-arrow-item::before {
+            content: '←'; /* 指向左邊 */
+            font-size: 28px;
+            margin-right: 5px;
+            text-shadow: 0 0 5px rgba(245, 158, 11, 0.6);
+        }
+
+        /* 地球：放大3倍 (原50px -> 150px) */
+        .earth {
+            width: 150px;
+            height: 150px;
+            background-color: var(--earth-color);
+            border-radius: 50%;
+            position: relative;
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
+            z-index: 10;
+        }
+        
+        /* 地球陰影 */
+        .earth::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            border-radius: 50%;
+            /* 右側受光，左側陰影 */
+            background: linear-gradient(90deg, rgba(0,0,0,0.85) 50%, transparent 50%);
+        }
+
+        /* 軌道路徑 */
+        .moon-orbit-path {
+            position: absolute;
+            width: 380px; /* 配合大地球加大軌道 */
+            height: 380px;
+            border: 1px dashed #475569;
+            border-radius: 50%;
+            opacity: 0.4;
+        }
+
+        /* 月球容器 */
+        .moon-container {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 380px; height: 380px;
+            transform: translate(-50%, -50%) rotate(0deg); 
+            pointer-events: none;
+        }
+
+        /* 月球本體 */
+        .moon {
+            position: absolute;
+            top: 50%;
+            right: -15px; 
+            width: 30px;
+            height: 30px;
+            background-color: var(--moon-color);
+            border-radius: 50%;
+            transform: translateY(-50%);
+            box-shadow: 0 0 8px rgba(255,255,255,0.3);
+            /* 重要：移除 overflow hidden 讓兔子可以站在外面 */
+            /* overflow: hidden;  <-- 移除這行 */
+        }
+
+        /* 月球陰影修正器 */
+        .moon-shadow-fixer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            border-radius: 50%;
+            background: linear-gradient(90deg, rgba(0,0,0,0.9) 50%, transparent 50%);
+            z-index: 2;
+            /* 確保陰影切圓 */
+            overflow: hidden; 
+        }
+
+        /* 月兔 (站在月球表面) */
+        .moon-rabbit {
+            position: absolute;
+            /* 讓兔子站在月球左側邊緣外面 */
+            left: -18px; 
+            top: 50%;
+            /* 旋轉 -90度 讓腳朝向月球中心 */
+            transform: translateY(-50%) rotate(-90deg); 
+            font-size: 20px; /* 稍微放大兔子 */
+            z-index: 5; 
+            filter: drop-shadow(0 0 2px black); /* 加一點陰影讓它在太空中明顯 */
+        }
+
+        /* ----- 右側：地球視角與控制區 ----- */
+
+        /* 視角區塊通用樣式 */
+        .panel-box {
+            background-color: var(--panel-bg);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 月相圖 */
+        .moon-phase-display {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background-color: black;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #475569;
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.1);
+            margin: 15px 0;
+        }
+
+        .phase-text {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--sun-color);
+        }
+
+        .phase-desc {
+            font-size: 14px;
+            color: #94a3b8;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        /* 控制桿區 */
+        input[type=range] {
+            width: 100%;
+            margin: 20px 0 10px 0;
+            cursor: pointer;
+            accent-color: var(--earth-color);
+        }
+        
+        .range-labels {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .label-title {
+            color: #94a3b8;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+        
+        .rabbit-note {
+            font-size: 12px;
+            color: #fca5a5;
+            margin-top: 5px;
+        }
+
+        /* RWD */
+        @media (max-width: 800px) {
+            .main-layout {
+                flex-direction: column;
+                align-items: center;
+            }
+            .right-column {
+                width: 100%;
+                max-width: 450px;
+            }
+            .orbit-view {
+                width: 320px;
+                height: 320px;
+            }
+            .moon-orbit-path, .moon-container {
+                width: 280px;
+                height: 280px;
+            }
+            .earth {
+                width: 100px; /* 手機版稍微縮小地球 */
+                height: 100px;
+            }
+            .sun-arrows-container {
+                right: -40px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="signature">© 小粘製作</div>
+
+    <h1>月相變化與潮汐鎖定模擬</h1>
+
+    <div class="main-layout">
+        <div class="left-column">
+            <div class="label-title">1. 太空上帝視角 (北極上空)</div>
+            <div class="orbit-view">
+                <div class="earth"></div>
+                <div class="moon-orbit-path"></div>
+                
+                <div class="moon-container" id="moonContainer">
+                    <div class="moon">
+                        <div class="moon-rabbit">🐇</div>
+                        <div class="moon-shadow-fixer" id="moonShadowFixer"></div>
+                    </div>
+                </div>
+
+                <div class="sun-arrows-container">
+                    <div class="sun-arrow-item">陽光</div>
+                    <div class="sun-arrow-item"></div>
+                    <div class="sun-arrow-item"></div>
+                </div>
+            </div>
+            <p class="rabbit-note">*注意：月兔始終站在「面向地球」的那一側 (潮汐鎖定)</p>
+        </div>
+
+        <div class="right-column">
+            
+            <div class="panel-box">
+                <div class="label-title">2. 地球觀察視角</div>
+                <div class="phase-text" id="phaseName">新月 (朔)</div>
+                
+                <div class="moon-phase-display" id="phaseDisplay"></div>
+
+                <div class="phase-desc" id="phaseDesc">
+                    農曆初一。<br>月亮運行到地球與太陽之間，<br>暗面朝向我們。
+                </div>
+            </div>
+
+            <div class="panel-box">
+                <div class="label-title">互動控制</div>
+                <label for="orbitRange" style="font-size: 13px; color:#ccc; margin-top:5px;">拖曳滑桿改變日期</label>
+                
+                <input type="range" id="orbitRange" min="0" max="360" value="0">
+                
+                <div class="range-labels">
+                    <span>初一</span>
+                    <span>初八</span>
+                    <span>十五</span>
+                    <span>廿三</span>
+                    <span>三十</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <script>
+        const range = document.getElementById('orbitRange');
+        const moonContainer = document.getElementById('moonContainer');
+        const moonShadowFixer = document.getElementById('moonShadowFixer');
+        const phaseDisplay = document.getElementById('phaseDisplay');
+        const phaseName = document.getElementById('phaseName');
+        const phaseDesc = document.getElementById('phaseDesc');
+
+        const moonColor = '#e2e8f0';
+        const shadowColor = '#000000';
+
+        // 更新畫面核心函式
+        function updateView(angle) {
+            // 公轉方向：逆時針 (使用負角度)
+            const orbitAngle = -angle;
+            moonContainer.style.transform = `translate(-50%, -50%) rotate(${orbitAngle}deg)`;
+            
+            // 陰影修正：反向旋轉以保持陰影背對太陽
+            moonShadowFixer.style.transform = `rotate(${angle}deg)`;
+
+            // 更新右側月相圖
+            renderMoonPhase(angle);
+            // 更新文字說明
+            updateText(angle);
+        }
+
+        // 使用 CSS 繪製月相
+        function renderMoonPhase(angle) {
+            let deg = angle % 360;
+            phaseDisplay.style.background = shadowColor;
+            phaseDisplay.innerHTML = '';
+
+            if (deg <= 180) {
+                // 漸盈 (Waxing)
+                if (deg < 90) {
+                    phaseDisplay.style.background = shadowColor;
+                    createPart(phaseDisplay, 'right', moonColor, '0 150px 150px 0');
+                    createOval(phaseDisplay, 100 - (deg/90)*100, shadowColor, true);
+                } else {
+                    phaseDisplay.style.background = moonColor;
+                    createPart(phaseDisplay, 'left', shadowColor, '150px 0 0 150px');
+                    createOval(phaseDisplay, ((deg-90)/90)*100, moonColor, true);
+                }
+            } else {
+                // 漸虧 (Waning)
+                if (deg < 270) {
+                    phaseDisplay.style.background = moonColor;
+                    createPart(phaseDisplay, 'right', shadowColor, '0 150px 150px 0');
+                    createOval(phaseDisplay, 100 - ((deg-180)/90)*100, moonColor, true);
+                } else {
+                    phaseDisplay.style.background = shadowColor;
+                    createPart(phaseDisplay, 'left', moonColor, '150px 0 0 150px');
+                    createOval(phaseDisplay, ((deg-270)/90)*100, shadowColor, true);
+                }
+            }
+        }
+
+        function createPart(parent, side, color, radius) {
+            let part = document.createElement('div');
+            part.style.cssText = `position:absolute; ${side}:0; top:0; width:50%; height:100%; background:${color}; border-radius:${radius};`;
+            parent.appendChild(part);
+        }
+        function createOval(parent, widthPct, color, center) {
+            let oval = document.createElement('div');
+            oval.style.cssText = `position:absolute; left:50%; top:0; width:${widthPct}%; height:100%; background:${color}; border-radius:50%;`;
+            if (center) oval.style.transform = 'translateX(-50%)';
+            parent.appendChild(oval);
+        }
+
+        // 更新文字描述
+        function updateText(angle) {
+            const phases = [
+                { range: [355, 360], name: "新月 (朔)", desc: "農曆初一。日出月出，不可見。" },
+                { range: [0, 5], name: "新月 (朔)", desc: "農曆初一。日出月出，不可見。" },
+                { range: [5, 85], name: "眉月 (漸盈)", desc: "初二至初七。傍晚見於西方，亮面朝西。" },
+                { range: [85, 95], name: "上弦月", desc: "初八左右。午夜落下，右半邊亮。" },
+                { range: [95, 175], name: "盈凸月", desc: "初九至十四。午後升起，大半亮。" },
+                { range: [175, 185], name: "滿月 (望)", desc: "農曆十五、十六。日落月出，整夜可見。" },
+                { range: [185, 265], name: "虧凸月", desc: "十七至廿二。日出後落下，開始缺損。" },
+                { range: [265, 275], name: "下弦月", desc: "廿三左右。中午落下，左半邊亮。" },
+                { range: [275, 355], name: "殘月 (漸虧)", desc: "廿四至月底。清晨見於東方，亮面朝東。" }
+            ];
+            
+            let normalizedAngle = angle % 360;
+            let currentPhase = phases.find(p => normalizedAngle >= p.range[0] && normalizedAngle <= p.range[1]);
+            
+            if (currentPhase) {
+                phaseName.textContent = currentPhase.name;
+                phaseDesc.innerHTML = currentPhase.desc;
+            }
+        }
+
+        // 僅保留手動拖曳事件
+        range.addEventListener('input', (e) => {
+            updateView(parseInt(e.target.value));
+        });
+
+        // 初始化
+        updateView(0);
+
+    </script>
+</body>
+</html>
