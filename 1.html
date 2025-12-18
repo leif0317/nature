@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>離子化合物配對練習表</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --success-color: #27ae60;
+            --error-color: #c0392b;
+            --bg-color: #f4f6f7;
+            --header-bg: #e8f6f3;
+            --border-color: #bdc3c7;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 頂部控制區 */
+        .top-bar {
+            background: white;
+            padding: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin: 5px 0;
+            font-size: 1.2rem;
+        }
+        
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 8px;
+            font-size: 0.8rem;
+            display: block;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            touch-action: manipulation;
+        }
+
+        button:active { transform: scale(0.95); }
+        button.check-btn { background-color: var(--success-color); }
+        button.reset-btn { background-color: #95a5a6; }
+
+        .creator-badge {
+            font-size: 0.75rem;
+            color: #95a5a6;
+            background: #eee;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        /* 表格捲動區域 */
+        .table-scroll-area {
+            flex-grow: 1;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 10px;
+            background: #fff;
+        }
+
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 0 auto;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 4px;
+            text-align: center;
+            vertical-align: middle;
+            
+            /* --- 關鍵修改：加寬到 105px --- */
+            min-width: 105px;  
+            height: 70px; /* 稍微加高一點讓手指好點 */
+            position: relative;
+        }
+
+        /* Headers Styling */
+        th {
+            background-color: #ecf0f1;
+            color: var(--primary-color);
+            font-weight: bold;
+            font-size: 1.05rem;
+            white-space: nowrap; /* 確保標題（如 CH3COO-）不會換行 */
+        }
+        
+        /* 凍結窗格邏輯 */
+        th.corner-header {
+            position: sticky;
+            left: 0;
+            top: 0;
+            z-index: 30;
+            background-color: #fff;
+            border-right: 2px solid var(--border-color);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        th.col-header {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background-color: var(--header-bg);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        th.row-header {
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            background-color: var(--header-bg);
+            border-right: 2px solid var(--border-color);
+        }
+
+        /* Input Styling */
+        .cell-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            width: 100%;
+        }
+
+        input {
+            width: 95%; /* 稍微加寬 */
+            height: 34px;
+            padding: 0 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 16px; /* 保持 16px */
+            background: #fcfcfc;
+            color: #333;
+        }
+
+        input:focus {
+            border-color: var(--accent-color);
+            background: #fff;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        .correct input {
+            background-color: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+            font-weight: bold;
+        }
+
+        .incorrect input {
+            background-color: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+
+        .answer-reveal {
+            font-weight: bold;
+            color: var(--primary-color);
+            font-size: 0.95rem;
+            display: none;
+            line-height: 1.2;
+            word-break: break-all;
+        }
+
+        .show-answers .answer-reveal { display: block; }
+        .show-answers input { display: none; }
+
+        .blocked {
+            background: repeating-linear-gradient(
+                -45deg,
+                #f0f0f0,
+                #f0f0f0 5px,
+                #dbdbdb 5px,
+                #dbdbdb 10px
+            );
+        }
+        
+        sup, sub { font-size: 0.75em; }
+
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <h1>離子化合物配對</h1>
+        <span class="subtitle">輸入化學式 (如 NaCl) 或中文</span>
+        <div class="controls">
+            <button class="check-btn" onclick="checkAnswers()">檢查</button>
+            <button class="reset-btn" onclick="resetTable()">重置</button>
+            <button onclick="toggleMode()">解答</button>
+            <div class="creator-badge">✎ 小粘製作</div>
+        </div>
+    </div>
+
+    <div class="table-scroll-area">
+        <table id="chemistryTable">
+            </table>
+        <div style="height: 50px;"></div>
+    </div>
+
+    <script>
+        const cations = [
+            { id: 'H', label: 'H<sup>+</sup>', charge: 1, name: '氫' },
+            { id: 'Na', label: 'Na<sup>+</sup>', charge: 1, name: '鈉' },
+            { id: 'K', label: 'K<sup>+</sup>', charge: 1, name: '鉀' },
+            { id: 'Ca', label: 'Ca<sup>2+</sup>', charge: 2, name: '鈣' },
+            { id: 'Mg', label: 'Mg<sup>2+</sup>', charge: 2, name: '鎂' },
+            { id: 'Cu', label: 'Cu<sup>2+</sup>', charge: 2, name: '銅' },
+            { id: 'Fe', label: 'Fe<sup>3+</sup>', charge: 3, name: '鐵' },
+            { id: 'NH4', label: 'NH<sub>4</sub><sup>+</sup>', charge: 1, name: '銨', poly: true }
+        ];
+
+        const anions = [
+            { id: 'Cl', label: 'Cl<sup>-</sup>', charge: 1, name: '氯', suffix: '化' },
+            { id: 'O', label: 'O<sup>2-</sup>', charge: 2, name: '氧', suffix: '化' },
+            { id: 'OH', label: 'OH<sup>-</sup>', charge: 1, name: '氫氧', suffix: '化', poly: true },
+            { id: 'NO3', label: 'NO<sub>3</sub><sup>-</sup>', charge: 1, name: '硝酸', suffix: '', poly: true },
+            { id: 'CH3COO', label: 'CH<sub>3</sub>COO<sup>-</sup>', charge: 1, name: '醋酸', suffix: '', poly: true },
+            { id: 'CO3', label: 'CO<sub>3</sub><sup>2-</sup>', charge: 2, name: '碳酸', suffix: '', poly: true },
+            { id: 'SO4', label: 'SO<sub>4</sub><sup>2-</sup>', charge: 2, name: '硫酸', suffix: '', poly: true },
+            { id: 'PO4', label: 'PO<sub>4</sub><sup>3-</sup>', charge: 3, name: '磷酸', suffix: '', poly: true }
+        ];
+
+        const blockedCells = ['NH4_O']; 
+        
+        const acids = {
+            'H_Cl': { formula: 'HCl', name: '鹽酸' },
+            'H_NO3': { formula: 'HNO3', name: '硝酸' },
+            'H_SO4': { formula: 'H2SO4', name: '硫酸' },
+            'H_CO3': { formula: 'H2CO3', name: '碳酸' },
+            'H_CH3COO': { formula: 'CH3COOH', name: '醋酸' },
+            'H_OH': { formula: 'H2O', name: '水' },
+            'H_O': { formula: 'H2O', name: '水' },
+            'H_PO4': { formula: 'H3PO4', name: '磷酸' }
+        };
+
+        function initTable() {
+            const table = document.getElementById('chemistryTable');
+            
+            let headerRow = '<thead><tr><th class="corner-header"></th>';
+            cations.forEach(cat => {
+                headerRow += `<th class="col-header">${cat.label}</th>`;
+            });
+            headerRow += '</tr></thead>';
+            table.innerHTML = headerRow;
+
+            let tbody = '<tbody>';
+            anions.forEach(anion => {
+                tbody += `<tr><th class="row-header">${anion.label}</th>`;
+                cations.forEach(cation => {
+                    const cellId = `${cation.id}_${anion.id}`;
+                    if (blockedCells.includes(cellId)) {
+                        tbody += `<td class="blocked"></td>`;
+                    } else {
+                        const answer = calculateAnswer(cation, anion);
+                        tbody += `
+                            <td class="cell" data-formula="${answer.formula}" data-name="${answer.name}">
+                                <div class="cell-content">
+                                    <input type="text" class="input-formula" autocomplete="off" autocapitalize="off" autocorrect="off">
+                                    <div class="answer-reveal">
+                                        <div>${formatFormula(answer.formula)}</div>
+                                        <div style="font-size:0.75em; color:#7f8c8d;">${answer.name}</div>
+                                    </div>
+                                </div>
+                            </td>
+                        `;
+                    }
+                });
+                tbody += '</tr>';
+            });
+            tbody += '</tbody>';
+            table.innerHTML += tbody;
+        }
+
+        function calculateAnswer(cat, an) {
+            const acidKey = `${cat.id}_${an.id}`;
+            if (acids[acidKey]) return acids[acidKey];
+
+            let cCharge = cat.charge;
+            let aCharge = an.charge;
+            const commonDivisor = gcd(cCharge, aCharge);
+            const numCat = aCharge / commonDivisor;
+            const numAn = cCharge / commonDivisor;
+
+            let formula = "";
+            if (an.id === 'CH3COO') {
+                formula = 'CH3COO';
+                if (numAn > 1) formula = `(${formula})${numAn}`; 
+                formula += cat.id;
+                if (numCat > 1) formula += numCat;
+            } else {
+                formula = cat.id;
+                if (cat.poly && numCat > 1) formula = `(${formula})`;
+                if (numCat > 1) formula += numCat;
+
+                let partAn = an.id;
+                if (an.poly && numAn > 1) partAn = `(${partAn})`;
+                formula += partAn;
+                if (numAn > 1) formula += numAn;
+            }
+
+            let name = an.name + an.suffix + cat.name;
+            return { formula, name };
+        }
+
+        function gcd(a, b) { return !b ? a : gcd(b, a % b); }
+        function formatFormula(str) { return str.replace(/(\d+)/g, '<sub>$1</sub>'); }
+
+        function checkAnswers() {
+            document.querySelectorAll('.input-formula').forEach(input => {
+                const cell = input.closest('td');
+                const userVal = input.value.trim();
+                let isCorrect = false;
+                
+                if (userVal.toLowerCase() === cell.dataset.formula.toLowerCase()) isCorrect = true;
+                if (userVal === cell.dataset.name) isCorrect = true;
+                // 寬容處理 HCl/HCL
+                if (userVal.toUpperCase() === cell.dataset.formula.toUpperCase()) isCorrect = true;
+
+                cell.classList.remove('correct', 'incorrect');
+                if (userVal !== "") {
+                    cell.classList.add(isCorrect ? 'correct' : 'incorrect');
+                }
+            });
+        }
+
+        function resetTable() {
+            document.querySelectorAll('input').forEach(i => {
+                i.value = '';
+                i.closest('td').classList.remove('correct', 'incorrect');
+            });
+            document.querySelector('.table-scroll-area').classList.remove('show-answers');
+        }
+
+        function toggleMode() {
+            document.querySelector('.table-scroll-area').classList.toggle('show-answers');
+        }
+
+        window.onload = initTable;
+    </script>
+</body>
+</html>
