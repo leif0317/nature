@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式驗電器 - 清晰教學版</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            background-color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #controls {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            margin-top: 25px;
+            z-index: 100;
+            display: flex;
+            gap: 30px;
+            align-items: center;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        button {
+            padding: 10px 24px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 5px rgba(59, 130, 246, 0.3);
+        }
+        button:hover { background-color: #2563eb; transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+
+        #simulation-area {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+        }
+
+        #electroscope-svg {
+            width: auto;
+            height: 85%;
+            max-height: 750px;
+            overflow: visible;
+        }
+
+        /* 帶電棒 */
+        #rod {
+            position: absolute;
+            width: 160px;
+            height: 44px;
+            border-radius: 22px;
+            background: #e2e8f0;
+            border: 3px solid #94a3b8;
+            cursor: grab;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 800;
+            font-size: 1.5rem;
+            color: #64748b;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            top: 10%;
+            left: 10%;
+            z-index: 50;
+            transition: box-shadow 0.3s;
+        }
+        #rod:active { cursor: grabbing; scale: 1.02; }
+
+        #status-text {
+            position: absolute;
+            bottom: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #334155;
+            background: rgba(255,255,255,0.95);
+            padding: 12px 30px;
+            border-radius: 40px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            pointer-events: none;
+        }
+
+        #signature {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #94a3b8;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 8px 16px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+
+        /* --- 粒子樣式優化 --- */
+        
+        /* 固定正電荷 (+) */
+        .static-proton {
+            fill: #ef4444; 
+            font-family: Arial, sans-serif;
+            font-weight: 900;
+            font-size: 18px; /* 字體加大 */
+            pointer-events: none;
+            opacity: 0.4;    /* 半透明，作為背景 */
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+
+        /* 移動電子 (-) */
+        .mobile-electron {
+            /* 讓移動有慣性感，更平滑 */
+            transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); 
+            pointer-events: none;
+        }
+        .electron-body {
+            fill: #3b82f6; 
+            stroke: #fff;
+            stroke-width: 2px;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+        }
+        .electron-symbol {
+            fill: white;
+            font-size: 14px; /* 字體加大 */
+            font-weight: bold;
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+
+        /* 外部流動粒子 */
+        .flow-particle { pointer-events: none; }
+
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <div class="control-group">
+            <label>帶電棒電荷量 (μC)</label>
+            <input type="range" id="rod-slider" min="-10" max="10" value="-10" step="1">
+            <span id="rod-charge-val" style="font-weight:bold; color:#3b82f6;">-10</span>
+        </div>
+        <button onclick="resetSim()">重置 (接地)</button>
+    </div>
+
+    <div id="simulation-area">
+        <svg id="electroscope-svg" viewBox="0 0 200 450" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="metalGrid" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color:#94a3b8" />
+                    <stop offset="50%" style="stop-color:#e2e8f0" />
+                    <stop offset="100%" style="stop-color:#94a3b8" />
+                </linearGradient>
+                <radialGradient id="knobGrad" cx="50%" cy="50%" r="50%" fx="30%" fy="30%">
+                    <stop offset="0%" style="stop-color:#fff" />
+                    <stop offset="100%" style="stop-color:#64748b" />
+                </radialGradient>
+            </defs>
+
+            <path d="M 40 160 L 160 160 L 160 400 Q 160 430 100 430 Q 40 430 40 400 Z" 
+                  fill="rgba(220, 245, 255, 0.4)" stroke="#bae6fd" stroke-width="3"/>
+            <rect x="70" y="140" width="60" height="20" fill="#a89f91" stroke="#8b8170" stroke-width="2" rx="4"/>
+
+            <rect x="94" y="80" width="12" height="200" fill="url(#metalGrid)" stroke="#64748b" />
+
+            <circle id="knob" cx="100" cy="80" r="38" fill="url(#knobGrad)" stroke="#475569" stroke-width="2"/>
+
+            <g id="static-charges-layer"></g>
+
+            <g id="leaves-pivot" transform="translate(100, 280)">
+                <g id="leaf-left-wrapper">
+                    <rect x="-8" y="0" width="8" height="100" fill="#facc15" stroke="#ca8a04" stroke-width="1" />
+                    <text x="-4" y="30" class="static-proton">+</text>
+                    <text x="-4" y="70" class="static-proton">+</text>
+                </g>
+                <g id="leaf-right-wrapper">
+                    <rect x="0" y="0" width="8" height="100" fill="#facc15" stroke="#ca8a04" stroke-width="1" />
+                    <text x="4" y="30" class="static-proton">+</text>
+                    <text x="4" y="70" class="static-proton">+</text>
+                </g>
+            </g>
+
+            <g id="mobile-electrons-layer"></g>
+            
+            <g id="flow-layer"></g>
+
+        </svg>
+
+        <div id="rod">------</div>
+        <div id="status-text">請拖曳帶電棒靠近金屬盤</div>
+        <div id="signature">小粘製作</div>
+    </div>
+
+<script>
+    // --- 變數 ---
+    const rod = document.getElementById('rod');
+    const svgElement = document.getElementById('electroscope-svg');
+    const leafLeftWrapper = document.getElementById('leaf-left-wrapper');
+    const leafRightWrapper = document.getElementById('leaf-right-wrapper');
+    const slider = document.getElementById('rod-slider');
+    const rodChargeVal = document.getElementById('rod-charge-val');
+    const statusText = document.getElementById('status-text');
+    const knob = document.getElementById('knob');
+    const staticLayer = document.getElementById('static-charges-layer');
+    const electronLayer = document.getElementById('mobile-electrons-layer');
+    const flowLayer = document.getElementById('flow-layer');
+
+    // 物理狀態
+    let rodCharge = -10;
+    let scopeNetCharge = 0;
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+    let lastFlowTime = 0;
+    let currentAngle = 0;
+
+    // 電子管理
+    let electrons = []; 
+    // 定義區域邊界
+    const BOUNDS = {
+        TOP: 55,         // 球頂
+        STEM_START: 120, // 桿子開始
+        PIVOT: 280,      // 樞紐
+        BOTTOM: 370      // 箔片底部 (留點邊距，不要到底)
+    };
+    
+    // 初始化
+    initSystem();
+
+    // --- 拖曳事件 ---
+    rod.addEventListener('mousedown', startDrag);
+    rod.addEventListener('touchstart', startDrag, {passive: false});
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('touchmove', drag, {passive: false});
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchend', endDrag);
+
+    function startDrag(e) {
+        isDragging = true;
+        rod.style.transition = 'none';
+        const cx = e.clientX || e.touches[0].clientX;
+        const cy = e.clientY || e.touches[0].clientY;
+        const rect = rod.getBoundingClientRect();
+        dragOffset.x = cx - rect.left;
+        dragOffset.y = cy - rect.top;
+        if(e.type === 'touchstart') e.preventDefault();
+    }
+
+    function drag(e) {
+        if (!isDragging) return;
+        const cx = e.clientX || e.touches[0].clientX;
+        const cy = e.clientY || e.touches[0].clientY;
+        rod.style.left = (cx - dragOffset.x) + 'px';
+        rod.style.top = (cy - dragOffset.y) + 'px';
+        updatePhysics();
+        if(e.type === 'touchmove') e.preventDefault();
+    }
+
+    function endDrag() {
+        isDragging = false;
+        rod.style.transition = 'background-color 0.3s, color 0.3s, box-shadow 0.3s';
+        updatePhysics();
+    }
+
+    // --- 系統初始化 ---
+    function initSystem() {
+        // 1. 放置固定正電荷 (球上) - 減少數量
+        const knobProtons = [
+            {x:100, y:80}, {x:80, y:80}, {x:120, y:80} // 只留3個
+        ];
+        knobProtons.forEach(p => {
+            const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            t.textContent = "+";
+            t.setAttribute("x", p.x);
+            t.setAttribute("y", p.y);
+            t.classList.add("static-proton");
+            staticLayer.appendChild(t);
+        });
+
+        // 2. 創建自由電子 - 減少數量至 10 個
+        const numElectrons = 10;
+        
+        for(let i=0; i<numElectrons; i++) {
+            // 讓它們有一個初始的「順序」(0.0 ~ 1.0)
+            // 0.0 代表最上面，1.0 代表最下面
+            let relativePos = i / (numElectrons - 1);
+            createElectron(relativePos, i);
+        }
+    }
+
+    function createElectron(relPos, index) {
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        g.classList.add("mobile-electron");
+        
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        c.setAttribute("r", 9); // 加大尺寸，更清晰
+        c.classList.add("electron-body");
+        
+        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        t.textContent = "-";
+        t.setAttribute("dy", 1);
+        t.classList.add("electron-symbol");
+        
+        g.appendChild(c);
+        g.appendChild(t);
+        
+        // 儲存狀態
+        g.dataset.relPos = relPos; // 相對排序位置 (0~1)
+        g.dataset.index = index;
+        
+        electronLayer.appendChild(g);
+        electrons.push(g);
+    }
+
+    // --- 物理核心 ---
+    function updatePhysics() {
+        const rodRect = rod.getBoundingClientRect();
+        const knobRect = knob.getBoundingClientRect();
+        
+        const rodCx = rodRect.left + rodRect.width/2;
+        const rodCy = rodRect.top + rodRect.height/2;
+        const knobCx = knobRect.left + knobRect.width/2;
+        const knobCy = knobRect.top + knobRect.height/2;
+        
+        const dist = Math.sqrt(Math.pow(rodCx - knobCx, 2) + Math.pow(rodCy - knobCy, 2));
+        const touchThreshold = 90; 
+        const isTouching = dist < touchThreshold;
+        
+        const rodSvg = getSVGPoint(rodCx, rodCy);
+        const knobSvg = getSVGPoint(knobCx, knobCy);
+
+        // 1. 接觸傳導邏輯
+        if (isTouching) {
+            statusText.innerText = "接觸傳導中... 電荷中和";
+            statusText.style.color = rodCharge > 0 ? "#ef4444" : "#2563eb";
+            
+            if (Math.abs(rodCharge - scopeNetCharge) > 0.1) {
+                scopeNetCharge += (rodCharge - scopeNetCharge) * 0.05;
+                
+                const now = Date.now();
+                if (now - lastFlowTime > 250 && Math.abs(rodCharge) > 0.5) {
+                    if (rodCharge < scopeNetCharge) {
+                        spawnFlowParticle(rodSvg.x, rodSvg.y, knobSvg.x, knobSvg.y);
+                    } else {
+                        spawnFlowParticle(knobSvg.x, knobSvg.y, rodSvg.x, rodSvg.y);
+                    }
+                    lastFlowTime = now;
+                }
+            }
+        } else {
+            statusText.innerText = "靜電感應：觀察電子流動分佈";
+            statusText.style.color = "#334155";
+        }
+
+        // 2. 計算感應強度 (Induction Strength)
+        // strength 範圍 -1 (強正電吸引) 到 +1 (強負電排斥)
+        let inductionStrength = 0;
+        const maxDist = 600;
+        if (dist < maxDist) {
+            let factor = Math.pow(1 - dist/maxDist, 2); 
+            // 負電棒 -> 排斥 -> strength > 0
+            // 正電棒 -> 吸引 -> strength < 0
+            inductionStrength = -rodCharge * factor * 0.15; 
+        }
+
+        // 3. 計算箔片張角
+        let totalChargeAtBottom = scopeNetCharge + (inductionStrength * 10); // 簡單估算
+        currentAngle = Math.min(Math.sqrt(Math.abs(totalChargeAtBottom)) * 25, 70);
+        
+        leafLeftWrapper.style.transform = `rotate(${-currentAngle}deg)`;
+        leafRightWrapper.style.transform = `rotate(${currentAngle}deg)`;
+        
+        // 4. 更新電子分佈 (核心演算法：區間映射)
+        updateElectronsDistribution(inductionStrength, scopeNetCharge);
+        
+        // 5. 更新 UI
+        updateUI(totalChargeAtBottom);
+    }
+
+    function updateElectronsDistribution(strength, netCharge) {
+        // 這是一個「防止擠壓」的演算法
+        // 我們不只是移動電子，而是「縮放」它們的分佈範圍
+        
+        // 定義電子的有效移動區間 (Active Range)
+        let minBound = BOUNDS.TOP;
+        let maxBound = BOUNDS.BOTTOM;
+
+        // 根據感應強度，改變分佈的「重心」
+        // strength > 0 (被推下來): 區間變成 [桿子中部] 到 [箔片底部]
+        // strength < 0 (被吸上去): 區間變成 [球頂] 到 [桿子中部]
+        
+        // 基礎位移
+        let shift = strength * 200; 
+        // 淨電荷影響 (帶負電則整體互相排斥，擴散一點；帶正電則內縮)
+        let netShift = -netCharge * 5;
+
+        electrons.forEach((el, i) => {
+            let relPos = parseFloat(el.dataset.relPos); // 0.0 ~ 1.0 (它的相對排序)
+            let idx = parseInt(el.dataset.index);
+
+            // 計算目標 Y：
+            // 我們將 relPos 映射到當前的動態區間
+            // 這樣保證最上面的一顆永遠在上面，最下面的一顆在下面，絕對不會重疊
+            
+            // 計算動態的頂部和底部邊界
+            let dynamicTop = BOUNDS.TOP + shift + netShift;
+            let dynamicBottom = BOUNDS.BOTTOM + shift + netShift;
+            
+            // 限制邊界，不讓整個群體跑出畫面
+            // 如果被推得很下面，DynamicTop 應該要跟著下來，但不超過桿子底
+            if (strength > 0.05) { // 被推下來
+                dynamicTop = Math.max(dynamicTop, BOUNDS.STEM_START); 
+                dynamicBottom = Math.min(dynamicBottom, BOUNDS.BOTTOM);
+            } else if (strength < -0.05) { // 被吸上去
+                dynamicTop = Math.max(dynamicTop, BOUNDS.TOP);
+                dynamicBottom = Math.min(dynamicBottom, BOUNDS.PIVOT); 
+            } else {
+                // 中性附近，限制在合理範圍
+                dynamicTop = Math.max(dynamicTop, BOUNDS.TOP);
+                dynamicBottom = Math.min(dynamicBottom, BOUNDS.BOTTOM);
+            }
+
+            // 線性插值：根據排序決定具體位置
+            // 這一步是防止擁擠的關鍵！我們把 10 顆電子均勻鋪在 dynamicTop 到 dynamicBottom 之間
+            let targetY = dynamicTop + relPos * (dynamicBottom - dynamicTop);
+
+            // 最後一道防線：硬性限制
+            targetY = Math.max(BOUNDS.TOP + 10, Math.min(targetY, BOUNDS.BOTTOM - 5));
+
+            // 計算 X 座標
+            let targetX = 100;
+
+            if (targetY < BOUNDS.STEM_START) {
+                // 球區：均勻散開
+                // 根據 index 左右散開，避免重疊
+                let xSpread = ((idx % 3) - 1) * 20; 
+                targetX = 100 + xSpread;
+                // 用圓形方程式修正 Y，讓它們看起來像在球體表面/內部
+                let dyFromCenter = targetY - 80;
+                let maxW = Math.sqrt(Math.max(0, 36*36 - dyFromCenter*dyFromCenter));
+                targetX = Math.max(100 - maxW + 5, Math.min(targetX, 100 + maxW - 5));
+
+            } else if (targetY < BOUNDS.PIVOT) {
+                // 桿區：一直線
+                targetX = 100;
+            } else {
+                // 箔片區：跟隨角度張開
+                // 我們希望電子均勻分佈在箔片的長度上，而不是堆在頂端
+                let distFromPivot = targetY - BOUNDS.PIVOT;
+                
+                // 奇數左，偶數右
+                let angleRad = (currentAngle * Math.PI) / 180;
+                let xOffset = Math.sin(angleRad) * distFromPivot;
+                let yOffset = Math.cos(angleRad) * distFromPivot; // 修正實際長度投影
+                
+                // 重新計算 Y，因為箔片翹起來了，垂直高度會變短
+                targetY = BOUNDS.PIVOT + yOffset;
+
+                if (idx % 2 === 0) {
+                    targetX = 100 + xOffset; // 右
+                } else {
+                    targetX = 100 - xOffset; // 左
+                }
+            }
+
+            el.style.transform = `translate(${targetX}px, ${targetY}px)`;
+            
+            // 隱藏邏輯：如果是強正電 (淨電荷 > 5)，隱藏部分電子
+            if (netCharge > 4 && i % 2 === 0) el.style.opacity = 0;
+            else el.style.opacity = 1;
+        });
+    }
+
+    function spawnFlowParticle(x1, y1, x2, y2) {
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        g.classList.add("flow-particle");
+        
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        c.setAttribute("r", 6);
+        c.setAttribute("fill", "#2563eb");
+        
+        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        t.textContent = "-";
+        t.setAttribute("dy", 1);
+        t.setAttribute("fill", "white");
+        t.setAttribute("font-size", "10px");
+        t.setAttribute("text-anchor", "middle");
+        t.setAttribute("dominant-baseline", "central");
+        
+        g.appendChild(c);
+        g.appendChild(t);
+        g.setAttribute("transform", `translate(${x1}, ${y1})`);
+        
+        flowLayer.appendChild(g);
+
+        const anim = g.animate([
+            { transform: `translate(${x1}px, ${y1}px)`, opacity: 1 },
+            { transform: `translate(${x2}px, ${y2}px)`, opacity: 0 }
+        ], {
+            duration: 600,
+            easing: 'ease-out',
+            fill: 'forwards'
+        });
+        
+        anim.onfinish = () => g.remove();
+    }
+
+    function updateUI(totalQ) {
+        // 更新棒子
+        const absQ = Math.abs(rodCharge);
+        let rodStr = rodCharge > 0 ? "+".repeat(Math.min(absQ,6)) : (rodCharge < 0 ? "-".repeat(Math.min(absQ,6)) : "Neutral");
+        rod.innerText = rodStr;
+        
+        if (rodCharge > 0) { 
+            rod.style.background = "#fee2e2"; 
+            rod.style.color="#dc2626"; 
+            rodChargeVal.style.color="#dc2626";
+            rod.style.borderColor="#f87171";
+        } else if (rodCharge < 0) { 
+            rod.style.background = "#dbeafe"; 
+            rod.style.color="#2563eb"; 
+            rodChargeVal.style.color="#2563eb";
+            rod.style.borderColor="#60a5fa";
+        } else { 
+            rod.style.background = "#e2e8f0"; 
+            rod.style.color="#64748b"; 
+            rodChargeVal.style.color="#64748b";
+            rod.style.borderColor="#94a3b8";
+        }
+        
+        // 箔片顏色
+        let color = "#facc15";
+        let stroke = "#ca8a04";
+        if (totalQ > 2) { color = "#fca5a5"; stroke = "#dc2626"; } // 變紅
+        if (totalQ < -2) { color = "#93c5fd"; stroke = "#2563eb"; } // 變藍
+        
+        document.querySelector("#leaf-left-wrapper rect").setAttribute("fill", color);
+        document.querySelector("#leaf-left-wrapper rect").setAttribute("stroke", stroke);
+        document.querySelector("#leaf-right-wrapper rect").setAttribute("fill", color);
+        document.querySelector("#leaf-right-wrapper rect").setAttribute("stroke", stroke);
+    }
+
+    function getSVGPoint(screenX, screenY) {
+        const pt = svgElement.createSVGPoint();
+        pt.x = screenX;
+        pt.y = screenY;
+        return pt.matrixTransform(svgElement.getScreenCTM().inverse());
+    }
+
+    function resetSim() {
+        scopeNetCharge = 0;
+        rod.style.top = "10%";
+        rod.style.left = "10%";
+        updatePhysics();
+    }
+
+    slider.addEventListener('input', (e) => {
+        rodCharge = parseInt(e.target.value);
+        rodChargeVal.innerText = rodCharge;
+        updatePhysics();
+    });
+
+    initSystem();
+    updatePhysics();
+
+</script>
+</body>
+</html>
