@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>地月日系統 - 小粘製作最終版</title>
+    <title>地月日系統 - 穩定防迷路版</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: '微軟正黑體', 'Segoe UI', sans-serif; }
         
@@ -27,14 +27,14 @@
         .icon { width: 24px; height: 3px; margin-right: 12px; display: inline-block; }
         .icon-circle { width: 12px; height: 12px; border-radius: 50%; margin-right: 16px; margin-left: 6px; }
         
-        /* --- 新增：右下角明顯署名 --- */
+        /* 右下角署名 */
         #signature {
             position: absolute;
             bottom: 30px;
             right: 30px;
             color: #ffffff;
-            font-size: 32px; /* 大字體 */
-            font-weight: 900; /* 極粗體 */
+            font-size: 32px;
+            font-weight: 900;
             letter-spacing: 2px;
             background: rgba(255, 255, 255, 0.1);
             padding: 15px 30px;
@@ -90,7 +90,8 @@
     
     // 1. 初始化
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+    // 增加最遠可視距離到 20000，防止遠處物體被切掉
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 20000);
     camera.position.set(0, 250, 450); 
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -110,11 +111,11 @@
         canvas.width = size; canvas.height = size / 2;
         const ctx = canvas.getContext('2d');
 
-        // A. 藍色海洋 (基底 100%)
+        // A. 藍色海洋 (100% 基底)
         ctx.fillStyle = "#0055bb";
         ctx.fillRect(0, 0, size, size / 2);
 
-        // B. 綠色陸地 (約 20% 覆蓋)
+        // B. 綠色陸地 (約 20% 散佈)
         ctx.fillStyle = "#00cc44";
         for (let i = 0; i < 60; i++) {
             const x = Math.random() * size;
@@ -125,7 +126,7 @@
             ctx.fill();
         }
 
-        // C. 白色雲層 (約 10% 覆蓋)
+        // C. 白色雲層 (約 10% 點綴)
         ctx.fillStyle = "#ffffff";
         for (let i = 0; i < 40; i++) {
             const x = Math.random() * size;
@@ -179,7 +180,7 @@
     orbitLine.rotation.x = Math.PI / 2;
     scene.add(orbitLine);
 
-    // --- 節氣標記 (逆時針順序，位置修正) ---
+    // --- 節氣標記 ---
     markersGroup = new THREE.Group();
     scene.add(markersGroup);
 
@@ -200,7 +201,6 @@
         return sprite;
     }
     
-    // 增加標籤與軌道的間距
     const labelDist = orbitRadius + 55; 
 
     // 冬至 (右, +X)
@@ -223,7 +223,6 @@
     autumnLabel.position.set(0, 0, labelDist);
     markersGroup.add(autumnLabel);
 
-
     // 5. 地球系統
     const earthPosGroup = new THREE.Group();
     scene.add(earthPosGroup);
@@ -233,7 +232,7 @@
     earthTiltGroup.rotation.z = THREE.MathUtils.degToRad(-23.5); 
     earthPosGroup.add(earthTiltGroup);
 
-    // --- 地球 (70/20/10 比例) ---
+    // 地球 (手繪紋理)
     earthMesh = new THREE.Mesh(
         new THREE.SphereGeometry(7, 64, 64),
         new THREE.MeshBasicMaterial({
@@ -267,7 +266,7 @@
     earthMesh.add(createLatLine(23.5, 0xffff00, true)); 
     earthMesh.add(createLatLine(-23.5, 0xffff00, true)); 
 
-    // 自轉箭頭 (逆時針)
+    // 自轉箭頭
     arrowGroup = new THREE.Group();
     arrowGroup.position.set(0, 11, 0); 
     earthTiltGroup.add(arrowGroup);
@@ -302,9 +301,14 @@
     sunArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 1, 0xffff00, 8, 5);
     scene.add(sunArrow);
 
-    // 8. 控制與動畫
+    // 8. 控制與動畫 (關鍵修正：增加限制)
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    
+    // 【核心修正】限制縮放與平移，防止操作失效
+    controls.minDistance = 50;   // 最近只能拉到 50 (不會穿進地球)
+    controls.maxDistance = 800;  // 最遠只能拉到 800 (不會迷失太空)
+    controls.enablePan = false;  // 禁止平移 (防止地球被拖出畫面)
 
     const gui = new GUI({ title: '⚙️ 模擬控制' });
     const params = { speed: 1.0, pause: false, earthScale: 1.0, showMarkers: true };
