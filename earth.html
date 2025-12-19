@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>地月日系統 - 小粘製作最終版</title>
+    <style>
+        body { margin: 0; background-color: #000; overflow: hidden; font-family: '微軟正黑體', 'Segoe UI', sans-serif; }
+        
+        /* 左下角圖例 */
+        #legend-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(10, 15, 30, 0.9);
+            padding: 15px 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(150, 150, 150, 0.3);
+            backdrop-filter: blur(8px);
+            pointer-events: none;
+            user-select: none;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
+            min-width: 240px;
+            z-index: 10;
+        }
+        .legend-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; }
+        .icon { width: 24px; height: 3px; margin-right: 12px; display: inline-block; }
+        .icon-circle { width: 12px; height: 12px; border-radius: 50%; margin-right: 16px; margin-left: 6px; }
+        
+        /* --- 新增：右下角明顯署名 --- */
+        #signature {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            color: #ffffff;
+            font-size: 32px; /* 大字體 */
+            font-weight: 900; /* 極粗體 */
+            letter-spacing: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px 30px;
+            border-radius: 50px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(5px);
+            text-shadow: 0 0 10px rgba(0, 100, 255, 0.8);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            user-select: none;
+            z-index: 20;
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+        }
+
+        .lil-gui.root { top: 20px !important; left: 20px !important; right: auto !important; }
+    </style>
+</head>
+<body>
+
+<div id="signature">小粘製作</div>
+
+<div id="legend-panel">
+    <div style="font-weight: bold; margin-bottom: 12px; border-bottom: 1px solid #999; padding-bottom:8px; font-size: 15px; color:#fff;">圖例說明</div>
+    <div class="legend-row"><span class="icon" style="background: #ff0000; height: 3px;"></span>地球赤道 (0°)</div>
+    <div class="legend-row"><span class="icon" style="border-top: 2px dashed #ffff00; background: transparent;"></span>南北回歸線 (±23.5°)</div>
+    <div class="legend-row"><span class="icon" style="border-top: 2px solid white; background: transparent;"></span>黃道面 (公轉軌道)</div>
+    <div class="legend-row"><span class="icon" style="border-top: 2px solid #ffffff; background: transparent;"></span>月球軌道 (白)</div>
+    <div style="font-size: 12px; color: #aaa; margin-left: 36px; margin-bottom: 5px;">
+        與黃道夾 5.14°<br>與赤道夾 28.64°
+    </div>
+    <div class="legend-row"><span class="icon-circle" style="background: #00ff00;"></span>自轉方向 (逆時針)</div>
+    <div class="legend-row"><span class="icon-circle" style="background: #ffff00;"></span>太陽直射光</div>
+</div>
+
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GUI } from 'lil-gui';
+
+    // 全域變數
+    let earthMesh, axisLine, arrowGroup, sunArrow;
+    let markersGroup;
+    
+    // 1. 初始化
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.set(0, 250, 450); 
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.NoToneMapping; 
+    document.body.appendChild(renderer.domElement);
+
+    // ==========================================
+    // 2. 70/20/10 比例紋理產生器 (藍色主導)
+    // ==========================================
+    function generateProportionalTexture() {
+        const size = 1024;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size / 2;
+        const ctx = canvas.getContext('2d');
+
+        // A. 藍色海洋 (基底 100%)
+        ctx.fillStyle = "#0055bb";
+        ctx.fillRect(0, 0, size, size / 2);
+
+        // B. 綠色陸地 (約 20% 覆蓋)
+        ctx.fillStyle = "#00cc44";
+        for (let i = 0; i < 60; i++) {
+            const x = Math.random() * size;
+            const y = Math.random() * (size / 2);
+            const radius = Math.random() * 30 + 15;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // C. 白色雲層 (約 10% 覆蓋)
+        ctx.fillStyle = "#ffffff";
+        for (let i = 0; i < 40; i++) {
+            const x = Math.random() * size;
+            const y = Math.random() * (size / 2);
+            const rx = Math.random() * 60 + 20;
+            const ry = Math.random() * 25 + 10;
+            ctx.beginPath();
+            ctx.ellipse(x, y, rx, ry, Math.random() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        return new THREE.CanvasTexture(canvas);
+    }
+    const proportionalTexture = generateProportionalTexture();
+    const loader = new THREE.TextureLoader();
+
+    // 3. 環境與燈光
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6)); 
+    
+    const sunLight = new THREE.PointLight(0xffffff, 2.0, 0);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    scene.add(sunLight);
+
+    // 星空
+    const starTex = loader.load(
+        'https://unpkg.com/three-globe/example/img/night-sky.png',
+        undefined, undefined, () => {}
+    );
+    const starMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(4000, 64, 64),
+        new THREE.MeshBasicMaterial({ map: starTex, side: THREE.BackSide, color: 0x555555 })
+    );
+    scene.add(starMesh);
+
+    // 4. 太陽與軌道
+    const sunMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(15, 64, 64),
+        new THREE.MeshBasicMaterial({ color: 0xffcc00, toneMapped: false, transparent: true, opacity: 0.95 })
+    );
+    const sunGlow = new THREE.Mesh(
+        new THREE.SphereGeometry(18, 64, 64),
+        new THREE.MeshBasicMaterial({ color: 0xff8800, transparent: true, opacity: 0.3 })
+    );
+    scene.add(sunMesh, sunGlow);
+
+    const orbitRadius = 150;
+    const orbitLine = new THREE.LineLoop(
+        new THREE.BufferGeometry().setFromPoints(new THREE.EllipseCurve(0, 0, orbitRadius, orbitRadius, 0, 2 * Math.PI).getPoints(200)),
+        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2 })
+    );
+    orbitLine.rotation.x = Math.PI / 2;
+    scene.add(orbitLine);
+
+    // --- 節氣標記 (逆時針順序，位置修正) ---
+    markersGroup = new THREE.Group();
+    scene.add(markersGroup);
+
+    function createTextSprite(text, color) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 256; canvas.height = 128;
+        ctx.fillStyle = color;
+        ctx.font = 'bold 40px "Microsoft JhengHei", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = "rgba(0,0,0,1.0)";
+        ctx.shadowBlur = 4;
+        ctx.fillText(text, 128, 64);
+        const texture = new THREE.CanvasTexture(canvas);
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
+        sprite.scale.set(40, 20, 1);
+        return sprite;
+    }
+    
+    // 增加標籤與軌道的間距
+    const labelDist = orbitRadius + 55; 
+
+    // 冬至 (右, +X)
+    const winterLabel = createTextSprite('冬至', '#44aaff');
+    winterLabel.position.set(labelDist, 0, 0);
+    markersGroup.add(winterLabel);
+
+    // 春分 (後, -Z)
+    const springLabel = createTextSprite('春分', '#55ff55');
+    springLabel.position.set(0, 0, -labelDist);
+    markersGroup.add(springLabel);
+
+    // 夏至 (左, -X)
+    const summerLabel = createTextSprite('夏至', '#ff4444');
+    summerLabel.position.set(-labelDist, 0, 0);
+    markersGroup.add(summerLabel);
+
+    // 秋分 (前, +Z)
+    const autumnLabel = createTextSprite('秋分', '#ffaa55');
+    autumnLabel.position.set(0, 0, labelDist);
+    markersGroup.add(autumnLabel);
+
+
+    // 5. 地球系統
+    const earthPosGroup = new THREE.Group();
+    scene.add(earthPosGroup);
+
+    // 地軸傾斜 (-23.5)
+    const earthTiltGroup = new THREE.Group();
+    earthTiltGroup.rotation.z = THREE.MathUtils.degToRad(-23.5); 
+    earthPosGroup.add(earthTiltGroup);
+
+    // --- 地球 (70/20/10 比例) ---
+    earthMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(7, 64, 64),
+        new THREE.MeshBasicMaterial({
+            map: proportionalTexture,
+            color: 0xffffff 
+        })
+    );
+    earthTiltGroup.add(earthMesh);
+
+    // 地軸線
+    axisLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -15, 0), new THREE.Vector3(0, 15, 0)]),
+        new THREE.LineBasicMaterial({ color: 0xaaaaaa })
+    );
+    earthTiltGroup.add(axisLine);
+
+    // 基準線
+    function createLatLine(lat, color, dashed) {
+        const rad = THREE.MathUtils.degToRad(lat);
+        const r = 7.07 * Math.cos(rad); const y = 7.07 * Math.sin(rad);
+        const geo = new THREE.BufferGeometry().setFromPoints(new THREE.EllipseCurve(0, 0, r, r).getPoints(128));
+        const mat = dashed ? 
+            new THREE.LineDashedMaterial({ color, dashSize: 0.5, gapSize: 0.3, scale: 1, linewidth: 2 }) : 
+            new THREE.LineBasicMaterial({ color, linewidth: 2 });
+        const line = dashed ? new THREE.Line(geo, mat) : new THREE.LineLoop(geo, mat);
+        if (dashed) line.computeLineDistances();
+        line.rotation.x = -Math.PI / 2; line.position.y = y;
+        return line;
+    }
+    earthMesh.add(createLatLine(0, 0xff0000, false)); 
+    earthMesh.add(createLatLine(23.5, 0xffff00, true)); 
+    earthMesh.add(createLatLine(-23.5, 0xffff00, true)); 
+
+    // 自轉箭頭 (逆時針)
+    arrowGroup = new THREE.Group();
+    arrowGroup.position.set(0, 11, 0); 
+    earthTiltGroup.add(arrowGroup);
+    const arcMesh = new THREE.Mesh(new THREE.TorusGeometry(3.5, 0.25, 16, 64, Math.PI * 1.5), new THREE.MeshBasicMaterial({ color: 0x00ff00 }));
+    arcMesh.rotation.x = Math.PI / 2; arcMesh.rotation.z = Math.PI * 0.75; arrowGroup.add(arcMesh);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.8, 32), new THREE.MeshBasicMaterial({ color: 0x00ff00 }));
+    cone.position.set(-2.47, 0, 2.47); cone.rotation.x = Math.PI / 2; cone.rotation.z = Math.PI * 0.25; arrowGroup.add(cone);
+
+    // 6. 月球系統
+    const moonSystemContainer = new THREE.Group();
+    earthPosGroup.add(moonSystemContainer);
+    moonSystemContainer.rotation.z = THREE.MathUtils.degToRad(5.14);
+
+    const moonDist = 32;
+    const moonOrbitLine = new THREE.LineLoop(
+        new THREE.BufferGeometry().setFromPoints(new THREE.EllipseCurve(0, 0, moonDist, moonDist).getPoints(128)),
+        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+    );
+    moonOrbitLine.rotation.x = Math.PI / 2;
+    moonSystemContainer.add(moonOrbitLine);
+
+    const moonRotator = new THREE.Group();
+    moonSystemContainer.add(moonRotator);
+    const moonMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(2, 32, 32),
+        new THREE.MeshBasicMaterial({ color: 0xffffff }) 
+    );
+    moonMesh.position.set(moonDist, 0, 0);
+    moonRotator.add(moonMesh);
+
+    // 7. 太陽直射箭頭
+    sunArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 1, 0xffff00, 8, 5);
+    scene.add(sunArrow);
+
+    // 8. 控制與動畫
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    const gui = new GUI({ title: '⚙️ 模擬控制' });
+    const params = { speed: 1.0, pause: false, earthScale: 1.0, showMarkers: true };
+    
+    gui.add(params, 'earthScale', 0.5, 3.0).name('🌍 地球大小').onChange(v => {
+        if (earthMesh) earthMesh.scale.set(v, v, v);
+        if (axisLine) axisLine.scale.set(1, v, 1);
+        if (arrowGroup) arrowGroup.position.y = 11 + (v - 1) * 7;
+    });
+    gui.add(params, 'showMarkers').name('顯示節氣').onChange(v => markersGroup.visible = v);
+    gui.add(params, 'speed', 0, 2.5).name('⏩ 速度');
+    gui.add(params, 'pause').name('⏸ 暫停');
+
+    let orbitAngle = 0;
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        if (!params.pause) {
+            const dt = 0.008 * params.speed;
+            
+            // 逆時針公轉
+            orbitAngle -= dt * 0.8; 
+            
+            earthPosGroup.position.x = Math.cos(orbitAngle) * orbitRadius;
+            earthPosGroup.position.z = Math.sin(orbitAngle) * orbitRadius;
+            
+            if (earthMesh) earthMesh.rotation.y += dt * 15;
+            if (arrowGroup) arrowGroup.rotation.y += dt * 15;
+            moonRotator.rotation.y += dt * 10;
+        }
+
+        const earthPos = earthPosGroup.position.clone();
+        const arrowGap = 8 * params.earthScale;
+        const dist = earthPos.length() - arrowGap;
+        sunArrow.setDirection(earthPos.normalize());
+        sunArrow.setLength(dist > 0 ? dist : 0, 8, 5);
+
+        markersGroup.children.forEach(sprite => sprite.lookAt(camera.position));
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+</script>
+</body>
+</html>
