@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>眼球光學成像模擬實驗室</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --retina-color: #e74c3c;
+            --ray-color: #f1c40f;
+            --bg-color: #2c3e50;
+            --text-color: #ecf0f1;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 { margin-top: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+
+        /* 主要模擬區域 */
+        .simulation-container {
+            position: relative;
+            width: 900px;
+            height: 400px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            margin: 20px;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        /* 1. 左側：物體 */
+        .object-container {
+            position: absolute;
+            left: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 2;
+        }
+        .target-object {
+            font-size: 80px;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.3));
+        }
+        .label { font-size: 16px; margin-top: 5px; opacity: 0.8; font-weight: bold; }
+
+        /* 2. 中間：矯正鏡片 */
+        .lens-holder {
+            position: absolute;
+            left: 250px;
+            width: 40px;
+            height: 120px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3;
+        }
+        .corrective-lens {
+            width: 20px;
+            height: 100px;
+            background: rgba(173, 216, 230, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            display: none; /* 預設隱藏 */
+            box-shadow: 0 0 10px rgba(173, 216, 230, 0.5);
+        }
+        /* 凹透鏡形狀 */
+        .concave {
+            display: block;
+            border-radius: 4px;
+            clip-path: polygon(0 0, 100% 10%, 100% 90%, 0 100%, 20% 50%);
+        }
+        /* 凸透鏡形狀 */
+        .convex {
+            display: block;
+            border-radius: 50%;
+            width: 25px;
+        }
+
+        /* 3. 右側：眼球結構 */
+        .eye-container {
+            position: absolute;
+            right: 50px;
+            width: 300px;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            z-index: 1;
+        }
+
+        /* 鞏膜與視網膜 */
+        .eyeball {
+            width: 300px;
+            height: 300px;
+            background: #fff;
+            border-radius: 50%;
+            position: relative;
+            box-shadow: inset 10px 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+        }
+
+        /* 視網膜 (紅色內壁) */
+        .retina-layer {
+            position: absolute;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border-right: 8px solid var(--retina-color);
+            pointer-events: none;
+        }
+
+        /* 角膜 */
+        .cornea {
+            position: absolute;
+            left: -15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            border-left: 2px solid #ccc;
+            z-index: 5;
+        }
+
+        /* 水晶體 */
+        .lens {
+            position: absolute;
+            left: 35px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 25px;
+            height: 120px;
+            background: #a8d6ff;
+            border-radius: 50%;
+            border: 1px solid #74b9ff;
+            opacity: 0.8;
+            z-index: 4;
+            transition: transform 0.3s;
+        }
+
+        /* 視網膜上的成像 */
+        .retina-image {
+            position: absolute;
+            right: 10px; /* 視網膜位置 */
+            font-size: 40px;
+            transform: scaleY(-1); /* 倒立成像 */
+            opacity: 0.9;
+            transition: filter 0.5s ease;
+        }
+
+        /* SVG 光線層 */
+        svg.rays {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .light-ray {
+            stroke: var(--ray-color);
+            stroke-width: 3; /* 稍微加粗光線以便觀察 */
+            stroke-dasharray: 8;
+            animation: dash 0.5s linear infinite; /* 加快動畫速度 */
+        }
+
+        @keyframes dash {
+            to { stroke-dashoffset: -16; }
+        }
+
+        /* 控制面板 */
+        .controls {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            text-align: center;
+        }
+
+        .control-group h3 { margin: 0 0 10px 0; font-size: 1.2rem; color: #3498db; }
+        
+        button {
+            background: #34495e;
+            color: white;
+            border: 2px solid #3498db;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1rem;
+        }
+
+        button:hover { background: #3498db; }
+        button.active { background: #e67e22; border-color: #d35400; }
+
+        .status-message {
+            margin-top: 15px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            min-height: 40px;
+        }
+        .clear { color: #2ecc71; }
+        .blurry { color: #e74c3c; }
+
+    </style>
+</head>
+<body>
+
+    <h1>👀 眼球光學成像模擬</h1>
+
+    <div class="simulation-container">
+        <svg class="rays" id="rayCanvas"></svg>
+
+        <div class="object-container">
+            <div class="target-object">🌲</div>
+            <div class="label">觀測物體</div>
+        </div>
+
+        <div class="lens-holder">
+            <div id="correctiveLens" class="corrective-lens"></div>
+            <div style="position: absolute; top: -20px; font-size: 12px; width: 100px; text-align: center;">矯正鏡片</div>
+        </div>
+
+        <div class="eye-container">
+            <div class="eyeball">
+                <div class="cornea"></div>
+                <div class="lens" id="eyeLens"></div>
+                <div class="retina-layer"></div>
+                <div class="retina-image" id="retinaImage">🌲</div>
+            </div>
+            <div style="position: absolute; right: -60px; top: 50%; transform: translateY(-50%); width: 50px; font-size: 14px;">
+                視網膜<br>(成像處)
+            </div>
+        </div>
+    </div>
+
+    <div class="status-message" id="statusMessage">成像清晰</div>
+
+    <div class="controls">
+        <div class="control-group">
+            <h3>1. 眼睛狀況設定</h3>
+            <button onclick="setCondition('normal')" id="btn-normal" class="active">正常眼</button>
+            <button onclick="setCondition('myopia')" id="btn-myopia">近視眼 (成像在以內)</button>
+            <button onclick="setCondition('hyperopia')" id="btn-hyperopia">遠視眼 (成像在以外)</button>
+        </div>
+        <div class="control-group">
+            <h3>2. 矯正鏡片選擇</h3>
+            <button onclick="setLens('none')" id="btn-lens-none" class="active">不戴眼鏡</button>
+            <button onclick="setLens('concave')" id="btn-lens-concave">凹透鏡 (發散)</button>
+            <button onclick="setLens('convex')" id="btn-lens-convex">凸透鏡 (匯聚)</button>
+        </div>
+    </div>
+
+    <script>
+        // 狀態變數
+        let condition = 'normal'; // normal, myopia, hyperopia
+        let lensType = 'none';    // none, concave, convex
+
+        // 座標設定 (基於 CSS 佈局的大致位置)
+        const objectX = 70;       // 物體發出光線的 X
+        const objectY_Top = 160;  // 上方光線起點
+        const objectY_Bottom = 240; // 下方光線起點
+        const centerY = 200;      // 畫面中心 Y
+        
+        const correctiveLensX = 270; // 矯正鏡片 X
+        const eyeLensX = 635;        // 水晶體 X
+        const retinaX = 840;         // 視網膜 X (成像目標)
+
+        // *** 新增：定義矯正鏡片的折射強度 ***
+        const lensDeflectionAmount = 35; // 數值越大，折射越明顯
+
+        function setCondition(type) {
+            condition = type;
+            updateUI();
+            drawRays();
+        }
+
+        function setLens(type) {
+            lensType = type;
+            updateUI();
+            drawRays();
+        }
+
+        function updateUI() {
+            // 更新按鈕樣式
+            document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${condition}`).classList.add('active');
+            document.getElementById(`btn-lens-${lensType}`).classList.add('active');
+
+            // 更新水晶體形狀示意 (近視水晶體較厚/圓，遠視較扁)
+            const eyeLens = document.getElementById('eyeLens');
+            if (condition === 'myopia') eyeLens.style.transform = 'translateY(-50%) scaleX(1.3)';
+            else if (condition === 'hyperopia') eyeLens.style.transform = 'translateY(-50%) scaleX(0.7)';
+            else eyeLens.style.transform = 'translateY(-50%) scaleX(1)';
+
+            // 更新矯正鏡片顯示
+            const lensEl = document.getElementById('correctiveLens');
+            lensEl.className = 'corrective-lens'; // reset
+            if (lensType === 'concave') {
+                lensEl.classList.add('concave');
+                lensEl.style.display = 'block';
+            } else if (lensType === 'convex') {
+                lensEl.classList.add('convex');
+                lensEl.style.display = 'block';
+            } else {
+                lensEl.style.display = 'none';
+            }
+        }
+
+        function drawRays() {
+            const canvas = document.getElementById('rayCanvas');
+            canvas.innerHTML = ''; // 清空畫布
+
+            // 1. 計算焦點位置 (Focal Point X) - 物理邏輯部分保持不變
+            let focalPointX = retinaX;
+            let blurAmount = 0;
+            let isFocused = false;
+
+            if (condition === 'normal') {
+                if (lensType === 'none') { focalPointX = retinaX; isFocused = true; }
+                else if (lensType === 'concave') { focalPointX = retinaX + 100; blurAmount = 5; }
+                else if (lensType === 'convex') { focalPointX = retinaX - 100; blurAmount = 5; }
+            } else if (condition === 'myopia') {
+                let naturalFocus = retinaX - 90; 
+                if (lensType === 'none') { focalPointX = naturalFocus; blurAmount = 8; }
+                else if (lensType === 'concave') { focalPointX = retinaX; isFocused = true; }
+                else if (lensType === 'convex') { focalPointX = naturalFocus - 50; blurAmount = 15; }
+            } else if (condition === 'hyperopia') {
+                let naturalFocus = retinaX + 90;
+                if (lensType === 'none') { focalPointX = naturalFocus; blurAmount = 8; }
+                else if (lensType === 'concave') { focalPointX = naturalFocus + 50; blurAmount = 15; }
+                else if (lensType === 'convex') { focalPointX = retinaX; isFocused = true; }
+            }
+
+            // 2. 繪製光線 (SVG Lines) - *** 這裡修改了折射視覺效果 ***
+            
+            // --- 上半部光線 ---
+            // P1(起點) -> P2(矯正鏡片)
+            let pathStringTop = `M ${objectX} ${objectY_Top} L ${correctiveLensX} ${objectY_Top}`; 
+            
+            // 計算經過矯正鏡片後的 Y 座標偏折
+            let midY_Top = objectY_Top;
+            if (lensType === 'concave') midY_Top -= lensDeflectionAmount; // 發散：向上偏折
+            if (lensType === 'convex') midY_Top += lensDeflectionAmount;  // 匯聚：向下偏折
+
+            // P2(矯正鏡片) -> P3(水晶體) -> P4(焦點)
+            pathStringTop += ` L ${eyeLensX} ${midY_Top}`; 
+            pathStringTop += ` L ${focalPointX} ${centerY}`; 
+
+            // --- 下半部光線 ---
+            let pathStringBottom = `M ${objectX} ${objectY_Bottom} L ${correctiveLensX} ${objectY_Bottom}`;
+            
+            let midY_Bottom = objectY_Bottom;
+            if (lensType === 'concave') midY_Bottom += lensDeflectionAmount; // 發散：向下偏折
+            if (lensType === 'convex') midY_Bottom -= lensDeflectionAmount;  // 匯聚：向上偏折
+
+            pathStringBottom += ` L ${eyeLensX} ${midY_Bottom}`;
+            pathStringBottom += ` L ${focalPointX} ${centerY}`;
+
+            createSVGLine(pathStringTop, canvas);
+            createSVGLine(pathStringBottom, canvas);
+
+            // 3. 更新視網膜成像狀態
+            const retinaImg = document.getElementById('retinaImage');
+            const msg = document.getElementById('statusMessage');
+
+            retinaImg.style.filter = `blur(${blurAmount}px)`;
+            
+            if (isFocused) {
+                msg.textContent = "✅ 看得清楚！成像準確落在視網膜上。";
+                msg.className = "status-message clear";
+            } else {
+                if (focalPointX < retinaX) {
+                    msg.textContent = "❌ 模糊... 成像落在視網膜「前方」（近視狀態）。";
+                } else {
+                    msg.textContent = "❌ 模糊... 成像落在視網膜「後方」（遠視狀態）。";
+                }
+                msg.className = "status-message blurry";
+            }
+        }
+
+        function createSVGLine(d, canvas) {
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", d);
+            path.setAttribute("class", "light-ray");
+            path.setAttribute("fill", "none");
+            canvas.appendChild(path);
+        }
+
+        // 初始化
+        window.onload = () => {
+            updateUI();
+            drawRays();
+        };
+
+    </script>
+</body>
+</html>

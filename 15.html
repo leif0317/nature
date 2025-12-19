@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>專業版互動式元素週期表 (含影片功能)</title>
+    <style>
+        /* --- 1. 全域設定 --- */
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #ffffff;
+            --text-muted: #b0b0b0;
+            --border: #333;
+            --highlight: #4facfe;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* --- 2. 頂部導航 --- */
+        header {
+            width: 100%;
+            padding: 15px;
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        h1 { margin: 0; font-size: 1.5rem; letter-spacing: 1px; }
+
+        .search-box {
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: #2c2c2c;
+            color: white;
+            width: 300px;
+            outline: none;
+            transition: 0.3s;
+        }
+        .search-box:focus { border-color: var(--highlight); box-shadow: 0 0 8px rgba(79, 172, 254, 0.4); }
+
+        /* --- 3. 週期表佈局 --- */
+        .table-wrapper {
+            padding: 20px;
+            overflow-x: auto;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding-bottom: 50px;
+        }
+
+        .periodic-table {
+            display: grid;
+            grid-template-columns: repeat(18, 64px);
+            grid-template-rows: repeat(10, 64px);
+            gap: 5px;
+            position: relative; 
+        }
+
+        /* --- 4. 元素方塊 --- */
+        .element {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 2px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            user-select: none;
+        }
+
+        .element:hover {
+            transform: scale(1.4);
+            z-index: 20; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            border-color: #fff;
+            outline: 2px solid rgba(255, 255, 255, 0.8);
+        }
+
+        .element.dimmed { opacity: 0.1; filter: grayscale(100%); }
+
+        .el-num { font-size: 10px; color: var(--text-muted); padding-left: 4px; }
+        .el-sym { font-size: 20px; font-weight: bold; text-align: center; color: #fff; }
+        .el-name { font-size: 11px; text-align: center; white-space: nowrap; overflow: hidden; font-weight: bold; padding-bottom: 2px; }
+
+        /* --- 5. 預覽方框 --- */
+        #preview-container {
+            grid-column: 3 / 13;
+            grid-row: 1 / 4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none; 
+            z-index: 1;
+        }
+
+        #image-preview-box {
+            width: 320px;  
+            height: 250px;
+            background-color: #1a1a1a;
+            border: 2px dashed #444;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            transition: border-color 0.3s, background-color 0.3s;
+            position: relative;
+        }
+
+        #image-preview-box.active {
+            border-style: solid;
+            border-color: var(--highlight);
+            background-color: #000;
+        }
+
+        #preview-img {
+            width: 100%; height: 100%; object-fit: cover; display: none; 
+        }
+
+        #preview-text {
+            color: #666; font-size: 15px; text-align: center; padding: 20px; line-height: 1.6;
+        }
+
+        #preview-label {
+            position: absolute; bottom: 0; width: 100%;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0));
+            color: white; text-align: center; padding: 10px 0;
+            font-size: 18px; font-weight: bold; display: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,1);
+        }
+
+        @media (max-width: 1100px) {
+            #preview-container { display: none; }
+        }
+
+        /* --- 6. 分類顏色 --- */
+        .cat-alkali-metal { background-color: #b71c1c; }
+        .cat-alkaline-earth-metal { background-color: #f57f17; color: black; }
+        .cat-transition-metal { background-color: #ffb300; color: black; }
+        .cat-post-transition-metal { background-color: #43a047; color: black; }
+        .cat-metalloid { background-color: #00838f; }
+        .cat-polyatomic-nonmetal, .cat-diatomic-nonmetal, .cat-nonmetal { background-color: #1565c0; }
+        .cat-noble-gas { background-color: #5e35b1; }
+        .cat-lanthanide { background-color: #d81b60; }
+        .cat-actinide { background-color: #880e4f; }
+        .cat-unknown { background-color: #424242; }
+
+        /* --- 7. Modal 樣式 --- */
+        .modal {
+            display: none;
+            position: fixed; z-index: 100;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.85);
+            justify-content: center; align-items: center;
+            opacity: 0; transition: opacity 0.3s;
+            backdrop-filter: blur(5px);
+        }
+        .modal.show { opacity: 1; }
+        .modal-content {
+            background-color: #252525; padding: 30px;
+            border-radius: 12px; width: 90%; max-width: 600px;
+            position: relative; border: 1px solid #555;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        }
+        .close-btn {
+            position: absolute; top: 15px; right: 20px;
+            font-size: 28px; cursor: pointer; color: #aaa;
+            transition: color 0.2s;
+        }
+        .close-btn:hover { color: #fff; }
+
+        .modal-header {
+            display: flex; align-items: center; gap: 20px;
+            margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #444;
+        }
+        .big-symbol {
+            font-size: 60px; font-weight: bold;
+            width: 80px; height: 80px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 8px; background: #333; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+        .modal-title h2 { margin: 0; font-size: 2.2rem; }
+        .modal-title span { color: var(--text-muted); font-size: 1.1rem; }
+
+        .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .data-item { background: #333; padding: 10px; border-radius: 6px; }
+        .data-item strong { color: #ccc; font-size: 0.85rem; display: block; margin-bottom: 4px; }
+        .data-item span { font-size: 1.1rem; font-weight: bold; }
+
+        .summary-box { 
+            background: #202020; padding: 15px; 
+            border-radius: 6px; line-height: 1.6; 
+            color: #ddd; font-size: 1rem; 
+            max-height: 200px; overflow-y: auto; 
+            border-left: 4px solid var(--highlight);
+        }
+        
+        /* 連結與按鈕樣式 */
+        .links-container { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
+        
+        .wiki-link, .video-btn {
+            display: inline-flex; align-items: center;
+            padding: 8px 15px; border-radius: 20px;
+            text-decoration: none; font-size: 0.9rem;
+            transition: 0.2s;
+        }
+        
+        .wiki-link { background: #333; color: #4facfe; }
+        .wiki-link:hover { background: #444; }
+
+        /* [新增] 1A族影片按鈕樣式 */
+        .video-btn {
+            background: #d32f2f; color: white;
+            font-weight: bold;
+            display: none; /* 預設隱藏，JS控制顯示 */
+        }
+        .video-btn:hover { background: #b71c1c; transform: translateY(-2px); }
+
+        .loader { grid-column: 1 / -1; text-align: center; padding: 50px; color: #888; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>元素週期表</h1>
+        <input type="text" id="search" class="search-box" placeholder="搜尋 (例如: 金, Au, 79)...">
+    </header>
+
+    <div class="table-wrapper">
+        <div class="periodic-table" id="periodic-table">
+            <div id="preview-container">
+                <div id="image-preview-box">
+                    <img id="preview-img" src="" alt="">
+                    <div id="preview-text">滑鼠移至元素上方<br>預覽圖片</div>
+                    <div id="preview-label"></div>
+                </div>
+            </div>
+            <div class="loader">正在載入 118 個元素的中文資料...</div>
+        </div>
+    </div>
+
+    <div id="element-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <div class="modal-header">
+                <div id="m-bg" class="big-symbol"></div>
+                <div class="modal-title">
+                    <h2 id="m-name"></h2>
+                    <span id="m-en-name"></span><br>
+                    <span id="m-category" style="color:#aaa; font-size:0.9rem;"></span>
+                </div>
+            </div>
+            <div class="data-grid">
+                <div class="data-item"><strong>原子序</strong><span id="m-number"></span></div>
+                <div class="data-item"><strong>原子量</strong><span id="m-mass"></span></div>
+                <div class="data-item"><strong>電子組態</strong><span id="m-shell"></span></div>
+                <div class="data-item"><strong>相態 (常溫)</strong><span id="m-phase"></span></div>
+            </div>
+            <div class="summary-box">
+                <strong style="display:block; margin-bottom:5px; color:white;">簡介：</strong>
+                <span id="m-summary">載入中...</span>
+                
+                <div class="links-container">
+                    <a href="#" id="m-wiki" class="wiki-link" target="_blank">📖 維基百科</a>
+                    
+                    <a href="https://zh.wikipedia.org/wiki/File:Alkali_metals_reations.webm" 
+                       id="m-video-btn" 
+                       class="video-btn" 
+                       target="_blank">
+                       🎥 觀看反應影片 (1A族)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://raw.githubusercontent.com/Bowserinator/Periodic-Table-JSON/master/PeriodicTableJSON.json';
+        const IMG_PROXY_BASE = 'https://images.weserv.nl/?url=images-of-elements.com/';
+
+        const zhNames = {
+            "Hydrogen": "氫", "Helium": "氦", "Lithium": "鋰", "Beryllium": "鈹", "Boron": "硼", 
+            "Carbon": "碳", "Nitrogen": "氮", "Oxygen": "氧", "Fluorine": "氟", "Neon": "氖",
+            "Sodium": "鈉", "Magnesium": "鎂", "Aluminium": "鋁", "Silicon": "矽", "Phosphorus": "磷", 
+            "Sulfur": "硫", "Chlorine": "氯", "Argon": "氬", "Potassium": "鉀", "Calcium": "鈣",
+            "Scandium": "鈧", "Titanium": "鈦", "Vanadium": "釩", "Chromium": "鉻", "Manganese": "錳", 
+            "Iron": "鐵", "Cobalt": "鈷", "Nickel": "鎳", "Copper": "銅", "Zinc": "鋅",
+            "Gallium": "鎵", "Germanium": "鍺", "Arsenic": "砷", "Selenium": "硒", "Bromine": "溴", 
+            "Krypton": "氪", "Rubidium": "銣", "Strontium": "鍶", "Yttrium": "釔", "Zirconium": "鋯",
+            "Niobium": "鈮", "Molybdenum": "鉬", "Technetium": "鎝", "Ruthenium": "釕", "Rhodium": "銠", 
+            "Palladium": "鈀", "Silver": "銀", "Cadmium": "鎘", "Indium": "銦", "Tin": "錫",
+            "Antimony": "銻", "Tellurium": "碲", "Iodine": "碘", "Xenon": "氙", "Cesium": "銫", 
+            "Barium": "鋇", "Lanthanum": "鑭", "Cerium": "鈰", "Praseodymium": "鐠", "Neodymium": "釹",
+            "Promethium": "鉕", "Samarium": "釤", "Europium": "銪", "Gadolinium": "釓", "Terbium": "鋱", 
+            "Dysprosium": "鏑", "Holmium": "鈥", "Erbium": "鉺", "Thulium": "銩", "Ytterbium": "鐿",
+            "Lutetium": "鎦", "Hafnium": "鉿", "Tantalum": "鉭", "Tungsten": "鎢", "Rhenium": "錸", 
+            "Osmium": "鋨", "Iridium": "銥", "Platinum": "鉑", "Gold": "金", "Mercury": "汞",
+            "Thallium": "鉈", "Lead": "鉛", "Bismuth": "鉍", "Polonium": "釙", "Astatine": "砈", 
+            "Radon": "氡", "Francium": "鍅", "Radium": "鐳", "Actinium": "錒", "Thorium": "釷",
+            "Protactinium": "鏷", "Uranium": "鈾", "Neptunium": "錼", "Plutonium": "鈽", "Americium": "鋂", 
+            "Curium": "鋦", "Berkelium": "鉳", "Californium": "鉲", "Einsteinium": "鑀", "Fermium": "鐨",
+            "Mendelevium": "鍆", "Nobelium": "鍩", "Lawrencium": "鐒", "Rutherfordium": "鑪", "Dubnium": "𨧀", 
+            "Seaborgium": "𨭎", "Bohrium": "𨨏", "Hassium": "𨭆", "Meitnerium": "䥑", "Darmstadtium": "鐽",
+            "Roentgenium": "錀", "Copernicium": "鎶", "Nihonium": "鉨", "Flerovium": "鈇", "Moscovium": "鏌", 
+            "Livermorium": "鉝", "Tennessine": "鿬", "Oganesson": "鿫"
+        };
+
+        const categoryMap = {
+            "alkali metal": "鹼金屬", "alkaline earth metal": "鹼土金屬", "transition metal": "過渡金屬",
+            "post-transition metal": "貧金屬", "metalloid": "類金屬", "polyatomic nonmetal": "多原子非金屬",
+            "diatomic nonmetal": "雙原子非金屬", "noble gas": "惰性氣體", "lanthanide": "鑭系元素",
+            "actinide": "錒系元素", "unknown": "性質未知"
+        };
+
+        const phaseMap = { "Solid": "固體", "Liquid": "液體", "Gas": "氣體" };
+
+        const tableContainer = document.getElementById('periodic-table');
+        const modal = document.getElementById('element-modal');
+        const searchInput = document.getElementById('search');
+        
+        const previewBox = document.getElementById('image-preview-box');
+        const previewImg = document.getElementById('preview-img');
+        const previewText = document.getElementById('preview-text');
+        const previewLabel = document.getElementById('preview-label');
+
+        async function init() {
+            try {
+                const res = await fetch(API_URL);
+                const data = await res.json();
+                document.querySelector('.loader').style.display = 'none';
+                renderTable(data.elements);
+            } catch (err) {
+                console.error(err);
+                document.querySelector('.loader').innerText = "資料載入失敗，請檢查網路。";
+            }
+        }
+
+        function renderTable(elements) {
+            elements.forEach(el => {
+                const div = document.createElement('div');
+                div.className = 'element';
+                
+                let catClass = 'cat-' + (el.category || 'unknown').replace(/\s+/g, '-').toLowerCase();
+                if(catClass.includes('nonmetal')) catClass = 'cat-nonmetal'; 
+                div.classList.add(catClass);
+
+                div.style.gridColumn = el.xpos;
+                div.style.gridRow = el.ypos;
+                
+                const zhName = zhNames[el.name] || el.name;
+                div.dataset.zhName = zhName; 
+                div.dataset.enName = el.name.toLowerCase();
+
+                div.innerHTML = `
+                    <span class="el-num">${el.number}</span>
+                    <span class="el-sym">${el.symbol}</span>
+                    <span class="el-name">${zhName}</span>
+                `;
+
+                div.addEventListener('mouseenter', () => updatePreview(el, zhName));
+                div.onclick = () => openModal(el, catClass, zhName);
+                tableContainer.appendChild(div);
+            });
+        }
+
+        function updatePreview(el, zhName) {
+            previewBox.classList.add('active');
+            previewImg.style.display = 'none';
+            previewLabel.style.display = 'none';
+            previewText.style.display = 'block';
+            previewText.innerText = '載入中...';
+
+            let nameForUrl = el.name.toLowerCase();
+            if (nameForUrl === 'aluminum') nameForUrl = 'aluminium';
+            if (nameForUrl === 'cesium') nameForUrl = 'caesium';
+
+            const imgUrl = `${IMG_PROXY_BASE}${nameForUrl}.jpg`;
+            previewImg.src = imgUrl;
+
+            previewImg.onload = () => {
+                previewImg.style.display = 'block';
+                previewLabel.style.display = 'block';
+                previewLabel.innerText = `${zhName} (${el.symbol})`;
+                previewText.style.display = 'none';
+            };
+
+            previewImg.onerror = () => {
+                previewImg.style.display = 'none';
+                previewLabel.style.display = 'none';
+                previewText.style.display = 'block';
+                previewText.innerHTML = `<span style="font-size:40px; color:#555;">${el.symbol}</span><br>暫無圖片`;
+            };
+        }
+
+        async function openModal(el, colorClass, zhName) {
+            document.getElementById('m-bg').innerText = el.symbol;
+            document.getElementById('m-bg').className = `big-symbol ${colorClass}`;
+            document.getElementById('m-name').innerText = zhName;
+            document.getElementById('m-en-name').innerText = el.name;
+            document.getElementById('m-category').innerText = categoryMap[el.category] || el.category;
+            
+            document.getElementById('m-number').innerText = el.number;
+            document.getElementById('m-mass').innerText = el.atomic_mass;
+            document.getElementById('m-shell').innerText = el.electron_configuration;
+            document.getElementById('m-phase').innerText = phaseMap[el.phase] || el.phase;
+            
+            // --- [關鍵新增] 控制 1A 族影片按鈕顯示/隱藏 ---
+            const videoBtn = document.getElementById('m-video-btn');
+            // 判斷是否為鹼金屬 (Alkali metal)
+            if (el.category.includes('alkali metal')) {
+                videoBtn.style.display = 'inline-flex';
+            } else {
+                videoBtn.style.display = 'none';
+            }
+
+            const summaryEl = document.getElementById('m-summary');
+            const wikiLink = document.getElementById('m-wiki');
+            summaryEl.innerText = "正在從維基百科獲取中文介紹...";
+            wikiLink.href = `https://zh.wikipedia.org/wiki/${zhName}`;
+            
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
+
+            // API 獲取簡介
+            try {
+                const wikiApi = `https://zh.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(zhName)}`;
+                const res = await fetch(wikiApi);
+                if (res.ok) {
+                    const data = await res.json();
+                    summaryEl.innerText = data.extract || "暫無摘要。";
+                } else {
+                    summaryEl.innerText = "無法載入簡介。";
+                }
+            } catch (e) {
+                summaryEl.innerText = "載入失敗。";
+            }
+        }
+
+        searchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.element').forEach(card => {
+                const zh = card.dataset.zhName;
+                const en = card.dataset.enName;
+                const sym = card.querySelector('.el-sym').innerText.toLowerCase();
+                const num = card.querySelector('.el-num').innerText;
+
+                if (zh.includes(term) || en.includes(term) || sym.includes(term) || num === term) {
+                    card.classList.remove('dimmed');
+                } else {
+                    card.classList.add('dimmed');
+                }
+            });
+        });
+
+        const closeBtn = document.querySelector('.close-btn');
+        closeBtn.onclick = () => {
+            modal.classList.remove('show');
+            setTimeout(() => modal.style.display = 'none', 300);
+        };
+        window.onclick = (e) => { if (e.target == modal) closeBtn.onclick(); }
+
+        init();
+    </script>
+</body>
+</html>
