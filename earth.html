@@ -2,47 +2,59 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>地月日系統 - 穩定防迷路版</title>
+    <title>地月日系統 - 圖例置中優化版</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: '微軟正黑體', 'Segoe UI', sans-serif; }
         
-        /* 左下角圖例 */
+        /* --- 圖例面板 (水平置中) --- */
         #legend-panel {
             position: absolute;
             bottom: 20px;
-            left: 20px;
+            left: 50%;
+            transform: translateX(-50%); /* 水平置中 */
+            
+            display: flex;
+            flex-direction: row; /* 橫向排列 */
+            align-items: center;
+            gap: 20px; /* 項目間距 */
+            
             color: rgba(255, 255, 255, 0.9);
-            background: rgba(10, 15, 30, 0.9);
-            padding: 15px 20px;
-            border-radius: 12px;
+            background: rgba(10, 15, 30, 0.85); /* 稍微透明一點 */
+            padding: 12px 25px;
+            border-radius: 50px; /* 圓角膠囊狀 */
             border: 1px solid rgba(150, 150, 150, 0.3);
             backdrop-filter: blur(8px);
             pointer-events: none;
             user-select: none;
             box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
-            min-width: 240px;
             z-index: 10;
+            white-space: nowrap; /* 防止換行 */
         }
-        .legend-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; }
-        .icon { width: 24px; height: 3px; margin-right: 12px; display: inline-block; }
-        .icon-circle { width: 12px; height: 12px; border-radius: 50%; margin-right: 16px; margin-left: 6px; }
+
+        /* 圖例標題 (橫向時可以縮小或隱藏，這裡改為小標籤) */
+        .legend-title {
+            font-weight: bold;
+            color: #fff;
+            margin-right: 10px;
+            padding-right: 15px;
+            border-right: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .legend-item { display: flex; align-items: center; font-size: 13px; }
         
-        /* 右下角署名 */
+        .icon { width: 20px; height: 3px; margin-right: 8px; display: inline-block; }
+        .icon-circle { width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+        
+        /* 右下角署名 (稍微上移避開圖例) */
         #signature {
             position: absolute;
-            bottom: 30px;
-            right: 30px;
-            color: #ffffff;
-            font-size: 32px;
+            bottom: 20px;
+            right: 20px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 24px; /* 稍微縮小以免太搶眼 */
             font-weight: 900;
             letter-spacing: 2px;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 15px 30px;
-            border-radius: 50px;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            backdrop-filter: blur(5px);
             text-shadow: 0 0 10px rgba(0, 100, 255, 0.8);
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
             pointer-events: none;
             user-select: none;
             z-index: 20;
@@ -57,16 +69,19 @@
 <div id="signature">小粘製作</div>
 
 <div id="legend-panel">
-    <div style="font-weight: bold; margin-bottom: 12px; border-bottom: 1px solid #999; padding-bottom:8px; font-size: 15px; color:#fff;">圖例說明</div>
-    <div class="legend-row"><span class="icon" style="background: #ff0000; height: 3px;"></span>地球赤道 (0°)</div>
-    <div class="legend-row"><span class="icon" style="border-top: 2px dashed #ffff00; background: transparent;"></span>南北回歸線 (±23.5°)</div>
-    <div class="legend-row"><span class="icon" style="border-top: 2px solid white; background: transparent;"></span>黃道面 (公轉軌道)</div>
-    <div class="legend-row"><span class="icon" style="border-top: 2px solid #ffffff; background: transparent;"></span>月球軌道 (白)</div>
-    <div style="font-size: 12px; color: #aaa; margin-left: 36px; margin-bottom: 5px;">
-        與黃道夾 5.14°<br>與赤道夾 28.64°
+    <div class="legend-title">圖例</div>
+    
+    <div class="legend-item"><span class="icon" style="background: #ff0000; height: 3px;"></span>赤道(0°)</div>
+    <div class="legend-item"><span class="icon" style="border-top: 2px dashed #ffff00; background: transparent;"></span>回歸線(±23.5°)</div>
+    <div class="legend-item"><span class="icon" style="border-top: 2px solid white; background: transparent;"></span>黃道面</div>
+    <div class="legend-item"><span class="icon" style="border-top: 2px solid #ffffff; background: transparent;"></span>月球軌道</div>
+    
+    <div class="legend-item" style="color:#aaa; font-size:12px; margin-left:5px;">
+        (夾角: 黃道5.14° / 赤道28.64°)
     </div>
-    <div class="legend-row"><span class="icon-circle" style="background: #00ff00;"></span>自轉方向 (逆時針)</div>
-    <div class="legend-row"><span class="icon-circle" style="background: #ffff00;"></span>太陽直射光</div>
+
+    <div class="legend-item" style="margin-left: 10px;"><span class="icon-circle" style="background: #00ff00;"></span>自轉(逆)</div>
+    <div class="legend-item"><span class="icon-circle" style="background: #ffff00;"></span>直射光</div>
 </div>
 
 <script type="importmap">
@@ -90,9 +105,9 @@
     
     // 1. 初始化
     const scene = new THREE.Scene();
-    // 增加最遠可視距離到 20000，防止遠處物體被切掉
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 20000);
-    camera.position.set(0, 250, 450); 
+    const initialCameraPos = { x: 0, y: 300, z: 500 };
+    camera.position.set(initialCameraPos.x, initialCameraPos.y, initialCameraPos.z);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -201,7 +216,8 @@
         return sprite;
     }
     
-    const labelDist = orbitRadius + 55; 
+    // 標籤貼近軌道
+    const labelDist = orbitRadius + 25; 
 
     // 冬至 (右, +X)
     const winterLabel = createTextSprite('冬至', '#44aaff');
@@ -232,7 +248,7 @@
     earthTiltGroup.rotation.z = THREE.MathUtils.degToRad(-23.5); 
     earthPosGroup.add(earthTiltGroup);
 
-    // 地球 (手繪紋理)
+    // 地球 (手繪紋理 + 純白材質)
     earthMesh = new THREE.Mesh(
         new THREE.SphereGeometry(7, 64, 64),
         new THREE.MeshBasicMaterial({
@@ -301,17 +317,32 @@
     sunArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 1, 0xffff00, 8, 5);
     scene.add(sunArrow);
 
-    // 8. 控制與動畫 (關鍵修正：增加限制)
+    // 8. 控制與動畫
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    
-    // 【核心修正】限制縮放與平移，防止操作失效
-    controls.minDistance = 50;   // 最近只能拉到 50 (不會穿進地球)
-    controls.maxDistance = 800;  // 最遠只能拉到 800 (不會迷失太空)
-    controls.enablePan = false;  // 禁止平移 (防止地球被拖出畫面)
+    controls.dampingFactor = 0.05;
+    controls.zoomSpeed = 0.3;
+    controls.rotateSpeed = 0.5;
+    controls.minDistance = 100;
+    controls.maxDistance = 1500;
+    controls.enablePan = false;
 
+    // --- GUI 控制面板 ---
     const gui = new GUI({ title: '⚙️ 模擬控制' });
-    const params = { speed: 1.0, pause: false, earthScale: 1.0, showMarkers: true };
+    const params = { 
+        speed: 1.0, 
+        pause: false, 
+        earthScale: 1.0, 
+        showMarkers: true,
+        viewZoom: 1.0,
+        resetView: function() {
+            camera.position.set(initialCameraPos.x, initialCameraPos.y, initialCameraPos.z);
+            camera.zoom = 1.0;
+            camera.updateProjectionMatrix();
+            controls.reset();
+            params.viewZoom = 1.0;
+        }
+    };
     
     gui.add(params, 'earthScale', 0.5, 3.0).name('🌍 地球大小').onChange(v => {
         if (earthMesh) earthMesh.scale.set(v, v, v);
@@ -321,6 +352,11 @@
     gui.add(params, 'showMarkers').name('顯示節氣').onChange(v => markersGroup.visible = v);
     gui.add(params, 'speed', 0, 2.5).name('⏩ 速度');
     gui.add(params, 'pause').name('⏸ 暫停');
+    gui.add(params, 'viewZoom', 0.1, 3.0).name('🔍 畫面縮放').onChange(v => {
+        camera.zoom = v;
+        camera.updateProjectionMatrix();
+    });
+    gui.add(params, 'resetView').name('⟲ 重置視角');
 
     let orbitAngle = 0;
 
