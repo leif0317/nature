@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 潮汐 V8：修正穩定版</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: "Microsoft JhengHei", sans-serif; background-color: #87CEEB; }
+        
+        #ui-layer {
+            position: absolute;
+            top: 20px; left: 20px;
+            color: white;
+            background: rgba(0, 40, 60, 0.8);
+            padding: 25px;
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.15);
+            max-width: 360px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        h1 { margin: 0 0 15px 0; font-size: 1.8rem; color: #00eaff; text-shadow: 0 2px 10px rgba(0,200,255,0.5); }
+        
+        .status-card {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 12px;
+            margin: 20px 0;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        #current-state { font-size: 1.6rem; font-weight: bold; color: #FFD700; text-shadow: 0 2px 4px black; transition: color 0.5s; }
+        
+        .btn-group { display: flex; gap: 12px; margin-top: 25px; }
+        button {
+            flex: 1;
+            padding: 12px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: 0.3s;
+            font-size: 1rem; font-weight: bold;
+        }
+        button:hover { background: rgba(255,255,255,0.25); transform: translateY(-2px); }
+        button.active { 
+            background: linear-gradient(135deg, #00c6ff, #0072ff);
+            border: none; 
+            box-shadow: 0 4px 15px rgba(0, 114, 255, 0.5);
+        }
+        
+        .legend { font-size: 0.95rem; margin-top: 20px; color: #eee; line-height: 1.8; }
+        .legend b { color: #00eaff; }
+
+        #error-msg { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #ff4444; color: white; padding: 20px; border-radius: 10px; z-index: 999; text-align: center; }
+    </style>
+    <script> window.onerror = function(msg) { document.getElementById('error-msg').style.display = 'block'; document.getElementById('error-msg').innerHTML = `<h3⚠️ 錯誤</h3><p>${msg}</p>`; }; </script>
+    <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } } </script>
+</head>
+<body>
+
+    <div id="error-msg"></div>
+
+    <div id="ui-layer">
+        <h1>海岸生態觀測站 V8</h1>
+        <div class="status-card">
+            <div style="font-size:0.9rem; color:#bbb; margin-bottom:5px;">潮汐狀態</div>
+            <div id="current-state">生態系載入中...</div>
+        </div>
+
+        <div class="legend">
+            🐠 <b>動態魚群</b>：漲潮游近岸，退潮游回深海<br>
+            ⭐ <b>海星與貝殼</b>：散佈於潮間帶沙灘<br>
+            🦀 <b>螃蟹與樹木</b>：維持原有生態
+        </div>
+
+        <div class="btn-group">
+            <button id="btn-spring" class="active" onclick="window.setMode('spring')">大潮 (Spring)</button>
+            <button id="btn-neap" onclick="window.setMode('neap')">小潮 (Neap)</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ==================== 1. 場景基礎設定 ====================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); 
+        scene.fog = new THREE.FogExp2(0x87CEEB, 0.0025);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(120, 50, 140); 
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; 
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.maxPolarAngle = Math.PI / 2 - 0.02;
+        controls.maxDistance = 400;
+
+        // ==================== 2. 燈光系統 ====================
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffeedd, 0.6);
+        scene.add(hemiLight);
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 1.3);
+        sunLight.position.set(100, 150, 100);
+        sunLight.castShadow = true;
+        sunLight.shadow.camera.left = -250; sunLight.shadow.camera.right = 250;
+        sunLight.shadow.camera.top = 250; sunLight.shadow.camera.bottom = -250;
+        sunLight.shadow.mapSize.set(2048, 2048);
+        scene.add(sunLight);
+
+        // ==================== 3. 地形生成 ====================
+        const terrainSize = 450;
+        const terrainRes = 128;
+        const landGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainRes, terrainRes);
+        landGeo.rotateX(-Math.PI / 2);
+        const posAttr = landGeo.attributes.position;
+        
+        function getTerrainHeight(x, z) {
+            let h = x * 0.15; 
+            h += Math.sin(x * 0.03) * 3 + Math.cos(z * 0.04) * 2.5; 
+            h += Math.random() * 0.3; 
+            const riverPathCenterZ = Math.sin(x * 0.05) * 30;
+            const distToRiver = Math.abs(z - riverPathCenterZ);
+            if (distToRiver < 20) {
+                h -= (1 - distToRiver / 20) * 8;
+            }
+            return h;
+        }
+
+        for (let i = 0; i < posAttr.count; i++) {
+            posAttr.setY(i, getTerrainHeight(posAttr.getX(i), posAttr.getZ(i)));
+        }
+        landGeo.computeVertexNormals();
+        const terrain = new THREE.Mesh(landGeo, new THREE.MeshStandardMaterial({ color: 0xd4b483, roughness: 0.9 }));
+        terrain.receiveShadow = true;
+        terrain.position.y = -10;
+        scene.add(terrain);
+
+        // ==================== 4. 生態物件 ====================
+        
+        // 海星
+        function createStarfish() {
+            const group = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({ color: 0xff6f61, roughness: 1 });
+            for(let i=0; i<5; i++) {
+                const arm = new THREE.Mesh(new THREE.ConeGeometry(0.3, 1.8, 4), mat);
+                arm.rotation.z = Math.PI / 2;
+                arm.rotation.y = (i / 5) * Math.PI * 2;
+                arm.position.set(Math.cos(arm.rotation.y)*0.8, 0, Math.sin(arm.rotation.y)*0.8);
+                group.add(arm);
+            }
+            group.scale.y = 0.3; 
+            group.castShadow = true;
+            return group;
+        }
+
+        // 貝殼
+        function createSeashell() {
+            const geo = new THREE.SphereGeometry(0.6, 8, 6, 0, Math.PI * 2, 0, Math.PI/2);
+            const mat = new THREE.MeshStandardMaterial({ color: 0xF5ECCD, roughness: 0.6 });
+            const shell = new THREE.Mesh(geo, mat);
+            shell.scale.z = 0.4; 
+            shell.rotation.x = -Math.PI/2;
+            shell.castShadow = true;
+            return shell;
+        }
+
+        // 魚群
+        const fishSchoolGroup = new THREE.Group();
+        scene.add(fishSchoolGroup);
+        const fishCount = 50;
+        const fishMeshes = [];
+
+        function createFish() {
+            const fishGeo = new THREE.ConeGeometry(0.4, 1.5, 5);
+            fishGeo.rotateZ(-Math.PI/2);
+            const fishMat = new THREE.MeshStandardMaterial({ color: 0x44aaff, metalness: 0.5 });
+            return new THREE.Mesh(fishGeo, fishMat);
+        }
+
+        for(let i=0; i<fishCount; i++) {
+            const fish = createFish();
+            fish.position.set((Math.random()-0.5)*30, (Math.random()-0.5)*10, (Math.random()-0.5)*30);
+            fish.userData.speed = 0.05 + Math.random() * 0.05;
+            fish.userData.offset = Math.random() * Math.PI * 2;
+            fishSchoolGroup.add(fish);
+            fishMeshes.push(fish);
+        }
+
+        // 樹木
+        function createPalmTree() { 
+            const g=new THREE.Group(); 
+            const t=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.8,8,8),new THREE.MeshStandardMaterial({color:0x8B4513})); 
+            t.position.y=4; t.castShadow=true; g.add(t); 
+            const lm=new THREE.MeshStandardMaterial({color:0x228B22,flatShading:true}); 
+            for(let i=0;i<3;i++){
+                const l=new THREE.Mesh(new THREE.ConeGeometry(3-i*0.5,4,8),lm); 
+                l.position.y=8+i*1.5; l.rotation.y=Math.random(); l.castShadow=true; g.add(l);
+            } 
+            return g;
+        }
+        
+        // 螃蟹
+        function createCrab() { 
+            const g=new THREE.Group(); 
+            const b=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.6,0.8),new THREE.MeshStandardMaterial({color:0xff4422})); 
+            b.position.y=0.3; b.castShadow=true; g.add(b); 
+            return g;
+        }
+
+        // 散佈
+        for (let i = 0; i < 250; i++) {
+            const x = (Math.random() - 0.5) * terrainSize * 0.85;
+            const z = (Math.random() - 0.5) * terrainSize * 0.85;
+            const y = getTerrainHeight(x, z) - 10;
+            const distToRiver = Math.abs(z - Math.sin(x * 0.05) * 30);
+
+            if (x > 60 && y > 6 && distToRiver > 30) {
+                const tree = createPalmTree(); tree.position.set(x,y,z); tree.scale.setScalar(0.8+Math.random()*0.5); scene.add(tree);
+            }
+            if (y > -8 && y < 3) {
+                const rand = Math.random();
+                if (rand > 0.85) {
+                    const crab = createCrab(); crab.position.set(x,y,z); crab.rotation.y=Math.random()*Math.PI; scene.add(crab);
+                } else if (rand > 0.6) {
+                    const star = createStarfish(); star.position.set(x,y+0.1,z); star.rotation.y=Math.random(); scene.add(star);
+                } else if (rand > 0.35) {
+                    const shell = createSeashell(); shell.position.set(x,y+0.1,z); shell.rotation.y=Math.random(); scene.add(shell);
+                }
+            }
+        }
+
+        // ==================== 5. 海洋與船隻 (修正 Bug 區) ====================
+        const waterGeo = new THREE.PlaneGeometry(terrainSize * 1.8, terrainSize * 1.8);
+        const waterMat = new THREE.MeshStandardMaterial({
+            color: 0x006994, transparent: true, opacity: 0.75,
+            roughness: 0.1, metalness: 0.4,
+        });
+        const water = new THREE.Mesh(waterGeo, waterMat);
+        water.rotateX(-Math.PI / 2);
+        scene.add(water);
+
+        const boatGroup = new THREE.Group();
+        
+        // 船身 (Hull)
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(6, 2.5, 3), new THREE.MeshStandardMaterial({ color: 0x8B4513 }));
+        hull.position.y = 1.25;
+        boatGroup.add(hull);
+
+        // 船艙 (Cabin)
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 2), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+        cabin.position.set(-1, 3, 0); // 使用標準 position.set
+        boatGroup.add(cabin);
+
+        // 桅杆 (Mast)
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 6), new THREE.MeshStandardMaterial({ color: 0x555555 }));
+        mast.position.set(1, 4, 0); // 使用標準 position.set
+        boatGroup.add(mast);
+
+        // 旗幟 (Flag)
+        const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1), new THREE.MeshStandardMaterial({ color: 0xff0000, side: THREE.DoubleSide }));
+        flag.position.set(1.8, 6.5, 0); // 使用標準 position.set
+        boatGroup.add(flag);
+
+        boatGroup.castShadow = true;
+        scene.add(boatGroup);
+
+        // ==================== 6. 動畫邏輯 ====================
+        let time = 0;
+        let amplitude = 9; 
+        let currentAmp = 9;
+        const waterBaseY = -10; 
+
+        window.setMode = (m) => {
+            amplitude = (m === 'spring') ? 9 : 3;
+            document.getElementById('btn-spring').classList.toggle('active', m === 'spring');
+            document.getElementById('btn-neap').classList.toggle('active', m === 'neap');
+        };
+
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.008;
+
+            currentAmp += (amplitude - currentAmp) * 0.03; 
+
+            const tideSin = Math.sin(time); 
+            const tideDerivative = Math.cos(time);
+            const waterLevel = waterBaseY + (tideSin * currentAmp);
+            water.position.y = waterLevel;
+
+            // 魚群遷徙
+            const deepSeaX = -150;
+            const shoreX = -20;
+            const tideNormalized = (tideSin + 1) / 2;
+            const targetFishX = deepSeaX + (shoreX - deepSeaX) * tideNormalized;
+            
+            fishSchoolGroup.position.x += (targetFishX - fishSchoolGroup.position.x) * 0.02;
+            fishSchoolGroup.position.y = waterLevel - 5; 
+
+            fishMeshes.forEach(fish => {
+                fish.rotation.y = Math.sin(time * 2 + fish.userData.offset) * 0.2;
+                fish.position.y += Math.sin(time * 4 + fish.userData.offset) * 0.02;
+            });
+
+            // 船隻
+            boatGroup.position.set(-100, waterLevel - 0.8 + Math.sin(time*3)*0.3, 40);
+            boatGroup.rotation.z = Math.sin(time*2)*0.08;
+            boatGroup.rotation.x = Math.cos(time*2.5)*0.05;
+
+            // 狀態
+            let statusText = "", statusColor = "#FFD700";
+            if (tideSin > 0.95) { statusText = "🌊 滿潮 (High Tide)"; statusColor = "#00eaff"; }
+            else if (tideSin < -0.95) { statusText = "🪨 乾潮 (Low Tide)"; statusColor = "#ff9a00"; }
+            else if (tideDerivative > 0) { statusText = "📈 漲潮中 (Rising) - 魚群進港"; statusColor = "#00eaff"; }
+            else { statusText = "📉 退潮中 (Ebbing) - 魚群離岸"; statusColor = "#ff9a00"; }
+            document.getElementById('current-state').innerHTML = statusText;
+            document.getElementById('current-state').style.color = statusColor;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
