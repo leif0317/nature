@@ -3,152 +3,322 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三角形三心互動演示</title>
+    <title>全功能三角形演示 (縮放/旋轉/數據/鎖定)</title>
     <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --light: #ecf0f1;
+        }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f9;
+            background-color: #f8f9fa;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             height: 100vh;
             overflow: hidden;
         }
 
-        header {
-            background-color: #2c3e50;
-            color: white;
-            width: 100%;
-            padding: 15px;
-            text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-
-        #controls {
-            margin: 10px;
-            padding: 10px;
+        /* Sidebar Layout */
+        #sidebar {
+            width: 340px;
             background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
             display: flex;
+            flex-direction: column;
             gap: 15px;
-            flex-wrap: wrap;
-            justify-content: center;
+            overflow-y: auto;
+            z-index: 10;
+            flex-shrink: 0;
         }
 
-        .control-group {
+        h3 { margin: 0 0 10px 0; color: var(--primary); font-size: 1.1em; border-bottom: 2px solid var(--accent); padding-bottom: 5px;}
+
+        /* Control Groups */
+        .control-section {
+            background: #fdfdfd;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .toggle-row {
             display: flex;
             align-items: center;
-            gap: 5px;
-            padding: 5px 10px;
+            margin-bottom: 6px;
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+        .toggle-row input { margin-right: 8px; transform: scale(1.1); }
+        .sub-option { margin-left: 24px; font-size: 0.85em; color: #555; }
+
+        /* Measurement Inputs */
+        .measure-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.85em;
+        }
+        .measure-row label { width: 45px; font-weight: bold; }
+        .measure-row input[type="number"] {
+            width: 60px;
+            padding: 3px;
+            border: 1px solid #ccc;
             border-radius: 4px;
-            cursor: pointer;
-            user-select: none;
-            font-weight: bold;
+            text-align: right;
         }
+        .lock-check { margin-left: 5px; cursor: pointer; }
+        
+        /* Slider Controls */
+        .slider-container { margin-bottom: 10px; }
+        input[type="range"] { width: 100%; cursor: pointer; margin-top: 5px;}
 
-        /* Color Coding */
-        .c-centroid { color: #e67e22; border: 1px solid #e67e22; }
-        .c-circum { color: #2980b9; border: 1px solid #2980b9; }
-        .c-incenter { color: #27ae60; border: 1px solid #27ae60; }
+        /* Colors */
+        .c-centroid { color: #e67e22; }
+        .c-circum { color: #2980b9; }
+        .c-incenter { color: #27ae60; }
 
-        input[type="checkbox"] {
-            cursor: pointer;
-            transform: scale(1.2);
-        }
-
+        /* Main Canvas */
         #canvas-container {
             flex-grow: 1;
-            width: 100%;
             position: relative;
-            background: white;
+            background: radial-gradient(circle, #ffffff 0%, #f0f2f5 100%);
             cursor: crosshair;
+            overflow: hidden;
         }
+        canvas { display: block; width: 100%; height: 100%; }
 
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-
-        .instruction {
+        /* Real-time Data Panel */
+        #data-panel {
             position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.8);
-            padding: 5px 15px;
-            border-radius: 20px;
+            top: 20px;
+            right: 20px;
+            width: 200px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            padding: 15px;
+            font-size: 0.85em;
             pointer-events: none;
-            color: #555;
-            font-size: 0.9em;
+            border-left: 4px solid var(--accent);
+        }
+        .data-group { margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .data-group:last-child { border-bottom: none; }
+        .data-title { font-weight: bold; margin-bottom: 3px; color: #555; }
+        .data-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .data-val { font-family: 'Consolas', monospace; font-weight: bold; }
+
+        .hint {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.8);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            color: #666;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
 
-<header>
-    <h2>三角形三心互動演示 (外心、內心、重心)</h2>
-</header>
+<div id="sidebar">
+    <h3>顯示與連線設定</h3>
+    <div class="control-section">
+        <label class="toggle-row c-centroid">
+            <input type="checkbox" id="showCentroid" checked> 重心 (G) / 中線
+        </label>
+        <label class="toggle-row c-centroid sub-option">
+            <input type="checkbox" id="showCentroidLines"> 連線 GA, GB, GC
+        </label>
+        <hr style="border:0; border-top:1px dashed #eee; margin:5px 0;">
 
-<div id="controls">
-    <label class="control-group c-centroid">
-        <input type="checkbox" id="showCentroid" checked> 重心 (G) / 中線
-    </label>
-    <label class="control-group c-circum">
-        <input type="checkbox" id="showCircum" checked> 外心 (O) / 外接圓
-    </label>
-    <label class="control-group c-incenter">
-        <input type="checkbox" id="showIncenter" checked> 內心 (I) / 內切圓
-    </label>
+        <label class="toggle-row c-circum">
+            <input type="checkbox" id="showCircum" checked> 外心 (O) / 外接圓
+        </label>
+        <label class="toggle-row c-circum sub-option">
+            <input type="checkbox" id="showCircumLines"> 連線 OA, OB, OC
+        </label>
+        <hr style="border:0; border-top:1px dashed #eee; margin:5px 0;">
+
+        <label class="toggle-row c-incenter">
+            <input type="checkbox" id="showIncenter" checked> 內心 (I) / 內切圓
+        </label>
+        <label class="toggle-row c-incenter sub-option">
+            <input type="checkbox" id="showIncenterLines"> 連線 IA, IB, IC
+        </label>
+    </div>
+
+    <h3>幾何參數 (輸入/鎖定)</h3>
+    <div class="control-section">
+        <div class="measure-row">
+            <label>c (AB)</label>
+            <input type="number" id="val_c" step="1">
+            <input type="checkbox" id="lock_c" class="lock-check" title="鎖定長度"> 🔒
+        </div>
+        <div class="measure-row">
+            <label>a (BC)</label>
+            <input type="number" id="val_a" step="1">
+            <input type="checkbox" id="lock_a" class="lock-check" title="鎖定長度"> 🔒
+        </div>
+        <div class="measure-row">
+            <label>b (AC)</label>
+            <input type="number" id="val_b" step="1">
+            <input type="checkbox" id="lock_b" class="lock-check" title="鎖定長度"> 🔒
+        </div>
+
+        <div style="font-size:0.8em; color:#666; margin:10px 0 5px 0;">角度</div>
+        <div class="measure-row">
+            <label>∠A</label>
+            <input type="number" id="val_A" step="0.1"> °
+        </div>
+        <div class="measure-row">
+            <label>∠B</label>
+            <input type="number" id="val_B" step="0.1"> °
+        </div>
+        <div class="measure-row">
+            <label>∠C</label>
+            <input type="number" id="val_C" step="0.1"> °
+        </div>
+    </div>
+
+    <h3>畫面操作</h3>
+    <div class="control-section">
+        <div class="slider-container">
+            <label>旋轉 (Rotate): <span id="rotVal">0</span>°</label>
+            <input type="range" id="rotationRange" min="0" max="360" value="0">
+        </div>
+        
+        <div class="slider-container">
+            <label>縮放 (Zoom): <span id="zoomVal">1.0</span>x</label>
+            <input type="range" id="zoomRange" min="0.5" max="3.0" step="0.1" value="1.0">
+        </div>
+
+        <div style="margin-top:10px; text-align:center;">
+            <button onclick="resetView()" style="padding:5px 15px; cursor:pointer;">重置視角與位置</button>
+        </div>
+    </div>
 </div>
 
 <div id="canvas-container">
     <canvas id="geoCanvas"></canvas>
-    <div class="instruction">💡 拖曳 A, B, C 頂點來改變三角形形狀</div>
+    
+    <div id="data-panel">
+        <div class="data-group">
+            <div class="data-title">基本屬性</div>
+            <div class="data-row"><span>面積:</span> <span id="data_area" class="data-val">0</span></div>
+            <div class="data-row"><span>周長:</span> <span id="data_peri" class="data-val">0</span></div>
+        </div>
+        <div class="data-group" id="data_group_G" style="display:none; color:#d35400;">
+            <div class="data-title">重心 (G)</div>
+            <div class="data-row"><span>GA:</span> <span id="data_ga" class="data-val">0</span></div>
+            <div class="data-row"><span>GB:</span> <span id="data_gb" class="data-val">0</span></div>
+            <div class="data-row"><span>GC:</span> <span id="data_gc" class="data-val">0</span></div>
+        </div>
+        <div class="data-group" id="data_group_O" style="display:none; color:#2980b9;">
+            <div class="data-title">外心 (O)</div>
+            <div class="data-row"><span>R (半徑):</span> <span id="data_R" class="data-val">0</span></div>
+        </div>
+        <div class="data-group" id="data_group_I" style="display:none; color:#27ae60;">
+            <div class="data-title">內心 (I)</div>
+            <div class="data-row"><span>r (半徑):</span> <span id="data_r" class="data-val">0</span></div>
+            <div class="data-row"><span>IA:</span> <span id="data_ia" class="data-val">0</span></div>
+            <div class="data-row"><span>IB:</span> <span id="data_ib" class="data-val">0</span></div>
+            <div class="data-row"><span>IC:</span> <span id="data_ic" class="data-val">0</span></div>
+        </div>
+    </div>
+
+    <div class="hint">💡 滾輪縮放 | 拖曳頂點 | 勾選鎖頭固定邊長</div>
 </div>
 
 <script>
     const canvas = document.getElementById('geoCanvas');
     const ctx = canvas.getContext('2d');
     
-    // State
+    // --- State Variables ---
     let width, height;
+    let viewRotation = 0; // radians
+    let viewScale = 1.0;  // zoom factor
+    
     let points = [
         { x: 0, y: 0, label: 'A' },
         { x: 0, y: 0, label: 'B' },
         { x: 0, y: 0, label: 'C' }
     ];
     let dragIdx = -1;
-
-    // Configuration
-    const CONFIG = {
-        pointRadius: 6,
-        centerRadius: 5,
-        hitRadius: 20,
-        colors: {
-            triangle: '#34495e',
-            centroid: '#e67e22',
-            circum: '#2980b9',
-            incenter: '#27ae60',
-            grid: '#ecf0f1'
-        }
+    
+    // UI References
+    const inputs = {
+        c: document.getElementById('val_c'),
+        a: document.getElementById('val_a'),
+        b: document.getElementById('val_b'),
+        A: document.getElementById('val_A'),
+        B: document.getElementById('val_B'),
+        C: document.getElementById('val_C'),
+    };
+    const locks = {
+        c: document.getElementById('lock_c'),
+        a: document.getElementById('lock_a'),
+        b: document.getElementById('lock_b'),
+    };
+    const checkboxes = {
+        G: document.getElementById('showCentroid'),
+        GLines: document.getElementById('showCentroidLines'),
+        O: document.getElementById('showCircum'),
+        OLines: document.getElementById('showCircumLines'),
+        I: document.getElementById('showIncenter'),
+        ILines: document.getElementById('showIncenterLines'),
+    };
+    const dataDisplay = {
+        area: document.getElementById('data_area'),
+        peri: document.getElementById('data_peri'),
+        groupG: document.getElementById('data_group_G'),
+        ga: document.getElementById('data_ga'),
+        gb: document.getElementById('data_gb'),
+        gc: document.getElementById('data_gc'),
+        groupO: document.getElementById('data_group_O'),
+        R: document.getElementById('data_R'),
+        groupI: document.getElementById('data_group_I'),
+        r: document.getElementById('data_r'),
+        ia: document.getElementById('data_ia'),
+        ib: document.getElementById('data_ib'),
+        ic: document.getElementById('data_ic'),
     };
 
-    // Initialization
+    const CFG = {
+        ptR: 6,
+        hitR: 20,
+        colors: { tri: '#34495e', G: '#e67e22', O: '#2980b9', I: '#27ae60' }
+    };
+
+    // --- Init ---
     function init() {
         resize();
         window.addEventListener('resize', resize);
+        Object.values(checkboxes).forEach(cb => cb.addEventListener('change', draw));
+        resetView();
+    }
+
+    function resetView() {
+        viewRotation = 0;
+        viewScale = 1.0;
         
-        // Initial triangle position
+        // Reset Sliders UI
+        document.getElementById('rotationRange').value = 0;
+        document.getElementById('rotVal').innerText = "0";
+        document.getElementById('zoomRange').value = 1.0;
+        document.getElementById('zoomVal').innerText = "1.0";
+        
         const cx = width / 2;
         const cy = height / 2;
-        points[0] = { x: cx, y: cy - 150, label: 'A' };
-        points[1] = { x: cx - 180, y: cy + 150, label: 'B' };
-        points[2] = { x: cx + 180, y: cy + 150, label: 'C' };
-
+        points[0] = { x: cx, y: cy - 130, label: 'A' };
+        points[1] = { x: cx - 130, y: cy + 100, label: 'B' };
+        points[2] = { x: cx + 130, y: cy + 100, label: 'C' };
+        updateUIValues();
         draw();
     }
 
@@ -160,248 +330,367 @@
         draw();
     }
 
-    // Math Helpers
-    function dist(p1, p2) {
-        return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2);
+    // --- Math ---
+    function dist(p1, p2) { return Math.hypot(p1.x - p2.x, p1.y - p2.y); }
+    function degToRad(d) { return d * Math.PI / 180; }
+    function radToDeg(r) { return r * 180 / Math.PI; }
+    
+    function getAngle(p1, p2, p3) {
+        const d12 = dist(p1, p2);
+        const d23 = dist(p2, p3);
+        const d13 = dist(p1, p3);
+        let val = (d12**2 + d23**2 - d13**2) / (2 * d12 * d23);
+        val = Math.max(-1, Math.min(1, val)); 
+        return radToDeg(Math.acos(val));
     }
 
-    function midpoint(p1, p2) {
-        return { x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2 };
-    }
-
-    // --- Calculation Functions ---
-
-    // 1. Centroid (重心): Average of vertices
-    function getCentroid(A, B, C) {
+    function constrainToRadius(p, center, r) {
+        const d = dist(p, center);
+        if (d === 0) return { x: center.x + r, y: center.y };
+        const scale = r / d;
         return {
-            x: (A.x + B.x + C.x) / 3,
-            y: (A.y + B.y + C.y) / 3
+            x: center.x + (p.x - center.x) * scale,
+            y: center.y + (p.y - center.y) * scale
         };
     }
 
-    // 2. Incenter (內心): Weighted average by side lengths
+    // --- Constraints ---
+    function applyConstraints(movingIdx) {
+        const A = points[0], B = points[1], C = points[2];
+        const lock_c = locks.c.checked, lock_a = locks.a.checked, lock_b = locks.b.checked;
+        const len_c = parseFloat(inputs.c.value), len_a = parseFloat(inputs.a.value), len_b = parseFloat(inputs.b.value);
+
+        if (movingIdx === 0) { 
+            if (lock_c) Object.assign(A, constrainToRadius(A, B, len_c));
+            if (lock_b) Object.assign(A, constrainToRadius(A, C, len_b));
+            if (lock_c && lock_b) Object.assign(A, constrainToRadius(A, B, len_c));
+        } else if (movingIdx === 1) { 
+            if (lock_c) Object.assign(B, constrainToRadius(B, A, len_c));
+            if (lock_a) Object.assign(B, constrainToRadius(B, C, len_a));
+            if (lock_c && lock_a) Object.assign(B, constrainToRadius(B, A, len_c));
+        } else if (movingIdx === 2) { 
+            if (lock_b) Object.assign(C, constrainToRadius(C, A, len_b));
+            if (lock_a) Object.assign(C, constrainToRadius(C, B, len_a));
+            if (lock_b && lock_a) Object.assign(C, constrainToRadius(C, A, len_b));
+        }
+    }
+
+    function updateUIValues() {
+        const d_c = dist(points[0], points[1]); 
+        const d_a = dist(points[1], points[2]); 
+        const d_b = dist(points[0], points[2]); 
+        
+        if(document.activeElement !== inputs.c) inputs.c.value = Math.round(d_c);
+        if(document.activeElement !== inputs.a) inputs.a.value = Math.round(d_a);
+        if(document.activeElement !== inputs.b) inputs.b.value = Math.round(d_b);
+
+        const angA = getAngle(points[1], points[0], points[2]);
+        const angB = getAngle(points[0], points[1], points[2]);
+        const angC = getAngle(points[0], points[2], points[1]);
+
+        if(document.activeElement !== inputs.A) inputs.A.value = angA.toFixed(1);
+        if(document.activeElement !== inputs.B) inputs.B.value = angB.toFixed(1);
+        if(document.activeElement !== inputs.C) inputs.C.value = angC.toFixed(1);
+    }
+
+    function onManualInput(type, key) {
+        const val = parseFloat(inputs[key].value);
+        if(isNaN(val) || val <= 0) return;
+        const A = points[0], B = points[1], C = points[2];
+
+        if (type === 'side') {
+            if (key === 'c') Object.assign(B, constrainToRadius(B, A, val));
+            else if (key === 'b') Object.assign(C, constrainToRadius(C, A, val));
+            else if (key === 'a') Object.assign(C, constrainToRadius(C, B, val));
+        } else if (type === 'angle') {
+            let pivot, pFixed, pRotated;
+            if (key === 'A') { pivot = A; pFixed = B; pRotated = C; }
+            if (key === 'B') { pivot = B; pFixed = C; pRotated = A; }
+            if (key === 'C') { pivot = C; pFixed = A; pRotated = B; }
+            
+            const angleFixed = Math.atan2(pFixed.y - pivot.y, pFixed.x - pivot.x);
+            const distRotated = dist(pivot, pRotated);
+            const cross = (pFixed.x - pivot.x)*(pRotated.y - pivot.y) - (pFixed.y - pivot.y)*(pRotated.x - pivot.x);
+            const sign = cross >= 0 ? 1 : -1;
+            const targetAbs = angleFixed + sign * degToRad(val);
+            pRotated.x = pivot.x + distRotated * Math.cos(targetAbs);
+            pRotated.y = pivot.y + distRotated * Math.sin(targetAbs);
+        }
+        draw();
+    }
+
+    ['c','a','b'].forEach(k => inputs[k].addEventListener('input', () => onManualInput('side', k)));
+    ['A','B','C'].forEach(k => inputs[k].addEventListener('input', () => onManualInput('angle', k)));
+
+    // --- Centers ---
+    function getCentroid(A, B, C) {
+        return { x: (A.x+B.x+C.x)/3, y: (A.y+B.y+C.y)/3 };
+    }
     function getIncenter(A, B, C) {
-        const a = dist(B, C);
-        const b = dist(A, C);
-        const c = dist(A, B);
+        const a = dist(B, C), b = dist(A, C), c = dist(A, B);
         const p = a + b + c;
-        
-        const x = (a * A.x + b * B.x + c * C.x) / p;
-        const y = (a * A.y + b * B.y + c * C.y) / p;
-        
-        // Radius calculation: Area / semi-perimeter
-        const s = p / 2;
-        const area = Math.sqrt(s * (s - a) * (s - b) * (s - c));
-        const r = area / s;
-
-        return { x, y, r };
+        return { x: (a*A.x+b*B.x+c*C.x)/p, y: (a*A.y+b*B.y+c*C.y)/p, r: Math.sqrt(p/2*(p/2-a)*(p/2-b)*(p/2-c))/(p/2) };
     }
-
-    // 3. Circumcenter (外心): Intersection of perpendicular bisectors
     function getCircumcenter(A, B, C) {
-        const D = 2 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
-        
-        const Ux = (1 / D) * (
-            (A.x**2 + A.y**2) * (B.y - C.y) +
-            (B.x**2 + B.y**2) * (C.y - A.y) +
-            (C.x**2 + C.y**2) * (A.y - B.y)
-        );
-        
-        const Uy = (1 / D) * (
-            (A.x**2 + A.y**2) * (C.x - B.x) +
-            (B.x**2 + B.y**2) * (A.x - C.x) +
-            (C.x**2 + C.y**2) * (B.x - A.x)
-        );
-
-        const center = { x: Ux, y: Uy };
-        const r = dist(center, A);
-        
-        return { ...center, r };
+        const D = 2*(A.x*(B.y-C.y) + B.x*(C.y-A.y) + C.x*(A.y-B.y));
+        if(Math.abs(D) < 1e-6) return null;
+        const Ux = ((A.x**2+A.y**2)*(B.y-C.y) + (B.x**2+B.y**2)*(C.y-A.y) + (C.x**2+C.y**2)*(A.y-B.y))/D;
+        const Uy = ((A.x**2+A.y**2)*(C.x-B.x) + (B.x**2+B.y**2)*(A.x-C.x) + (C.x**2+C.y**2)*(B.x-A.x))/D;
+        return { x: Ux, y: Uy, r: dist({x:Ux,y:Uy}, A) };
     }
 
-    // --- Drawing Functions ---
+    // --- Update Data ---
+    function updateRealTimeData(A, B, C) {
+        const c = dist(A, B), a = dist(B, C), b = dist(A, C);
+        const s = (a + b + c) / 2;
+        const area = Math.sqrt(s * (s - a) * (s - b) * (s - c));
+        
+        dataDisplay.area.innerText = area.toFixed(1);
+        dataDisplay.peri.innerText = (a+b+c).toFixed(1);
 
-    function drawPoint(p, color, label, isMainVertex = false) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, isMainVertex ? CONFIG.pointRadius : CONFIG.centerRadius, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        if (checkboxes.G.checked) {
+            dataDisplay.groupG.style.display = 'block';
+            const G = getCentroid(A, B, C);
+            dataDisplay.ga.innerText = dist(G, A).toFixed(1);
+            dataDisplay.gb.innerText = dist(G, B).toFixed(1);
+            dataDisplay.gc.innerText = dist(G, C).toFixed(1);
+        } else {
+            dataDisplay.groupG.style.display = 'none';
+        }
 
-        ctx.fillStyle = '#333';
-        ctx.font = isMainVertex ? 'bold 16px Arial' : 'bold 14px Arial';
-        ctx.fillText(label, p.x + 10, p.y - 10);
+        if (checkboxes.O.checked) {
+            dataDisplay.groupO.style.display = 'block';
+            const O = getCircumcenter(A, B, C);
+            if(O) dataDisplay.R.innerText = O.r.toFixed(1);
+        } else {
+            dataDisplay.groupO.style.display = 'none';
+        }
+
+        if (checkboxes.I.checked) {
+            dataDisplay.groupI.style.display = 'block';
+            const I = getIncenter(A, B, C);
+            dataDisplay.r.innerText = I.r.toFixed(1);
+            dataDisplay.ia.innerText = dist(I, A).toFixed(1);
+            dataDisplay.ib.innerText = dist(I, B).toFixed(1);
+            dataDisplay.ic.innerText = dist(I, C).toFixed(1);
+        } else {
+            dataDisplay.groupI.style.display = 'none';
+        }
     }
 
-    function drawLine(p1, p2, color, width = 1, dashed = false) {
+    // --- Drawing ---
+    function drawPoint(p, color, label) {
         ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = width;
-        if (dashed) ctx.setLineDash([5, 5]);
-        else ctx.setLineDash([]);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.arc(p.x, p.y, CFG.ptR / viewScale, 0, Math.PI*2); // Adjust point size by scale
+        ctx.fillStyle = color; ctx.fill();
+        ctx.strokeStyle = 'white'; ctx.lineWidth=2/viewScale; ctx.stroke();
+        
+        ctx.fillStyle = '#333'; 
+        ctx.font = `bold ${14/viewScale}px Arial`; // Adjust font size
+        ctx.fillText(label, p.x + 10/viewScale, p.y - 10/viewScale);
     }
-
-    function drawCircle(center, r, color) {
-        ctx.beginPath();
-        ctx.arc(center.x, center.y, r, 0, Math.PI * 2);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+    
+    function drawLine(p1, p2, color, dashed=false, width=1) {
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+        ctx.strokeStyle = color; ctx.lineWidth = width / viewScale; // Adjust line width
+        if(dashed) ctx.setLineDash([5/viewScale, 5/viewScale]); else ctx.setLineDash([]);
+        ctx.stroke(); ctx.setLineDash([]);
     }
 
     function draw() {
         ctx.clearRect(0, 0, width, height);
         
-        // Draw Grid (Optional)
+        ctx.save();
+        const cx = width/2, cy = height/2;
+        ctx.translate(cx, cy);
+        ctx.scale(viewScale, viewScale); // Apply Zoom
+        ctx.rotate(viewRotation);        // Apply Rotation
+        ctx.translate(-cx, -cy);
+
+        // Grid
+        ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+        ctx.lineWidth = 1/viewScale;
         ctx.beginPath();
-        ctx.strokeStyle = CONFIG.colors.grid;
-        ctx.lineWidth = 1;
-        for(let i=0; i<width; i+=50) { ctx.moveTo(i,0); ctx.lineTo(i,height); }
-        for(let i=0; i<height; i+=50) { ctx.moveTo(0,i); ctx.lineTo(width,i); }
+        // Draw a larger grid area to cover zoom out
+        const gridLimit = Math.max(width, height) * 2 / viewScale; 
+        for(let i=-gridLimit; i<gridLimit*2; i+=50) { ctx.moveTo(i, -gridLimit); ctx.lineTo(i, gridLimit*2); }
         ctx.stroke();
 
         const [A, B, C] = points;
 
-        // Draw Triangle Edges
+        // Triangle
         ctx.beginPath();
-        ctx.moveTo(A.x, A.y);
-        ctx.lineTo(B.x, B.y);
-        ctx.lineTo(C.x, C.y);
-        ctx.closePath();
-        ctx.strokeStyle = CONFIG.colors.triangle;
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        ctx.fillStyle = "rgba(52, 73, 94, 0.05)";
-        ctx.fill();
+        ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.lineTo(C.x, C.y); ctx.closePath();
+        ctx.strokeStyle = CFG.colors.tri; ctx.lineWidth = 3/viewScale; ctx.stroke();
+        ctx.fillStyle = "rgba(52, 73, 94, 0.05)"; ctx.fill();
 
-        // 1. Draw Centroid Feature
-        if (document.getElementById('showCentroid').checked) {
+        // 1. Centroid (G)
+        if(checkboxes.G.checked) {
             const G = getCentroid(A, B, C);
-            const mAB = midpoint(A, B);
-            const mBC = midpoint(B, C);
-            const mCA = midpoint(C, A);
+            drawLine(A, {x:(B.x+C.x)/2, y:(B.y+C.y)/2}, CFG.colors.G, true);
+            drawLine(B, {x:(A.x+C.x)/2, y:(A.y+C.y)/2}, CFG.colors.G, true);
+            drawLine(C, {x:(A.x+B.x)/2, y:(A.y+B.y)/2}, CFG.colors.G, true);
             
-            // Medians
-            drawLine(A, mBC, CONFIG.colors.centroid, 1, true);
-            drawLine(B, mCA, CONFIG.colors.centroid, 1, true);
-            drawLine(C, mAB, CONFIG.colors.centroid, 1, true);
-            
-            drawPoint(G, CONFIG.colors.centroid, 'G');
+            if(checkboxes.GLines.checked) {
+                ctx.globalAlpha = 0.8;
+                drawLine(G, A, CFG.colors.G, false, 2);
+                drawLine(G, B, CFG.colors.G, false, 2);
+                drawLine(G, C, CFG.colors.G, false, 2);
+                ctx.globalAlpha = 1.0;
+            }
+            drawPoint(G, CFG.colors.G, 'G');
         }
 
-        // 2. Draw Circumcenter Feature
-        if (document.getElementById('showCircum').checked) {
+        // 2. Circumcenter (O)
+        if(checkboxes.O.checked) {
             const O = getCircumcenter(A, B, C);
-            
-            // Draw Perpendicular Bisectors (Visual aid: line from midpoint to O)
-            const mAB = midpoint(A, B);
-            const mBC = midpoint(B, C);
-            const mCA = midpoint(C, A);
-            
-            // Don't draw infinite lines, just connect midpoint to O to reduce clutter
-            ctx.globalAlpha = 0.4;
-            drawLine(mAB, O, CONFIG.colors.circum, 1, true);
-            drawLine(mBC, O, CONFIG.colors.circum, 1, true);
-            drawLine(mCA, O, CONFIG.colors.circum, 1, true);
-            ctx.globalAlpha = 1.0;
-
-            drawCircle(O, O.r, CONFIG.colors.circum);
-            drawPoint(O, CONFIG.colors.circum, 'O');
+            if(O) {
+                ctx.beginPath(); ctx.arc(O.x, O.y, O.r, 0, Math.PI*2);
+                ctx.strokeStyle = CFG.colors.O; ctx.lineWidth=1/viewScale; ctx.stroke();
+                
+                if(checkboxes.OLines.checked) {
+                    ctx.globalAlpha = 0.6;
+                    drawLine(O, A, CFG.colors.O, false, 2);
+                    drawLine(O, B, CFG.colors.O, false, 2);
+                    drawLine(O, C, CFG.colors.O, false, 2);
+                    ctx.globalAlpha = 1.0;
+                }
+                drawPoint(O, CFG.colors.O, 'O');
+            }
         }
 
-        // 3. Draw Incenter Feature
-        if (document.getElementById('showIncenter').checked) {
+        // 3. Incenter (I)
+        if(checkboxes.I.checked) {
             const I = getIncenter(A, B, C);
-            
-            // Angle Bisectors (Visual aid: line from vertex to I)
-            ctx.globalAlpha = 0.4;
-            drawLine(A, I, CONFIG.colors.incenter, 1, true);
-            drawLine(B, I, CONFIG.colors.incenter, 1, true);
-            drawLine(C, I, CONFIG.colors.incenter, 1, true);
+            ctx.beginPath(); ctx.arc(I.x, I.y, I.r, 0, Math.PI*2);
+            ctx.strokeStyle = CFG.colors.I; ctx.lineWidth=1/viewScale; ctx.stroke();
+
+            ctx.globalAlpha = 0.3;
+            drawLine(A, I, CFG.colors.I, true); 
+            drawLine(B, I, CFG.colors.I, true);
+            drawLine(C, I, CFG.colors.I, true);
             ctx.globalAlpha = 1.0;
 
-            drawCircle(I, I.r, CONFIG.colors.incenter);
-            drawPoint(I, CONFIG.colors.incenter, 'I');
+            if(checkboxes.ILines.checked) {
+                ctx.globalAlpha = 0.8;
+                drawLine(I, A, CFG.colors.I, false, 2);
+                drawLine(I, B, CFG.colors.I, false, 2);
+                drawLine(I, C, CFG.colors.I, false, 2);
+                ctx.globalAlpha = 1.0;
+            }
+            drawPoint(I, CFG.colors.I, 'I');
         }
 
-        // Draw Vertices
-        points.forEach(p => drawPoint(p, CONFIG.colors.triangle, p.label, true));
+        // Vertices
+        points.forEach(p => drawPoint(p, CFG.colors.tri, p.label));
+
+        ctx.restore(); 
+        
+        updateRealTimeData(A, B, C);
     }
 
     // --- Interaction ---
-
     function getMousePos(evt) {
         const rect = canvas.getBoundingClientRect();
-        return {
-            x: evt.clientX - rect.left,
-            y: evt.clientY - rect.top
-        };
+        const mx = evt.clientX - rect.left;
+        const my = evt.clientY - rect.top;
+
+        // Inverse Transform Logic
+        const cx = width/2, cy = height/2;
+        
+        // 1. Translate to center
+        let tx = mx - cx;
+        let ty = my - cy;
+
+        // 2. Inverse Scale (New!)
+        tx /= viewScale;
+        ty /= viewScale;
+
+        // 3. Inverse Rotate
+        const cos = Math.cos(-viewRotation);
+        const sin = Math.sin(-viewRotation);
+        let rx = tx * cos - ty * sin;
+        let ry = tx * sin + ty * cos;
+
+        // 4. Translate back
+        return { x: rx + cx, y: ry + cy };
     }
 
-    canvas.addEventListener('mousedown', (e) => {
-        const pos = getMousePos(e);
-        points.forEach((p, index) => {
-            if (dist(pos, p) < CONFIG.hitRadius) {
-                dragIdx = index;
-            }
-        });
+    // Zoom Slider Listener
+    const zoomSlider = document.getElementById('zoomRange');
+    zoomSlider.addEventListener('input', (e) => {
+        viewScale = parseFloat(e.target.value);
+        document.getElementById('zoomVal').innerText = viewScale.toFixed(1);
+        draw();
     });
 
-    canvas.addEventListener('mousemove', (e) => {
-        const pos = getMousePos(e);
+    // Rotation Slider Listener
+    const rotSlider = document.getElementById('rotationRange');
+    rotSlider.addEventListener('input', (e) => {
+        viewRotation = degToRad(parseInt(e.target.value));
+        document.getElementById('rotVal').innerText = e.target.value;
+        draw();
+    });
+
+    // Mouse Wheel Zoom
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = -Math.sign(e.deltaY) * 0.1;
+        let newScale = viewScale + delta;
+        newScale = Math.max(0.5, Math.min(3.0, newScale)); // Clamp
         
-        // Hover cursor effect
+        viewScale = newScale;
+        zoomSlider.value = viewScale;
+        document.getElementById('zoomVal').innerText = viewScale.toFixed(1);
+        draw();
+    }, {passive: false});
+
+    // Mouse Dragging
+    canvas.addEventListener('mousedown', e => {
+        const m = getMousePos(e);
+        // Adjust hit radius based on zoom so it's easier to grab when zoomed out
+        const effectiveHitR = CFG.hitR / viewScale; 
+        points.forEach((p, i) => { if(dist(m, p) < effectiveHitR) dragIdx = i; });
+    });
+    
+    canvas.addEventListener('mousemove', e => {
+        const m = getMousePos(e);
         let hovering = false;
-        points.forEach(p => {
-            if (dist(pos, p) < CONFIG.hitRadius) hovering = true;
-        });
-        canvas.style.cursor = hovering ? 'pointer' : 'crosshair';
+        const effectiveHitR = CFG.hitR / viewScale;
+        points.forEach(p => { if(dist(m, p) < effectiveHitR) hovering = true; });
+        canvas.style.cursor = hovering ? 'pointer' : 'default';
 
-        if (dragIdx !== -1) {
-            points[dragIdx].x = pos.x;
-            points[dragIdx].y = pos.y;
+        if(dragIdx !== -1) {
+            points[dragIdx].x = m.x;
+            points[dragIdx].y = m.y;
+            applyConstraints(dragIdx);
+            updateUIValues();
             draw();
         }
     });
 
-    window.addEventListener('mouseup', () => {
-        dragIdx = -1;
-    });
+    window.addEventListener('mouseup', () => dragIdx = -1);
 
-    // Touch support (for mobile)
-    canvas.addEventListener('touchstart', (e) => {
-        const pos = getMousePos(e.touches[0]);
-        points.forEach((p, index) => {
-            if (dist(pos, p) < CONFIG.hitRadius) {
-                dragIdx = index;
-            }
-        });
-    }, {passive: false});
+    // Touch Support
+    canvas.addEventListener('touchstart', e => {
+        const m = getMousePos(e.touches[0]);
+        const effectiveHitR = CFG.hitR / viewScale;
+        points.forEach((p, i) => { if(dist(m, p) < effectiveHitR) dragIdx = i; });
+        if(dragIdx!==-1) e.preventDefault();
+    }, {passive:false});
 
-    canvas.addEventListener('touchmove', (e) => {
-        if (dragIdx !== -1) {
-            e.preventDefault(); // prevent scrolling
-            const pos = getMousePos(e.touches[0]);
-            points[dragIdx].x = pos.x;
-            points[dragIdx].y = pos.y;
+    canvas.addEventListener('touchmove', e => {
+        if(dragIdx!==-1) {
+            e.preventDefault();
+            const m = getMousePos(e.touches[0]);
+            points[dragIdx].x = m.x; points[dragIdx].y = m.y;
+            applyConstraints(dragIdx);
+            updateUIValues();
             draw();
         }
-    }, {passive: false});
+    }, {passive:false});
 
-    // Inputs
-    document.getElementById('showCentroid').addEventListener('change', draw);
-    document.getElementById('showCircum').addEventListener('change', draw);
-    document.getElementById('showIncenter').addEventListener('change', draw);
-
-    // Run
     init();
-
 </script>
 </body>
 </html>

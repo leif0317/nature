@@ -2,56 +2,44 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>地月日系統 - 圖例置中優化版</title>
+    <title>地月日系統 - 軌道面與視覺優化版</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: '微軟正黑體', 'Segoe UI', sans-serif; }
         
-        /* --- 圖例面板 (水平置中) --- */
+        /* 左下角圖例 */
         #legend-panel {
             position: absolute;
             bottom: 20px;
             left: 50%;
-            transform: translateX(-50%); /* 水平置中 */
-            
+            transform: translateX(-50%);
             display: flex;
-            flex-direction: row; /* 橫向排列 */
+            flex-direction: row;
             align-items: center;
-            gap: 20px; /* 項目間距 */
-            
+            gap: 20px;
             color: rgba(255, 255, 255, 0.9);
-            background: rgba(10, 15, 30, 0.85); /* 稍微透明一點 */
+            background: rgba(10, 15, 30, 0.85);
             padding: 12px 25px;
-            border-radius: 50px; /* 圓角膠囊狀 */
+            border-radius: 50px;
             border: 1px solid rgba(150, 150, 150, 0.3);
             backdrop-filter: blur(8px);
             pointer-events: none;
             user-select: none;
             box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
             z-index: 10;
-            white-space: nowrap; /* 防止換行 */
+            white-space: nowrap;
         }
-
-        /* 圖例標題 (橫向時可以縮小或隱藏，這裡改為小標籤) */
-        .legend-title {
-            font-weight: bold;
-            color: #fff;
-            margin-right: 10px;
-            padding-right: 15px;
-            border-right: 1px solid rgba(255,255,255,0.3);
-        }
-
+        .legend-title { font-weight: bold; color: #fff; margin-right: 10px; padding-right: 15px; border-right: 1px solid rgba(255,255,255,0.3); }
         .legend-item { display: flex; align-items: center; font-size: 13px; }
-        
         .icon { width: 20px; height: 3px; margin-right: 8px; display: inline-block; }
         .icon-circle { width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
         
-        /* 右下角署名 (稍微上移避開圖例) */
+        /* 右下角署名 */
         #signature {
             position: absolute;
             bottom: 20px;
             right: 20px;
             color: rgba(255, 255, 255, 0.8);
-            font-size: 24px; /* 稍微縮小以免太搶眼 */
+            font-size: 24px;
             font-weight: 900;
             letter-spacing: 2px;
             text-shadow: 0 0 10px rgba(0, 100, 255, 0.8);
@@ -73,7 +61,7 @@
     
     <div class="legend-item"><span class="icon" style="background: #ff0000; height: 3px;"></span>赤道(0°)</div>
     <div class="legend-item"><span class="icon" style="border-top: 2px dashed #ffff00; background: transparent;"></span>回歸線(±23.5°)</div>
-    <div class="legend-item"><span class="icon" style="border-top: 2px solid white; background: transparent;"></span>黃道面</div>
+    <div class="legend-item"><span class="icon" style="background: #ffff00; height: 3px;"></span>黃道軌跡</div>
     <div class="legend-item"><span class="icon" style="border-top: 2px solid #ffffff; background: transparent;"></span>月球軌道</div>
     
     <div class="legend-item" style="color:#aaa; font-size:12px; margin-left:5px;">
@@ -102,6 +90,7 @@
     // 全域變數
     let earthMesh, axisLine, arrowGroup, sunArrow;
     let markersGroup;
+    let eclipticPlane, moonPlane; // 新增軌道面變數
     
     // 1. 初始化
     const scene = new THREE.Scene();
@@ -188,12 +177,40 @@
     scene.add(sunMesh, sunGlow);
 
     const orbitRadius = 150;
-    const orbitLine = new THREE.LineLoop(
-        new THREE.BufferGeometry().setFromPoints(new THREE.EllipseCurve(0, 0, orbitRadius, orbitRadius, 0, 2 * Math.PI).getPoints(200)),
-        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2 })
+
+    // --- 【修改】地球軌跡：變粗、變黃 ---
+    // 為了讓線條變粗，改用 TubeGeometry (管狀幾何體)
+    class OrbitCurve extends THREE.Curve {
+        constructor(scale) { super(); this.scale = scale; }
+        getPoint(t) {
+            const tx = Math.cos(2 * Math.PI * t) * this.scale;
+            const tz = Math.sin(2 * Math.PI * t) * this.scale;
+            return new THREE.Vector3(tx, 0, tz);
+        }
+    }
+    const orbitPath = new OrbitCurve(orbitRadius);
+    const orbitGeometry = new THREE.TubeGeometry(orbitPath, 200, 1.2, 8, true); // 半徑1.2，約等於3倍粗細
+    const orbitLine = new THREE.Mesh(
+        orbitGeometry,
+        new THREE.MeshBasicMaterial({ color: 0xffff00 }) // 黃色
     );
-    orbitLine.rotation.x = Math.PI / 2;
     scene.add(orbitLine);
+
+    // --- 【新增】黃道面 (淺黃色圓盤) ---
+    eclipticPlane = new THREE.Mesh(
+        new THREE.CircleGeometry(orbitRadius + 60, 64), // 比軌道稍大
+        new THREE.MeshBasicMaterial({ 
+            color: 0xffffaa, 
+            side: THREE.DoubleSide, 
+            transparent: true, 
+            opacity: 0.15, // 淺淺的透明
+            depthWrite: false // 避免遮擋背景星星
+        })
+    );
+    eclipticPlane.rotation.x = Math.PI / 2; // 放平
+    eclipticPlane.visible = false; // 預設關閉
+    scene.add(eclipticPlane);
+
 
     // --- 節氣標記 ---
     markersGroup = new THREE.Group();
@@ -304,6 +321,22 @@
     moonOrbitLine.rotation.x = Math.PI / 2;
     moonSystemContainer.add(moonOrbitLine);
 
+    // --- 【新增】白道面 (淺白色圓盤) ---
+    // 掛載在 moonSystemContainer 下，這樣它會自動跟著有 5.14 度的傾角
+    moonPlane = new THREE.Mesh(
+        new THREE.CircleGeometry(moonDist + 10, 64),
+        new THREE.MeshBasicMaterial({ 
+            color: 0xffffff, 
+            side: THREE.DoubleSide, 
+            transparent: true, 
+            opacity: 0.15, 
+            depthWrite: false 
+        })
+    );
+    moonPlane.rotation.x = Math.PI / 2; // 相對於容器放平
+    moonPlane.visible = false; // 預設關閉
+    moonSystemContainer.add(moonPlane);
+
     const moonRotator = new THREE.Group();
     moonSystemContainer.add(moonRotator);
     const moonMesh = new THREE.Mesh(
@@ -334,6 +367,8 @@
         pause: false, 
         earthScale: 1.0, 
         showMarkers: true,
+        showEcliptic: false, // 新增
+        showMoonPlane: false, // 新增
         viewZoom: 1.0,
         resetView: function() {
             camera.position.set(initialCameraPos.x, initialCameraPos.y, initialCameraPos.z);
@@ -350,6 +385,11 @@
         if (arrowGroup) arrowGroup.position.y = 11 + (v - 1) * 7;
     });
     gui.add(params, 'showMarkers').name('顯示節氣').onChange(v => markersGroup.visible = v);
+    
+    // 【新增】軌道面控制開關
+    gui.add(params, 'showEcliptic').name('🟨 顯示黃道面').onChange(v => eclipticPlane.visible = v);
+    gui.add(params, 'showMoonPlane').name('⬜ 顯示白道面').onChange(v => moonPlane.visible = v);
+
     gui.add(params, 'speed', 0, 2.5).name('⏩ 速度');
     gui.add(params, 'pause').name('⏸ 暫停');
     gui.add(params, 'viewZoom', 0.1, 3.0).name('🔍 畫面縮放').onChange(v => {
