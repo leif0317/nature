@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>水的三態變化：按比例均勻融化模擬</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --panel-color: #2d2d2d;
+            --text-color: #e0e0e0;
+            --accent-color: #4facfe;
+            --heat-color: #ff6b6b;
+            --warn-color: #ffd700;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 0 0 5px 0; /* 減少底部邊距，讓署名更靠近 */
+            font-size: 1.5rem;
+        }
+        
+        /* 新增署名樣式 */
+        .signature {
+            text-align: center;
+            font-size: 1.1rem;
+            color: var(--accent-color); /* 使用醒目的強調色 */
+            font-weight: bold;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: bold;
+        }
+
+        #btn-start { background-color: var(--accent-color); color: white; }
+        #btn-start:hover { background-color: #00c6fb; }
+        #btn-reset { background-color: var(--heat-color); color: white; }
+        #btn-reset:hover { background-color: #ff4757; }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            background: var(--panel-color);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .metric {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metric span:first-child {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        .metric span:last-child {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            min-height: 0;
+        }
+
+        #simulation-container {
+            flex: 6; 
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid var(--panel-color);
+            min-height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #chart-container {
+            flex: 4; 
+            background: var(--panel-color);
+            border-radius: 8px;
+            padding: 15px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-height: 400px;
+        }
+
+        canvas {
+            display: block;
+        }
+        
+        .phase-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            pointer-events: none;
+            font-size: 0.9rem;
+            z-index: 10;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+            #simulation-container, #chart-container {
+                flex: none;
+                height: 350px;
+                min-height: 350px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>水的三態變化：按比例均勻融化模擬</h1>
+    <div class="signature">小粘製作</div>
+
+    <div class="controls">
+        <button id="btn-start" onclick="toggleSimulation()">開始 / 暫停加熱</button>
+        <button id="btn-reset" onclick="resetSimulation()">重置模擬</button>
+    </div>
+
+    <div class="dashboard">
+        <div class="metric">
+            <span>當前狀態</span>
+            <span id="disp-phase">固態 (冰)</span>
+        </div>
+        <div class="metric">
+            <span>溫度 (T)</span>
+            <span id="disp-temp">-20.0 °C</span>
+        </div>
+        <div class="metric">
+            <span>累積吸熱 (Q)</span>
+            <span id="disp-heat">0 kJ</span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div id="simulation-container">
+            <div class="phase-label">微觀視圖：封閉容器</div>
+        </div>
+
+        <div id="chart-container">
+            <canvas id="tempChart"></canvas>
+        </div>
+    </div>
+
+<script>
+    // --- 全域變數 ---
+    let isRunning = false;
+    let timeStep = 0;
+    const maxTime = 1250;
+    let currentTemp = -20;
+    let totalHeat = 0;
+    let currentPhaseProgress = 0; // 用於傳遞融化/沸騰的百分比 (0.0 - 1.0)
+    
+    // --- Chart.js 設定 ---
+    let chartInstance;
+    const ctx = document.getElementById('tempChart').getContext('2d');
+    
+    function initChart() {
+        if(chartInstance) chartInstance.destroy();
+        
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: '溫度 (°C)',
+                    data: [],
+                    borderColor: '#4facfe',
+                    backgroundColor: 'rgba(79, 172, 254, 0.2)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.2,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        title: { display: true, text: '加熱時間', color: '#aaa' },
+                        min: 0,
+                        max: 1250,
+                        grid: { color: '#444' },
+                        ticks: { color: '#aaa', stepSize: 250 }
+                    },
+                    y: {
+                        title: { display: true, text: '溫度 (°C)', color: '#aaa' },
+                        min: -30,
+                        max: 150,
+                        grid: { color: '#444' },
+                        ticks: { color: '#aaa' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `溫度: ${ctx.parsed.y.toFixed(1)} °C`
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // --- P5.js 粒子系統 ---
+    let particles = [];
+    const numParticles = 100;
+    let boxMargin = 50;
+    let boxLeft, boxRight, boxTop, boxBottom;
+
+    // p5.js 初始化函數
+    function setup() {
+        let container = document.getElementById('simulation-container');
+        let w = container.offsetWidth || 400; 
+        let h = container.offsetHeight || 400; 
+        
+        let cvs = createCanvas(w, h);
+        cvs.parent('simulation-container');
+        
+        textAlign(CENTER, CENTER);
+        
+        calculateBoxBoundaries();
+        initParticles();
+    }
+
+    function windowResized() {
+        let container = document.getElementById('simulation-container');
+        if(container) {
+            resizeCanvas(container.offsetWidth, container.offsetHeight);
+            calculateBoxBoundaries();
+            if(!isRunning) initParticles();
+        }
+    }
+
+    function calculateBoxBoundaries() {
+        boxLeft = boxMargin;
+        boxRight = width - boxMargin;
+        boxTop = boxMargin + 20;
+        boxBottom = height - boxMargin;
+    }
+
+    class Particle {
+        constructor(x, y) {
+            this.pos = createVector(x, y);
+            this.vel = createVector(0, 0);
+            this.acc = createVector(0, 0);
+            this.radius = 8;
+            this.state = "solid"; // solid, liquid, gas
+            this.originalX = x; // 記住晶格位置
+            this.originalY = y;
+            
+            // 設定一個隨機的「融化門檻」(0~1)
+            this.meltThreshold = random(0.01, 0.99);
+            // 設定一個隨機的「沸騰門檻」
+            this.boilThreshold = random(0.01, 0.99);
+        }
+
+        update(temp, phaseInfo, progress) {
+            // --- 固態與融化 ---
+            if (this.state === "solid") {
+                // 原地振動
+                let vib = map(temp, -20, 0, 0.5, 2.0);
+                this.pos.x = this.originalX + random(-vib, vib);
+                this.pos.y = this.originalY + random(-vib, vib);
+
+                // 按比例融化邏輯
+                if (phaseInfo === "Melting") {
+                    if (progress > this.meltThreshold) {
+                        this.state = "liquid";
+                        this.vel = p5.Vector.random2D().mult(0.8);
+                    }
+                }
+            }
+
+            // --- 液態與沸騰 ---
+            if (this.state === "liquid") {
+                this.acc.add(0, 0.3); // 重力
+                
+                let speed = map(temp, 0, 100, 2, 6);
+                this.vel.add(this.acc);
+                this.vel.limit(speed);
+                this.pos.add(this.vel);
+                this.acc.mult(0);
+
+                // 容器反彈
+                this.checkBoundaryCollision(false); 
+
+                // 沸騰邏輯
+                if (phaseInfo === "Boiling") {
+                    if (progress > this.boilThreshold && this.pos.y > boxTop) {
+                         if (random(1) < 0.1) {
+                            this.state = "gas";
+                            this.vel.y = -5; // 向上衝
+                            this.vel.x = random(-2, 2);
+                         }
+                    }
+                    if (progress > this.boilThreshold + 0.1) {
+                         this.state = "gas";
+                         this.vel.y = -5;
+                    }
+                }
+            }
+
+            // --- 氣態 ---
+            if (this.state === "gas") {
+                let speed = map(temp, 100, 140, 6, 12);
+                if (this.vel.mag() < speed) this.vel.setMag(speed);
+                
+                this.pos.add(this.vel);
+                // 氣體會在四面牆壁反彈
+                this.checkBoundaryCollision(true);
+            }
+        }
+
+        checkBoundaryCollision(bounceTop) {
+            // 底部
+            if (this.pos.y > boxBottom - this.radius) {
+                this.pos.y = boxBottom - this.radius;
+                this.vel.y *= -0.6; // 損失能量
+                this.vel.x *= 0.95; // 摩擦
+            }
+            // 左右
+            if (this.pos.x < boxLeft + this.radius) {
+                this.pos.x = boxLeft + this.radius;
+                this.vel.x *= -0.8;
+            } else if (this.pos.x > boxRight - this.radius) {
+                this.pos.x = boxRight - this.radius;
+                this.vel.x *= -0.8;
+            }
+            // 頂部
+            if (bounceTop) {
+                if (this.pos.y < boxTop + this.radius) {
+                    this.pos.y = boxTop + this.radius;
+                    this.vel.y *= -1;
+                }
+            }
+        }
+
+        display() {
+            noStroke();
+            if (this.state === "solid") fill(50, 180, 255); // 亮藍
+            else if (this.state === "liquid") fill(30, 100, 220, 200); // 深藍
+            else fill(200, 200, 200, 180); // 灰白蒸氣
+
+            ellipse(this.pos.x, this.pos.y, this.radius * 2);
+            // 高光
+            fill(255, 255, 255, 120);
+            ellipse(this.pos.x - 2, this.pos.y - 2, this.radius * 0.6);
+        }
+    }
+
+    function initParticles() {
+        particles = [];
+        let cols = 10;
+        let rows = 10;
+        let spacing = 22;
+        
+        let gridW = (cols-1) * spacing;
+        let gridH = (rows-1) * spacing;
+        
+        let startX = boxLeft + (boxRight - boxLeft - gridW) / 2;
+        let startY = boxBottom - gridH - 10;
+
+        for (let i = 0; i < numParticles; i++) {
+            let col = i % cols;
+            let row = Math.floor(i / cols);
+            let p = new Particle(startX + col*spacing, startY + row*spacing);
+            particles.push(p);
+        }
+    }
+
+    function draw() {
+        background(20);
+        
+        // 畫容器白框
+        noFill();
+        stroke(255);
+        strokeWeight(3);
+        rect(boxLeft, boxTop, boxRight - boxLeft, boxBottom - boxTop);
+
+        // 加熱指示
+        if(isRunning) {
+            stroke(255, 100, 100, 150);
+            strokeWeight(2);
+            let y = boxBottom + 10;
+            for(let x = boxLeft; x < boxRight; x+=20) {
+                line(x, y, x+10, y+10);
+                line(x+10, y, x, y+10);
+            }
+        }
+
+        // 判斷當前階段與進度
+        let phaseInfo = "Solid";
+        if (timeStep > 200 && timeStep <= 500) phaseInfo = "Melting";
+        if (timeStep > 800 && timeStep <= 1100) phaseInfo = "Boiling";
+
+        // 更新粒子 (傳入 currentPhaseProgress)
+        for (let p of particles) {
+            p.update(currentTemp, phaseInfo, currentPhaseProgress);
+            p.display();
+        }
+
+        if (isRunning) {
+            simulationLoop();
+        }
+    }
+
+    // --- 核心邏輯 Loop ---
+    function simulationLoop() {
+        timeStep++;
+        totalHeat += 1;
+        currentPhaseProgress = 0;
+
+        // 1. 固態 (-20 ~ 0)
+        if (timeStep <= 200) {
+            currentTemp = map(timeStep, 0, 200, -20, 0);
+            updateDashboard("固態 (冰)", "#e0e0e0");
+        }
+        // 2. 固液共存 (0度恆溫) - 持續300個單位時間
+        else if (timeStep <= 500) {
+            currentTemp = 0;
+            // 計算融化進度 0.0 ~ 1.0
+            currentPhaseProgress = (timeStep - 200) / 300;
+            updateDashboard(`固液共存 (融化中 ${Math.floor(currentPhaseProgress*100)}%)`, "#ffd700"); 
+        }
+        // 3. 液態 (0 ~ 100)
+        else if (timeStep <= 800) {
+            if(timeStep === 501) particles.forEach(p => { if(p.state==='solid') p.state='liquid'});
+            currentTemp = map(timeStep, 500, 800, 0, 100);
+            updateDashboard("液態 (水)", "#4facfe");
+        }
+        // 4. 液氣共存 (100度恆溫) - 持續300個單位時間
+        else if (timeStep <= 1100) {
+            currentTemp = 100;
+            // 計算沸騰進度 0.0 ~ 1.0
+            currentPhaseProgress = (timeStep - 800) / 300;
+            updateDashboard(`液氣共存 (汽化中 ${Math.floor(currentPhaseProgress*100)}%)`, "#ffd700");
+        }
+        // 5. 氣態 (> 100)
+        else {
+            if(timeStep === 1101) particles.forEach(p => p.state='gas');
+            currentTemp = 100 + (timeStep - 1100) * 0.5;
+            updateDashboard("氣態 (水蒸氣)", "#e0e0e0");
+        }
+
+        document.getElementById('disp-temp').innerText = currentTemp.toFixed(1) + " °C";
+        document.getElementById('disp-heat').innerText = totalHeat + " kJ";
+
+        // 更新圖表
+        if (timeStep % 3 === 0) {
+            chartInstance.data.datasets[0].data.push({x: timeStep, y: currentTemp});
+            chartInstance.update('none');
+        }
+
+        if (timeStep >= maxTime) {
+            isRunning = false;
+            document.getElementById('btn-start').innerText = "模擬結束";
+        }
+    }
+
+    function updateDashboard(text, color) {
+        let el = document.getElementById('disp-phase');
+        el.innerText = text;
+        el.style.color = color;
+    }
+
+    function toggleSimulation() {
+        if(timeStep >= maxTime) { resetSimulation(); return; }
+        isRunning = !isRunning;
+        document.getElementById('btn-start').innerText = isRunning ? "暫停加熱" : "開始 / 繼續加熱";
+    }
+
+    function resetSimulation() {
+        isRunning = false;
+        timeStep = 0;
+        totalHeat = 0;
+        currentTemp = -20;
+        currentPhaseProgress = 0;
+        
+        chartInstance.data.datasets[0].data = [];
+        chartInstance.update();
+
+        initParticles();
+        
+        updateDashboard("固態 (冰)", "#e0e0e0");
+        document.getElementById('disp-temp').innerText = "-20.0 °C";
+        document.getElementById('disp-heat').innerText = "0 kJ";
+        document.getElementById('btn-start').innerText = "開始 / 暫停加熱";
+    }
+
+    initChart();
+
+</script>
+</body>
+</html>
