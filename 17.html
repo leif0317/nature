@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>神經系統演示：腦幹路徑修正版</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #e74c3c;
+            --highlight: #f39c12;
+            --bg: #f8f9fa;
+            --skin: #f0e0d6;
+            --brain: #e6b8c7;      
+            --brainstem: #9b59b6;  /* 腦幹 (紫色加深) */
+            --spine: #d4a5b8;      
+            --nerve: #f1c40f;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', sans-serif;
+            background-color: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { margin: 10px 0; color: var(--primary); }
+        .subtitle { color: #555; margin-bottom: 20px; font-size: 0.95rem; }
+
+        .container {
+            display: flex;
+            gap: 30px;
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            max-width: 1250px;
+            width: 100%;
+            min-height: 900px;
+        }
+
+        /* 左側選單 */
+        .menu {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn-group-title {
+            font-weight: bold;
+            color: #7f8c8d;
+            margin-top: 15px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .scenario-btn {
+            padding: 12px 15px;
+            border: 2px solid #eee;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            font-size: 1rem;
+        }
+
+        .scenario-btn:hover { border-color: var(--highlight); background: #fffdf0; }
+        .scenario-btn.active { 
+            background: var(--primary); 
+            color: white; 
+            border-color: var(--primary); 
+        }
+        .scenario-btn span { margin-right: 12px; font-size: 1.4rem; }
+
+        .status-box {
+            margin-top: auto;
+            padding: 20px;
+            background: #ecf0f1;
+            border-radius: 10px;
+            border-left: 5px solid var(--primary);
+        }
+        .status-text { font-size: 1.1rem; font-weight: bold; color: var(--primary); }
+        .status-desc { font-size: 0.95rem; color: #555; margin-top: 8px; line-height: 1.5; }
+
+        /* 右側視覺區 */
+        .visual-area {
+            flex: 1.8;
+            position: relative;
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        svg {
+            height: 850px;
+            width: auto;
+        }
+
+        /* SVG 樣式 */
+        .body-skin { fill: var(--skin); stroke: #dcb; stroke-width: 3; opacity: 0.5; }
+        .cns-brain { fill: var(--brain); stroke: #c08a9e; stroke-width: 2; }
+        .cns-brainstem { fill: var(--brainstem); stroke: #8e44ad; stroke-width: 2; }
+        .cns-spine { fill: var(--spine); stroke: #c08a9e; stroke-width: 2; }
+        .cns-text { 
+            font-size: 14px; font-weight: bold; fill: white; 
+            text-anchor: middle; pointer-events: none;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        /* 器官與神經線 */
+        .organ-group { display: none; }
+        .organ-group.visible { display: block; }
+        .organ-icon { fill: white; stroke: #333; stroke-width: 2; }
+
+        /* 黃色神經線 (靜態) */
+        .nerve-line { 
+            fill: none; 
+            stroke: var(--nerve); 
+            stroke-width: 5; 
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* 神經流動特效 */
+        .nerve-line.flowing {
+            stroke: #f39c12;
+            stroke-dasharray: 10, 8;
+            animation: flowAnim 0.5s linear infinite;
+        }
+
+        @keyframes flowAnim {
+            from { stroke-dashoffset: 20; }
+            to { stroke-dashoffset: 2; }
+        }
+
+        /* 道具 */
+        .prop-icon { display: none; }
+        .prop-icon.visible { display: block; }
+
+        /* 訊號球 */
+        #signal-dot {
+            fill: var(--accent);
+            r: 9;
+            opacity: 0;
+            offset-rotate: auto;
+            z-index: 100;
+            filter: drop-shadow(0 0 3px rgba(0,0,0,0.3));
+        }
+        .pulse { animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0% { r: 9; opacity: 1; }
+            50% { r: 12; opacity: 0.8; }
+            100% { r: 9; opacity: 1; }
+        }
+
+        /* 浮動標籤 */
+        #float-label {
+            position: absolute;
+            background: rgba(44, 62, 80, 0.95);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+            transform: translate(-50%, -170%);
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 200;
+        }
+        #float-label::after {
+            content: ''; position: absolute; top: 100%; left: 50%; margin-left: -5px;
+            border-width: 5px; border-style: solid;
+            border-color: rgba(44, 62, 80, 0.95) transparent transparent transparent;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>🧠 神經傳導路徑演示 (腦幹修正版)</h1>
+    <p class="subtitle">修正：腦幹反射路徑異常，確保訊號精確停留在腦幹中心</p>
+
+    <div class="container">
+        <div class="menu">
+            <div class="btn-group-title">意識行為 (大腦皮質)</div>
+            <button class="scenario-btn" onclick="runScenario('visual')">
+                <span>👁️</span> 看到尺掉落 (手接)
+            </button>
+            <button class="scenario-btn" onclick="runScenario('auditory')">
+                <span>👂</span> 聽到鐘聲 (寫字)
+            </button>
+
+            <div class="btn-group-title">腦幹反射 (頭部反射)</div>
+            <button class="scenario-btn" onclick="runScenario('reflex_blink')">
+                <span>💨</span> 風吹進眼睛 (眨眼反射)
+            </button>
+            <button class="scenario-btn" onclick="runScenario('reflex_saliva')">
+                <span>🍗</span> 聞到香味 (流口水反射)
+            </button>
+
+            <div class="btn-group-title">脊髓反射 (四肢反射)</div>
+            <button class="scenario-btn" onclick="runScenario('reflex_hand')">
+                <span>🔥</span> 手碰熱鍋 (縮手反射)
+            </button>
+            <button class="scenario-btn" onclick="runScenario('reflex_foot')">
+                <span>🦶</span> 腳踩圖釘 (縮腳反射)
+            </button>
+
+            <div class="status-box">
+                <div class="status-text" id="status-title">準備開始</div>
+                <div class="status-desc" id="status-desc">請選擇「眨眼」或「流口水」，觀察訊號在紫色腦幹區的精確路徑。</div>
+            </div>
+        </div>
+
+        <div class="visual-area" id="visual-area">
+            <div id="float-label">提示</div>
+
+            <svg viewBox="0 0 500 850" xmlns="http://www.w3.org/2000/svg" id="main-svg">
+                <defs>
+                    <path id="path-visual" d="M 180,120 L 250,110 L 250,250 L 320,320 L 390,420" fill="none" />
+                    
+                    <path id="path-auditory" d="M 140,140 L 250,110 L 250,250 L 320,320 L 390,420" fill="none" />
+                    
+                    <path id="path-reflex-blink" d="M 180,120 L 250,215 L 190,130" fill="none" />
+
+                    <path id="path-reflex-saliva" d="M 150,165 L 250,215 L 200,240" fill="none" />
+
+                    <path id="path-reflex-hand" d="M 390,420 L 320,320 L 250,300 L 320,320 L 390,420" fill="none" />
+
+                    <path id="path-reflex-foot" d="M 180,800 L 250,480 L 210,750" fill="none" />
+                </defs>
+
+                <g id="body-group">
+                    <path class="body-skin" d="M 250,40 C 180,40 150,90 150,160 C 150,230 180,260 250,260 C 320,260 350,230 350,160 C 350,90 320,40 250,40 Z" />
+                    <path class="body-skin" d="M 200,260 L 300,260 L 320,350 L 320,550 L 180,550 L 180,350 Z" />
+                    <path class="body-skin" d="M 180,300 L 120,450 L 110,480 C 100,500 140,500 130,480 L 140,460 L 200,320" /> 
+                    <path class="body-skin" d="M 320,300 L 360,380 C 350,360 380,340 400,360 C 420,380 410,420 380,410 L 340,320 Z" />
+                    <path class="body-skin" d="M 210,550 L 200,750 L 170,800 L 230,750 L 240,550" /> 
+                    <path class="body-skin" d="M 290,550 L 300,750 L 330,800 L 270,750 L 260,550" /> 
+                </g>
+
+                <path class="cns-brain" d="M 250,55 C 200,55 170,95 170,140 C 170,180 200,200 250,200 C 300,200 330,180 330,140 C 330,95 300,55 250,55 Z" />
+                <path d="M 250,55 L 250,200" stroke="#d090a8" stroke-width="1" fill="none"/> 
+                <text x="250" y="125" class="cns-text">大腦</text>
+
+                <path class="cns-brainstem" d="M 230,200 L 270,200 L 265,230 L 235,230 Z" />
+                <text x="250" y="220" class="cns-text" style="font-size:12px;">腦幹</text>
+
+                <rect class="cns-spine" x="240" y="230" width="20" height="320" rx="5" />
+                <text x="250" y="320" class="cns-text" style="font-size:12px;">脊髓</text>
+
+                <g id="group-visual" class="organ-group">
+                    <path id="line-visual-sensory" class="nerve-line" d="M 180,120 L 250,110" />
+                    <circle cx="180" cy="120" r="10" fill="white" stroke="#333" stroke-width="2"/>
+                    <circle cx="180" cy="120" r="4" fill="#333"/>
+                    <text x="175" y="105" font-size="12" fill="#333">眼</text>
+                </g>
+
+                <g id="group-auditory" class="organ-group">
+                    <path id="line-auditory-sensory" class="nerve-line" d="M 140,140 L 250,110" />
+                    <path class="organ-icon" d="M 140,125 C 130,125 125,140 130,155 C 135,160 145,155 140,140" fill="#f0e0d6" />
+                    <text x="130" y="120" font-size="12" fill="#333">耳</text>
+                </g>
+
+                <g id="group-nose" class="organ-group">
+                    <path class="organ-icon" d="M 150,150 L 135,165 L 150,180" fill="#f0e0d6" />
+                    <text x="130" y="150" font-size="12" fill="#333">鼻</text>
+                    
+                    <path id="line-saliva-sensory" class="nerve-line" d="M 150,165 L 250,215" />
+                    
+                    <path id="line-saliva-motor" class="nerve-line" d="M 250,215 L 200,240" />
+                    
+                    <circle cx="200" cy="240" r="8" fill="#e0f7fa" stroke="#333" />
+                    <text x="190" y="260" font-size="10" fill="#333">唾腺</text>
+                </g>
+
+                <g id="group-blink" class="organ-group">
+                    <circle cx="180" cy="120" r="10" fill="white" stroke="#333" stroke-width="2"/>
+                    <circle cx="180" cy="120" r="4" fill="#333"/>
+                    
+                    <path id="line-blink-sensory" class="nerve-line" d="M 180,120 L 250,215" />
+                    <path id="line-blink-motor" class="nerve-line" d="M 250,215 L 190,130" />
+                </g>
+
+                <path id="line-motor-hand" class="nerve-line" d="M 250,250 L 320,320 L 390,420" style="opacity:0.3"/>
+
+                <g id="group-reflex-hand" class="organ-group">
+                     <path id="line-reflex-hand-sensory" class="nerve-line" d="M 390,420 L 320,320 L 250,300" />
+                </g>
+
+                <g id="group-reflex-foot" class="organ-group">
+                    <path id="line-reflex-foot-sensory" class="nerve-line" d="M 180,800 L 250,480" />
+                    <path id="line-reflex-foot-motor" class="nerve-line" d="M 250,480 L 210,750" />
+                </g>
+
+                <g id="prop-pan" class="prop-icon" transform="translate(400, 430)">
+                    <text font-size="40">🍳</text>
+                </g>
+                <g id="prop-tack" class="prop-icon" transform="translate(150, 820)">
+                    <text font-size="35">📌</text>
+                </g>
+                <g id="prop-wind" class="prop-icon" transform="translate(120, 110)">
+                    <text font-size="35">💨</text>
+                </g>
+                <g id="prop-food" class="prop-icon" transform="translate(100, 160)">
+                    <text font-size="35">🍗</text>
+                </g>
+
+                <circle id="signal-dot" cx="0" cy="0" />
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        const scenarios = {
+            visual: {
+                title: "視覺反應 (手接尺)",
+                organId: "group-visual",
+                pathId: "path-visual",
+                propId: null,
+                waypoints: [
+                    { pct: '0%', label: '受器(眼)', desc: '眼睛接收光線。' },
+                    { pct: '8%', label: '感覺神經', desc: '傳向大腦皮質。', flowId: 'line-visual-sensory' },
+                    { pct: '16%', label: '中樞(大腦)', desc: '意識判斷：要接住尺。' },
+                    { pct: '35%', label: '脊髓(傳出)', desc: '命令下行。' },
+                    { pct: '70%', label: '運動神經', desc: '傳向手部。', flowId: 'line-motor-hand' },
+                    { pct: '100%', label: '動器(手)', desc: '肌肉收縮。' }
+                ]
+            },
+            auditory: {
+                title: "聽覺反應 (寫字)",
+                organId: "group-auditory",
+                pathId: "path-auditory",
+                propId: null,
+                waypoints: [
+                    { pct: '0%', label: '受器(耳)', desc: '耳朵接收聲波。' },
+                    { pct: '12%', label: '感覺神經', desc: '傳向大腦皮質。', flowId: 'line-auditory-sensory' },
+                    { pct: '24%', label: '中樞(大腦)', desc: '意識判斷：要寫字。' },
+                    { pct: '45%', label: '脊髓(傳出)', desc: '命令下行。' },
+                    { pct: '75%', label: '運動神經', desc: '傳向手部。', flowId: 'line-motor-hand' },
+                    { pct: '100%', label: '動器(手)', desc: '肌肉收縮。' }
+                ]
+            },
+            reflex_blink: {
+                title: "眨眼反射",
+                organId: "group-blink",
+                pathId: "path-reflex-blink",
+                propId: "prop-wind",
+                waypoints: [
+                    { pct: '0%', label: '受器(眼)', desc: '受到強風/異物刺激。', flowId: null },
+                    // 感覺神經: 0% 到 50%
+                    { pct: '25%', label: '感覺神經', desc: '訊號傳入腦幹。', flowId: 'line-blink-sensory' },
+                    // 腦幹中心: 50% (因為路徑是對稱的V型)
+                    { pct: '50%', label: '中樞(腦幹)', desc: '【反射中樞】腦幹(座標250,215)直接換元。', flowId: null },
+                    // 運動神經: 50% 到 100%
+                    { pct: '75%', label: '運動神經', desc: '命令傳回眼部肌肉。', flowId: 'line-blink-motor' },
+                    { pct: '100%', label: '動器(眼肌)', desc: '眼輪匝肌收縮，閉眼。', flowId: null }
+                ]
+            },
+            reflex_saliva: {
+                title: "流口水反射",
+                organId: "group-nose",
+                pathId: "path-reflex-saliva",
+                propId: "prop-food",
+                waypoints: [
+                    { pct: '0%', label: '受器(鼻)', desc: '聞到食物香味。', flowId: null },
+                    // 感覺神經
+                    { pct: '25%', label: '嗅神經', desc: '傳入腦幹。', flowId: 'line-saliva-sensory' },
+                    // 腦幹中心 (50% 位置，因為路徑定義經過中間點)
+                    { pct: '50%', label: '中樞(腦幹)', desc: '【反射中樞】腦幹(座標250,215)控制唾腺。', flowId: null },
+                    // 運動神經
+                    { pct: '75%', label: '運動神經', desc: '命令傳至唾腺。', flowId: 'line-saliva-motor' },
+                    { pct: '100%', label: '動器(唾腺)', desc: '分泌口水。', flowId: null }
+                ]
+            },
+            reflex_hand: {
+                title: "縮手反射",
+                organId: "group-reflex-hand",
+                pathId: "path-reflex-hand",
+                propId: "prop-pan",
+                waypoints: [
+                    { pct: '0%', label: '受器(手)', desc: '碰觸高溫。' },
+                    { pct: '25%', label: '感覺神經', desc: '痛覺快速傳入脊髓。', flowId: 'line-reflex-hand-sensory' },
+                    { pct: '50%', label: '中樞(脊髓)', desc: '【反射中樞】脊髓直接換元。' },
+                    { pct: '75%', label: '運動神經', desc: '命令傳向肌肉。', flowId: 'line-motor-hand' },
+                    { pct: '100%', label: '動器(手)', desc: '立刻縮手。' }
+                ]
+            },
+            reflex_foot: {
+                title: "縮腳反射",
+                organId: "group-reflex-foot",
+                pathId: "path-reflex-foot",
+                propId: "prop-tack",
+                waypoints: [
+                    { pct: '0%', label: '受器(腳)', desc: '踩到圖釘。' },
+                    { pct: '25%', label: '感覺神經', desc: '傳入脊髓。', flowId: 'line-reflex-foot-sensory' },
+                    { pct: '54%', label: '中樞(脊髓)', desc: '【反射中樞】脊髓腰部直接換元。' },
+                    { pct: '75%', label: '運動神經', desc: '命令傳回腿部。', flowId: 'line-reflex-foot-motor' },
+                    { pct: '100%', label: '動器(腳)', desc: '立刻縮腳。' }
+                ]
+            }
+        };
+
+        async function runScenario(key) {
+            const data = scenarios[key];
+            const dot = document.getElementById('signal-dot');
+            const label = document.getElementById('float-label');
+            const titleBox = document.getElementById('status-title');
+            const descBox = document.getElementById('status-desc');
+
+            document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            // 重置
+            document.querySelectorAll('.nerve-line').forEach(l => l.classList.remove('flowing'));
+            document.getElementById('line-motor-hand').style.opacity = '0.3'; 
+
+            document.querySelectorAll('.organ-group').forEach(g => g.classList.remove('visible'));
+            if(data.organId) document.getElementById(data.organId).classList.add('visible');
+            
+            document.querySelectorAll('.prop-icon').forEach(p => p.classList.remove('visible'));
+            if(data.propId) document.getElementById(data.propId).classList.add('visible');
+
+            const pathEl = document.getElementById(data.pathId);
+            const pathData = pathEl.getAttribute('d');
+            dot.style.offsetPath = `path('${pathData}')`;
+            dot.style.offsetDistance = '0%';
+            dot.style.opacity = '1';
+            dot.classList.add('pulse');
+            label.style.opacity = 0;
+
+            for(let i=0; i<data.waypoints.length; i++) {
+                const wp = data.waypoints[i];
+                
+                titleBox.innerText = `[${data.title}] ${wp.label}`;
+                descBox.innerText = wp.desc;
+
+                // 處理流動動畫
+                document.querySelectorAll('.nerve-line').forEach(l => l.classList.remove('flowing'));
+                if (wp.flowId) {
+                    const line = document.getElementById(wp.flowId);
+                    if(line) {
+                        line.style.opacity = '1';
+                        line.classList.add('flowing');
+                    }
+                }
+
+                dot.style.transition = 'offset-distance 1.2s ease-in-out';
+                dot.style.offsetDistance = wp.pct;
+                await wait(1200);
+
+                updateLabelPos(dot, wp.label);
+                label.style.opacity = 1;
+                await wait(1000);
+
+                if(i < data.waypoints.length - 1) label.style.opacity = 0;
+            }
+
+            titleBox.innerText = "傳遞完成";
+            dot.classList.remove('pulse');
+            document.querySelectorAll('.nerve-line').forEach(l => l.classList.remove('flowing'));
+        }
+
+        function updateLabelPos(dot, text) {
+            const label = document.getElementById('float-label');
+            label.innerText = text;
+            const dotRect = dot.getBoundingClientRect();
+            const containerRect = document.getElementById('visual-area').getBoundingClientRect();
+            label.style.left = (dotRect.left - containerRect.left) + 'px';
+            label.style.top = (dotRect.top - containerRect.top) + 'px';
+        }
+
+        function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+    </script>
+</body>
+</html>
