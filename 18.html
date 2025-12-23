@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>細胞生理模擬 v5.0：多通道與速度控制</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; display: flex; flex-direction: column; align-items: center; padding: 10px; }
+        h1 { color: #2c3e50; font-size: 1.6rem; margin-bottom: 10px; }
+        .main-layout { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+        
+        canvas { background: linear-gradient(to right, #ffffff, #f9fbfd); border: 4px solid #34495e; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .controls { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 340px; }
+        
+        .mode-switch { display: flex; gap: 10px; margin-bottom: 15px; background: #dfe6e9; padding: 5px; border-radius: 8px; }
+        .mode-btn { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: #555; transition: 0.2s; }
+        .mode-btn.active { background-color: #2980b9; color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        
+        .section-header { font-size: 0.9em; font-weight: bold; color: #7f8c8d; border-bottom: 2px solid #ecf0f1; margin: 15px 0 8px 0; padding-bottom: 5px; text-transform: uppercase; }
+        .control-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 0.9em; }
+        input[type="range"] { flex: 1; margin-left: 10px; cursor: pointer; }
+        
+        .speed-control { background: #fff3cd; padding: 10px; border-radius: 6px; border: 1px solid #ffeeba; margin-bottom: 15px; }
+        .speed-label { display: flex; justify-content: space-between; font-weight: bold; color: #856404; font-size: 0.9em; margin-bottom: 5px;}
+
+        .dot { width: 12px; height: 12px; display: inline-block; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); }
+        
+        .osmometer { margin-top: 15px; background: #eef7fb; padding: 10px; border-radius: 6px; border: 1px solid #cce4f7; text-align: center; }
+        .bar-wrapper { display: flex; height: 24px; margin-top: 5px; border: 1px solid #888; border-radius: 3px; overflow: hidden; background: white;}
+        .bar-left { background: #3498db; height: 100%; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8em; }
+        .bar-right { background: #ecf0f1; height: 100%; flex: 1; display: flex; align-items: center; justify-content: center; color: #555; font-size: 0.8em; }
+
+        button.reset-btn { width: 100%; padding: 12px; margin-top: 15px; background: #2c3e50; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button.reset-btn:hover { background: #34495e; }
+    </style>
+</head>
+<body>
+
+    <h1>🔬 細胞生理模擬系統 v5.0</h1>
+
+    <div class="main-layout">
+        <canvas id="simCanvas" width="640" height="520"></canvas>
+
+        <div class="controls">
+            
+            <div class="speed-control">
+                <div class="speed-label">
+                    <span>⏱️ 模擬速度</span>
+                    <span id="speedVal">1.0x</span>
+                </div>
+                <input type="range" id="speedSlider" min="0.2" max="3.0" step="0.1" value="1.0">
+            </div>
+
+            <div class="mode-switch">
+                <button class="mode-btn active" onclick="setMode('diffusion')">模式 A: 膜運輸</button>
+                <button class="mode-btn" onclick="setMode('osmosis')">模式 B: 滲透作用</button>
+            </div>
+
+            <div id="diffusionControls">
+                <div class="section-header">小分子 (可通過)</div>
+                <div class="control-row">
+                    <label><span class="dot" style="background:#3498db"></span> 水分子 ($H_2O$)</label>
+                    <input type="range" id="waterCount" min="0" max="150" value="60">
+                </div>
+                <div class="control-row">
+                    <label><span class="dot" style="background:#f39c12; border-radius:2px;"></span> 葡萄糖 (Glu)</label>
+                    <input type="range" id="glucoseCount" min="0" max="40" value="20">
+                </div>
+                <div class="control-row">
+                    <label><span class="dot" style="background:#2ecc71; clip-path: polygon(50% 0%, 0% 100%, 100% 100%);"></span> 胺基酸 (AA)</label>
+                    <input type="range" id="aminoCount" min="0" max="40" value="20">
+                </div>
+
+                <div class="section-header">大分子 (無法通過)</div>
+                <div class="control-row">
+                    <label><span class="dot" style="background:#8e44ad; width:14px; height:14px;"></span> 蛋白質</label>
+                    <input type="range" id="proteinCount" min="0" max="10" value="5">
+                </div>
+                <div class="control-row">
+                    <label><span class="dot" style="background:#c0392b; width:16px; height:16px;"></span> 澱粉</label>
+                    <input type="range" id="starchCount" min="0" max="10" value="3">
+                </div>
+            </div>
+
+            <div id="osmosisControls" style="display:none;">
+                <div class="section-header">溶質濃度 ($NaCl$)</div>
+                <div class="control-row">
+                    <label>左側 [NaCl]</label>
+                    <input type="range" id="saltLeft" min="0" max="80" value="0">
+                </div>
+                <div class="control-row">
+                    <label>右側 [NaCl]</label>
+                    <input type="range" id="saltRight" min="0" max="80" value="50">
+                </div>
+                
+                <div class="osmometer">
+                    <div style="font-size:0.9em; margin-bottom:5px;">💧 左右水量分佈</div>
+                    <div class="bar-wrapper">
+                        <div id="waterBarLeft" class="bar-left" style="width: 50%;">50%</div>
+                        <div id="waterBarRight" class="bar-right">50%</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="reset-btn" onclick="resetSim()">⟳ 重置實驗</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let mode = 'diffusion'; 
+        let speedMultiplier = 1.0;
+
+        // 通道配置：現在增加為 6 個，交錯排列以最大化利用空間
+        // Y 軸分布在 Canvas 高度 520 內
+        const CHANNELS = [
+            { y: 50,  h: 40, type: 'glucose', color: '#f39c12', label: 'Glu' },
+            { y: 120, h: 40, type: 'water',   color: '#3498db', label: 'H2O' }, 
+            { y: 190, h: 40, type: 'amino',   color: '#2ecc71', label: 'AA' },
+            
+            { y: 290, h: 40, type: 'glucose', color: '#f39c12', label: 'Glu' },
+            { y: 360, h: 40, type: 'water',   color: '#3498db', label: 'H2O' },
+            { y: 430, h: 40, type: 'amino',   color: '#2ecc71', label: 'AA' }
+        ];
+
+        const TYPES = {
+            WATER:   { r: 3,  c: '#3498db', s: 3.5, shape:'circle' },
+            GLUCOSE: { r: 7,  c: '#f39c12', s: 1.2, shape:'square' },
+            AMINO:   { r: 6,  c: '#2ecc71', s: 1.5, shape:'triangle' },
+            PROTEIN: { r: 15, c: '#8e44ad', s: 0.5, shape:'complex' },
+            STARCH:  { r: 20, c: '#c0392b', s: 0.3, shape:'complex' },
+            SALT:    { r: 4,  c: '#95a5a6', s: 0.8, shape:'hollow' } 
+        };
+
+        class Particle {
+            constructor(typeKey, x, y) {
+                this.typeKey = typeKey;
+                this.props = TYPES[typeKey];
+                this.x = x;
+                this.y = y;
+                let angle = Math.random() * Math.PI * 2;
+                this.vx = Math.cos(angle) * this.props.s;
+                this.vy = Math.sin(angle) * this.props.s;
+            }
+
+            draw() {
+                ctx.fillStyle = this.props.c;
+                ctx.strokeStyle = this.props.c;
+                
+                if (this.props.shape === 'square') {
+                    ctx.fillRect(this.x - this.props.r, this.y - this.props.r, this.props.r*2, this.props.r*2);
+                } else if (this.props.shape === 'triangle') {
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y - this.props.r);
+                    ctx.lineTo(this.x - this.props.r, this.y + this.props.r);
+                    ctx.lineTo(this.x + this.props.r, this.y + this.props.r);
+                    ctx.fill();
+                } else if (this.props.shape === 'complex') {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.props.r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                } else if (this.props.shape === 'hollow') {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.props.r, 0, Math.PI * 2);
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.props.r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            update() {
+                // 應用速度倍率
+                const currentVx = this.vx * speedMultiplier;
+                const currentVy = this.vy * speedMultiplier;
+
+                this.x += currentVx;
+                this.y += currentVy;
+
+                // 邊界反彈
+                if (this.x < this.props.r || this.x > canvas.width - this.props.r) this.vx *= -1;
+                if (this.y < this.props.r || this.y > canvas.height - this.props.r) this.vy *= -1;
+
+                // 膜的交互作用
+                const mx = canvas.width / 2;
+                
+                // 動態調整碰撞偵測範圍 (防穿牆：速度越快，偵測範圍要越寬)
+                const hitRange = this.props.r + Math.abs(currentVx) + 2;
+
+                // 檢查是否接觸膜區域
+                const isCrossing = (this.x < mx && this.x + hitRange >= mx) || (this.x > mx && this.x - hitRange <= mx);
+
+                if (isCrossing) {
+                    // 再次確認方向：確保是往膜的方向撞
+                    if ((this.x < mx && this.vx < 0) || (this.x > mx && this.vx > 0)) {
+                        return; // 正在遠離膜，不處理
+                    }
+
+                    let allowed = false;
+
+                    if (mode === 'osmosis') {
+                        // 滲透模式邏輯 (水勢計算)
+                        if (this.typeKey === 'WATER') {
+                            const saltLeft = particles.filter(p => p.typeKey === 'SALT' && p.x < mx).length;
+                            const saltRight = particles.filter(p => p.typeKey === 'SALT' && p.x > mx).length;
+                            
+                            let probPass = 0.5;
+                            // 往鹽多的一邊跑機率高
+                            if (this.vx > 0) probPass = (saltRight + 1) / (saltLeft + saltRight + 2); 
+                            else probPass = (saltLeft + 1) / (saltLeft + saltRight + 2);
+                            
+                            // 放大效應
+                            if (probPass > 0.5) probPass = Math.min(1, probPass * 1.5);
+                            else probPass = probPass * 0.3;
+
+                            allowed = Math.random() < probPass;
+
+                        } else {
+                            allowed = false; // 鹽不可過
+                        }
+                    } else {
+                        // 擴散模式邏輯
+                        if (this.typeKey === 'WATER') allowed = true;
+                        else if (this.typeKey === 'GLUCOSE') allowed = checkChannel(this.y, 'glucose');
+                        else if (this.typeKey === 'AMINO') allowed = checkChannel(this.y, 'amino');
+                        else allowed = false;
+                    }
+
+                    if (!allowed) {
+                        this.vx *= -1; // 反彈
+                        // 強制位置修正，防止因速度過快而卡在膜中間
+                        if (this.x < mx) this.x = mx - this.props.r - 2;
+                        else this.x = mx + this.props.r + 2;
+                    }
+                }
+            }
+        }
+
+        function checkChannel(y, type) {
+            // 檢查是否對準任意一個同類型的通道
+            return CHANNELS.some(ch => ch.type === type && y > ch.y && y < ch.y + ch.h);
+        }
+
+        function drawMembrane() {
+            const mx = canvas.width / 2;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 脂雙層背景
+            ctx.beginPath();
+            ctx.moveTo(mx, 0);
+            ctx.lineTo(mx, canvas.height);
+            ctx.lineWidth = 12;
+            ctx.strokeStyle = '#bdc3c7';
+            ctx.stroke();
+
+            if (mode === 'diffusion') {
+                CHANNELS.forEach(ch => {
+                    ctx.clearRect(mx - 8, ch.y, 16, ch.h); 
+                    
+                    // 通道主體
+                    ctx.fillStyle = ch.color;
+                    ctx.fillRect(mx - 12, ch.y, 10, ch.h);
+                    ctx.fillRect(mx + 2, ch.y, 10, ch.h);
+                    
+                    // 標籤 (稍微簡化以避免太亂)
+                    ctx.fillStyle = '#777';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.fillText(ch.label, mx + 16, ch.y + ch.h/2 + 4);
+
+                    // 畫通道口形狀提示
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 1;
+                    if(ch.type === 'glucose') ctx.strokeRect(mx-8, ch.y+10, 6, 20); // 方孔
+                    if(ch.type === 'amino') { // 三角孔
+                        ctx.beginPath(); 
+                        ctx.moveTo(mx-5, ch.y+10); 
+                        ctx.lineTo(mx-2, ch.y+30); 
+                        ctx.lineTo(mx-8, ch.y+30); 
+                        ctx.stroke();
+                    }
+                });
+            } else {
+                // 滲透模式膜
+                ctx.beginPath();
+                ctx.setLineDash([4, 4]);
+                ctx.moveTo(mx, 0);
+                ctx.lineTo(mx, canvas.height);
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#3498db';
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        function updateStats() {
+            if (mode === 'osmosis') {
+                const mx = canvas.width / 2;
+                const leftW = particles.filter(p => p.typeKey === 'WATER' && p.x < mx).length;
+                const rightW = particles.filter(p => p.typeKey === 'WATER' && p.x > mx).length;
+                const total = leftW + rightW || 1;
+                
+                const pctLeft = Math.round((leftW / total) * 100);
+                const barL = document.getElementById('waterBarLeft');
+                const barR = document.getElementById('waterBarRight');
+                
+                barL.style.width = pctLeft + '%';
+                barL.innerText = pctLeft + '%';
+                barR.innerText = (100-pctLeft) + '%';
+            }
+        }
+
+        // 速度滑桿監聽
+        document.getElementById('speedSlider').addEventListener('input', (e) => {
+            speedMultiplier = parseFloat(e.target.value);
+            document.getElementById('speedVal').innerText = speedMultiplier.toFixed(1) + "x";
+        });
+
+        function animate() {
+            drawMembrane();
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            updateStats();
+            requestAnimationFrame(animate);
+        }
+
+        function resetSim() {
+            particles = [];
+            const mx = canvas.width / 2;
+
+            if (mode === 'diffusion') {
+                spawn('WATER', document.getElementById('waterCount').value, 0, mx);
+                spawn('GLUCOSE', document.getElementById('glucoseCount').value, 0, mx);
+                spawn('AMINO', document.getElementById('aminoCount').value, 0, mx);
+                spawn('PROTEIN', document.getElementById('proteinCount').value, 0, mx);
+                spawn('STARCH', document.getElementById('starchCount').value, 0, mx);
+                spawn('WATER', 30, mx, canvas.width);
+            } else {
+                spawn('WATER', 130, 0, mx); 
+                spawn('WATER', 130, mx, canvas.width);
+                spawn('SALT', document.getElementById('saltLeft').value, 0, mx - 10);
+                spawn('SALT', document.getElementById('saltRight').value, mx + 10, canvas.width);
+            }
+        }
+
+        function spawn(key, count, minX, maxX) {
+            for(let i=0; i<count; i++) {
+                let x = Math.random() * (maxX - minX - 40) + minX + 20;
+                let y = Math.random() * (canvas.height - 40) + 20;
+                particles.push(new Particle(key, x, y));
+            }
+        }
+
+        function setMode(m) {
+            mode = m;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('diffusionControls').style.display = m === 'diffusion' ? 'block' : 'none';
+            document.getElementById('osmosisControls').style.display = m === 'osmosis' ? 'block' : 'none';
+            
+            resetSim();
+        }
+
+        resetSim();
+        animate();
+    </script>
+</body>
+</html>
