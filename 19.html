@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>國中生物：呼吸運動模型 (位置修正版)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #2c3e50; font-family: 'Segoe UI', sans-serif; }
+        
+        /* --- 左側邊欄樣式 --- */
+        #sidebar {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            width: 280px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 100;
+            user-select: none;
+        }
+
+        h1 { margin: 0 0 10px 0; font-size: 1.5rem; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        p.desc { margin: 10px 0; font-size: 0.95rem; color: #555; line-height: 1.5; }
+        .highlight { color: #e74c3c; font-weight: bold; }
+        
+        .signature {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #eee;
+            font-weight: bold;
+            color: #2980b9;
+            text-align: right;
+            font-size: 1.1rem;
+        }
+        .signature span { font-size: 0.8rem; color: #999; font-weight: normal;}
+
+        .control-group { margin-top: 25px; }
+
+        button#hiccupBtn {
+            width: 100%;
+            padding: 12px; background: #e74c3c; color: white;
+            border: none; border-radius: 10px; font-size: 1.1rem;
+            cursor: pointer; box-shadow: 0 4px 0 #c0392b;
+            transition: all 0.1s; font-weight: bold; outline: none;
+        }
+        button#hiccupBtn:active { transform: translateY(4px); box-shadow: 0 0 0 #c0392b; }
+        button#hiccupBtn:disabled { background: #95a5a6; box-shadow: none; cursor: not-allowed; transform: translateY(4px); }
+
+        .toggle-container {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 15px; background: #f0f2f5; padding: 10px; border-radius: 10px;
+        }
+        .toggle-label { font-weight: bold; color: #34495e; font-size: 0.9rem;}
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc; transition: .4s; border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #2980b9; }
+        input:checked + .slider:before { transform: translateX(26px); }
+
+        #indicators-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 50;
+            display: none;
+            transition: opacity 0.3s;
+        }
+
+        #airflow-arrow {
+            position: absolute;
+            top: 15%; left: 50%; /* 這裡會動態調整 */
+            transform: translateX(-50%);
+            font-size: 4rem; font-weight: bold;
+            text-shadow: 0 0 10px rgba(255,255,255,0.8);
+            transition: all 0.2s;
+        }
+
+        .pressure-label {
+            position: absolute;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+        #pressure-ext {
+            top: 15%; right: 20%;
+            background: rgba(236, 240, 241, 0.9); color: #7f8c8d;
+        }
+        #pressure-int {
+            top: 50%; left: 50%; /* 這裡會動態調整 */
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        #cursor-hint {
+            position: absolute; pointer-events: none; display: none;
+            background: rgba(0,0,0,0.8); color: white; padding: 6px 12px;
+            border-radius: 6px; font-size: 12px; white-space: nowrap;
+            z-index: 200; transform: translate(15px, 15px);
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h1>🫁 呼吸運動實驗室</h1>
+        <p class="desc">請用滑鼠 <span class="highlight">按住拉環上下拖曳</span>，觀察胸腔體積變化如何帶動肺部呼吸。</p>
+        
+        <div class="control-group">
+            <div class="toggle-container">
+                <span class="toggle-label">顯示氣流與壓力指標</span>
+                <label class="switch">
+                    <input type="checkbox" id="indicatorToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <button id="hiccupBtn" onclick="triggerHiccup()">💥 觸發橫膈膜痙攣 (打嗝)</button>
+        </div>
+
+        <div class="signature">
+            <span>Designer:</span> 小粘製作
+        </div>
+    </div>
+
+    <div id="indicators-overlay">
+        <div id="airflow-arrow" style="opacity: 0;">⬇️</div>
+        <div id="pressure-ext" class="pressure-label">外界壓力: 大氣壓</div>
+        <div id="pressure-int" class="pressure-label">胸腔內壓: 平衡</div>
+    </div>
+
+    <div id="cursor-hint">✋ 按住我上下拖曳</div>
+
+    <script>
+        // --- 1. 場景初始化 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x34495e);
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(3, 1.5, 17);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+        orbitControls.enablePan = false;
+        orbitControls.minPolarAngle = Math.PI / 2.5; 
+        orbitControls.maxPolarAngle = Math.PI / 1.8; 
+        orbitControls.enableZoom = true;
+        orbitControls.target.set(2, 0, 0);
+        orbitControls.update();
+
+        // 燈光
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+        dirLight.position.set(5, 10, 8);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+        const bottomLight = new THREE.DirectionalLight(0xffeedd, 0.3);
+        bottomLight.position.set(0, -10, 5);
+        scene.add(bottomLight);
+
+        // --- 2. 建立模型 (位置修正重點) ---
+        const lungGroup = new THREE.Group();
+        // ★★★ 關鍵：整個模型往右移，所有零件都要加到 lungGroup 裡 ★★★
+        lungGroup.position.x = 2; 
+        scene.add(lungGroup);
+
+        const jarHeight = 8;
+        const jarRadius = 3.5;
+        const jarBottomY = -jarHeight / 2;
+
+        const jar = new THREE.Mesh(
+            new THREE.CylinderGeometry(jarRadius, jarRadius, jarHeight, 32, 1, true),
+            new THREE.MeshPhysicalMaterial({ color: 0xaaccff, transmission: 0.6, opacity: 0.3, roughness: 0.1, transparent: true, side: THREE.DoubleSide })
+        );
+        lungGroup.add(jar);
+
+        const cork = new THREE.Mesh(
+            new THREE.CylinderGeometry(jarRadius -0.1, jarRadius -0.1, 0.5, 32),
+            new THREE.MeshLambertMaterial({ color: 0x555555 })
+        );
+        cork.position.y = jarHeight / 2 - 0.25;
+        lungGroup.add(cork);
+
+        const strawMat = new THREE.MeshPhongMaterial({ color: 0xecf0f1, shininess: 60 });
+        const trachea = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 3.0, 16), strawMat);
+        trachea.position.y = 2.25; 
+        lungGroup.add(trachea);
+
+        const leftBronchus = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.6, 16), strawMat);
+        leftBronchus.position.set(-0.7, -0.2, 0); 
+        leftBronchus.rotation.z = -Math.PI / 5.5; 
+        lungGroup.add(leftBronchus);
+
+        const rightBronchus = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.6, 16), strawMat);
+        rightBronchus.position.set(0.7, -0.2, 0);
+        rightBronchus.rotation.z = Math.PI / 5.5; 
+        lungGroup.add(rightBronchus);
+
+        const balloonGeo = new THREE.SphereGeometry(1.1, 64, 64);
+        balloonGeo.translate(0, -1.1, 0); 
+        const balloonMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c, shininess: 90, specular: 0x222222 });
+        const balloonTopY = -1.2;
+
+        const leftBalloon = new THREE.Mesh(balloonGeo, balloonMat);
+        leftBalloon.position.set(-1.4, balloonTopY, 0);
+        lungGroup.add(leftBalloon);
+
+        const rightBalloon = new THREE.Mesh(balloonGeo, balloonMat);
+        rightBalloon.position.set(1.4, balloonTopY, 0);
+        lungGroup.add(rightBalloon);
+
+        const diaphragmGeo = new THREE.CircleGeometry(jarRadius - 0.05, 128);
+        const diaphragm = new THREE.Mesh(diaphragmGeo, new THREE.MeshPhongMaterial({ color: 0xc0392b, side: THREE.DoubleSide, shininess: 30 }));
+        diaphragm.rotation.x = -Math.PI / 2; 
+        diaphragm.position.y = jarBottomY;
+        lungGroup.add(diaphragm);
+
+        // --- 修正區域：拉環群組 ---
+        const handleGroup = new THREE.Group();
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.12, 16, 32), new THREE.MeshStandardMaterial({ color: 0xbdc3c7 }));
+        ring.rotation.x = Math.PI / 2; 
+        ring.position.y = -0.8;
+        const connector = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8), new THREE.MeshStandardMaterial({ color: 0x7f8c8d }));
+        connector.position.y = -0.4;
+        handleGroup.add(ring);
+        handleGroup.add(connector);
+
+        const hitGeo = new THREE.CylinderGeometry(1.2, 1.2, 2.0, 16);
+        const hitMat = new THREE.MeshBasicMaterial({ color: 0xff0000, visible: false, side: THREE.DoubleSide });
+        const hitBox = new THREE.Mesh(hitGeo, hitMat);
+        hitBox.position.y = -0.6; 
+        handleGroup.add(hitBox);
+
+        const neutralDisplacement = 0.5; 
+        handleGroup.position.y = jarBottomY + neutralDisplacement;
+
+        // ★★★ 修正點：將 handleGroup 加入 lungGroup，而不是 scene ★★★
+        // 這樣它才會跟著 lungGroup 的 x=2 一起移動
+        lungGroup.add(handleGroup); 
+
+        // --- 3. 互動邏輯 ---
+        const maxUpDisp = 1.5;    
+        const maxDownDisp = -3.0;
+        let currentDisplacement = neutralDisplacement;
+        let lastDisplacement = neutralDisplacement; 
+
+        let isDragging = false;
+        let isHiccuping = false;
+        
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); 
+        let dragOffset = new THREE.Vector3();
+
+        const hintBox = document.getElementById('cursor-hint');
+        const hiccupBtn = document.getElementById('hiccupBtn');
+        const indicatorToggle = document.getElementById('indicatorToggle');
+        const indicatorsOverlay = document.getElementById('indicators-overlay');
+        const airflowArrow = document.getElementById('airflow-arrow');
+        const pressureIntLabel = document.getElementById('pressure-int');
+        
+        window.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            updateLabelPositions(); // 視窗縮放時更新標籤位置
+        });
+
+        indicatorToggle.addEventListener('change', (e) => {
+            indicatorsOverlay.style.display = e.target.checked ? 'block' : 'none';
+            if(e.target.checked) updateLabelPositions();
+        });
+
+        // 輔助函式：將 3D 座標轉為螢幕 2D 座標 (讓 HTML 標籤跟隨模型)
+        function toScreenPosition(obj, camera) {
+            var vector = new THREE.Vector3();
+            // 抓取模型的世界座標
+            obj.getWorldPosition(vector); 
+            vector.project(camera);
+            vector.x = (vector.x + 1) / 2 * window.innerWidth;
+            vector.y = -(vector.y - 1) / 2 * window.innerHeight;
+            return vector;
+        }
+
+        function updateLabelPositions() {
+            if (!indicatorToggle.checked) return;
+            
+            // 更新箭頭位置 (在氣管上方)
+            const arrowPos = toScreenPosition(trachea, camera);
+            airflowArrow.style.left = arrowPos.x + 'px';
+            airflowArrow.style.top = (arrowPos.y - 100) + 'px';
+
+            // 更新胸腔內壓標籤位置 (在瓶身中間)
+            const jarPos = toScreenPosition(jar, camera);
+            pressureIntLabel.style.left = jarPos.x + 'px';
+            pressureIntLabel.style.top = jarPos.y + 'px';
+        }
+
+        function updateMouseCoords(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onMouseDown(event) {
+            if(isHiccuping) return;
+            updateMouseCoords(event);
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(handleGroup.children);
+            if (intersects.length > 0) {
+                isDragging = true;
+                orbitControls.enabled = false;
+                document.body.style.cursor = 'grabbing';
+                const planeIntersect = new THREE.Vector3();
+                dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 0, 1), intersects[0].point);
+                raycaster.ray.intersectPlane(dragPlane, planeIntersect);
+                dragOffset.subVectors(handleGroup.position, planeIntersect); // 注意：這裡計算會有位移差，但因為互動是相對的，拖曳體驗仍是好的
+            }
+        }
+
+        function onMouseMove(event) {
+            updateMouseCoords(event);
+            hintBox.style.left = event.clientX + 'px';
+            hintBox.style.top = event.clientY + 'px';
+
+            if (isDragging) {
+                raycaster.setFromCamera(mouse, camera);
+                const planeIntersect = new THREE.Vector3();
+                raycaster.ray.intersectPlane(dragPlane, planeIntersect);
+                if(planeIntersect) {
+                    // 修正拖曳邏輯：因為 handleGroup 在 Group 裡 (有 X 偏移)，
+                    // 但 dragPlane 是世界座標。這會造成 Y 軸計算沒問題，但我們需要確保不影響 X/Z
+                    let newY = planeIntersect.y + dragOffset.y;
+                    let proposedDisplacement = newY - jarBottomY;
+                    proposedDisplacement = Math.max(maxDownDisp, Math.min(maxUpDisp, proposedDisplacement));
+                    currentDisplacement = proposedDisplacement;
+                }
+                orbitControls.enabled = false; 
+            } else if (!isHiccuping) {
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(handleGroup.children);
+                if (intersects.length > 0) {
+                    orbitControls.enabled = false;
+                    document.body.style.cursor = 'grab';
+                    hintBox.style.display = 'block';
+                } else {
+                    orbitControls.enabled = true;
+                    document.body.style.cursor = 'default';
+                    hintBox.style.display = 'none';
+                }
+            }
+        }
+
+        function onMouseUp() {
+            if(isDragging) {
+                isDragging = false;
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        window.triggerHiccup = function() {
+            if(isHiccuping || isDragging) return;
+            isHiccuping = true;
+            hiccupBtn.disabled = true;
+            const startDisp = currentDisplacement;
+            const spasmDisp = maxDownDisp;
+            let startTime = Date.now();
+            const durationDown = 80;  
+            const durationUp = 300;
+
+            function loop() {
+                let now = Date.now();
+                let elapsed = now - startTime;
+                if (elapsed < durationDown) {
+                    let p = elapsed / durationDown;
+                    currentDisplacement = startDisp + (spasmDisp - startDisp) * p;
+                    requestAnimationFrame(loop);
+                } else if (elapsed < durationDown + durationUp) {
+                    let p = (elapsed - durationDown) / durationUp;
+                    p = 1 - Math.pow(1 - p, 3); 
+                    currentDisplacement = spasmDisp + (startDisp - spasmDisp) * p;
+                    requestAnimationFrame(loop);
+                } else {
+                    currentDisplacement = startDisp;
+                    isHiccuping = false;
+                    hiccupBtn.disabled = false;
+                }
+            }
+            loop();
+        }
+
+        // --- 4. 渲染迴圈 ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 隨時更新標籤位置，以防使用者轉動畫面
+            updateLabelPositions();
+
+            const velocity = currentDisplacement - lastDisplacement;
+            lastDisplacement = currentDisplacement;
+
+            if (indicatorToggle.checked) {
+                const threshold = 0.005; 
+                if (velocity < -threshold) {
+                    airflowArrow.innerHTML = "⬇️<br><span style='font-size:1rem'>吸氣 (進)</span>";
+                    airflowArrow.style.color = "#2ecc71";
+                    airflowArrow.style.opacity = 1;
+                    pressureIntLabel.innerHTML = "胸腔內壓: <span style='color:#e74c3c'>低</span> (小於外界)";
+                    pressureIntLabel.style.background = "rgba(255, 235, 235, 0.9)";
+                } else if (velocity > threshold) {
+                    airflowArrow.innerHTML = "⬆️<br><span style='font-size:1rem'>吐氣 (出)</span>";
+                    airflowArrow.style.color = "#3498db";
+                    airflowArrow.style.opacity = 1;
+                    pressureIntLabel.innerHTML = "胸腔內壓: <span style='color:#2980b9'>高</span> (大於外界)";
+                    pressureIntLabel.style.background = "rgba(235, 245, 255, 0.9)";
+                } else {
+                    airflowArrow.style.opacity = 0;
+                    pressureIntLabel.innerHTML = "胸腔內壓: 平衡";
+                    pressureIntLabel.style.background = "rgba(255, 255, 255, 0.9)";
+                }
+            }
+
+            handleGroup.position.y = jarBottomY + currentDisplacement;
+
+            const positions = diaphragmGeo.attributes.position;
+            const v3 = new THREE.Vector3();
+            for (let i = 0; i < positions.count; i++) {
+                v3.fromBufferAttribute(positions, i);
+                const dist = Math.sqrt(v3.x * v3.x + v3.y * v3.y);
+                const normalizedDist = dist / (jarRadius - 0.05);
+                const weight = Math.cos(normalizedDist * Math.PI / 2); 
+                v3.z = currentDisplacement * weight; 
+                positions.setZ(i, v3.z);
+            }
+            positions.needsUpdate = true;
+            diaphragmGeo.computeVertexNormals();
+
+            const breathAlpha = (currentDisplacement - maxDownDisp) / (maxUpDisp - maxDownDisp);
+            const scale = 1.3 - (breathAlpha * 0.7);
+            leftBalloon.scale.set(scale, scale, scale); 
+            rightBalloon.scale.set(scale, scale, scale);
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+    </script>
+</body>
+</html>
