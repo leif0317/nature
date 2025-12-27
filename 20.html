@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>3D 構造地質學：V15 最終完美版</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; font-family: 'Microsoft JhengHei', sans-serif; }
+        #info {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: #ffffff;
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+        }
+        h1 { margin: 0; font-size: 28px; letter-spacing: 2px; font-weight: bold; }
+        .subtitle { font-size: 14px; color: #aaa; margin-top: 5px; font-weight: normal; letter-spacing: 1px;}
+        .author { color: #4fc3f7; font-weight: bold; }
+        p { font-size: 16px; color: #ffeb3b; margin-top: 10px; font-weight: bold; }
+        
+        .label {
+            color: #fff;
+            font-family: 'Microsoft JhengHei', sans-serif;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.4);
+            pointer-events: none;
+            font-size: 13px;
+        }
+        
+        #legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            font-size: 12px;
+            pointer-events: none;
+            border: 1px solid #555;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h1>3D 構造地質學模擬</h1>
+        <div class="subtitle">應力與河流最終修復版 (V15) &nbsp;|&nbsp; <span class="author">小粘製作</span></div>
+        <p>當前模式：準備就緒</p>
+    </div>
+
+    <div id="legend">
+        <strong>圖例說明</strong><br><br>
+        <span class="dot" style="background:#4fc3f7;"></span> 橫向河流 (River)<br>
+        <span class="dot" style="background:#ff4444;"></span> 張力 (Tension) - 向外拉<br>
+        <span class="dot" style="background:#4488ff;"></span> 壓力 (Compression) - 向內擠<br>
+        <span class="dot" style="background:#44ff44;"></span> 剪力 (Shear) - 平移
+    </div>
+
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.154.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.154.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+        // --- 1. 場景設置 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x222222); 
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 45, 65); // 稍微拉高，最佳化俯視河流
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        document.body.appendChild(labelRenderer.domElement);
+
+        const controls = new OrbitControls(camera, labelRenderer.domElement);
+        controls.enableDamping = true;
+
+        // --- 2. 燈光 ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(10, 50, 20);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.left = -30; dirLight.shadow.camera.right = 30;
+        dirLight.shadow.camera.top = 30; dirLight.shadow.camera.bottom = -30;
+        scene.add(dirLight);
+
+        // --- 3. 河流與地層紋理 ---
+        function createStratigraphyTexture() {
+            const canvasWidth = 512;
+            const canvasHeight = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            const ctx = canvas.getContext('2d');
+            
+            // 背景：棕色表土
+            ctx.fillStyle = '#5D4037';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+            
+            // 繪製橫向河流 (Blue River)
+            const riverZCenter = canvasHeight / 2;
+            const riverWidth = 60;
+
+            ctx.fillStyle = '#4fc3f7';
+            ctx.fillRect(0, riverZCenter - riverWidth/2, canvasWidth, riverWidth);
+            
+            // 河流波光
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            for(let i=0; i<50; i++) {
+                ctx.fillRect(Math.random()*canvasWidth, riverZCenter - riverWidth/2 + Math.random()*riverWidth, 10, 2);
+            }
+
+            // 地表雜點
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            for(let i=0; i<500; i++) {
+                const rx = Math.random()*canvasWidth;
+                const ry = Math.random()*canvasHeight;
+                if (Math.abs(ry - riverZCenter) > riverWidth/2) {
+                     ctx.fillRect(rx, ry, 3, 3);
+                }
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            return texture;
+        }
+
+        const topMaterial = new THREE.MeshStandardMaterial({ 
+            map: createStratigraphyTexture(),
+            roughness: 0.8,
+            metalness: 0.1
+        });
+
+        // --- 4. 幾何體構造 ---
+        const blockLenX = 20;
+        const blockHgtY = 10;
+        const blockDepZ = 30;
+        const extrudeSettings = { steps: 1, depth: blockDepZ, bevelEnabled: false };
+
+        const shapeFW = new THREE.Shape(); // 下盤 (右)
+        shapeFW.moveTo(5, 0); shapeFW.lineTo(blockLenX, 0);
+        shapeFW.lineTo(blockLenX, blockHgtY); shapeFW.lineTo(15, blockHgtY); shapeFW.lineTo(5, 0);
+
+        const shapeHW = new THREE.Shape(); // 上盤 (左)
+        shapeHW.moveTo(0, 0); shapeHW.lineTo(5, 0);
+        shapeHW.lineTo(15, blockHgtY); shapeHW.lineTo(0, blockHgtY); shapeHW.lineTo(0, 0);
+
+        const geoFW = new THREE.ExtrudeGeometry(shapeFW, extrudeSettings);
+        const geoHW = new THREE.ExtrudeGeometry(shapeHW, extrudeSettings);
+
+        // UV 修復：平面投影
+        function fixUVs(geometry, offsetX) {
+            const pos = geometry.attributes.position;
+            const uv = geometry.attributes.uv;
+            
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i) + offsetX;
+                const z = pos.getZ(i);
+                
+                // U (X軸): -10 ~ 10 -> 0 ~ 1
+                const u = (x + 10) / 20; 
+                // V (Z軸): 0 ~ 30 -> 0 ~ 1
+                const v = z / 30;        
+                
+                uv.setXY(i, u, v);
+            }
+            geometry.attributes.uv.needsUpdate = true;
+        }
+
+        fixUVs(geoFW, -10); // 右塊 (FW) 實際X範圍在 -5~10
+        fixUVs(geoHW, -10); // 左塊 (HW) 實際X範圍在 -10~5
+
+        const footwall = new THREE.Mesh(geoFW, topMaterial);
+        const hangingWall = new THREE.Mesh(geoHW, topMaterial);
+
+        footwall.castShadow = true; footwall.receiveShadow = true;
+        hangingWall.castShadow = true; hangingWall.receiveShadow = true;
+
+        const offsetX = -blockLenX / 2;
+        const offsetY = -blockHgtY / 2;
+        const offsetZ = -blockDepZ / 2;
+        
+        footwall.position.set(offsetX, offsetY, offsetZ);
+        hangingWall.position.set(offsetX, offsetY, offsetZ);
+
+        const fwGroup = new THREE.Group(); fwGroup.add(footwall);
+        const hwGroup = new THREE.Group(); hwGroup.add(hangingWall);
+        scene.add(fwGroup);
+        scene.add(hwGroup);
+
+        // 標籤
+        const fwLabelDiv = document.createElement('div'); fwLabelDiv.className = 'label'; fwLabelDiv.textContent = '下盤';
+        const fwLabel = new CSS2DObject(fwLabelDiv); fwLabel.position.set(8, blockHgtY/2 + 2, 15); fwGroup.add(fwLabel);
+        const hwLabelDiv = document.createElement('div'); hwLabelDiv.className = 'label'; hwLabelDiv.textContent = '上盤';
+        const hwLabel = new CSS2DObject(hwLabelDiv); hwLabel.position.set(-8, blockHgtY/2 + 2, 15); hwGroup.add(hwLabel);
+
+        // --- 5. 應力指示系統 (修正版) ---
+        const arrowGroup = new THREE.Group();
+        scene.add(arrowGroup);
+
+        function createSolidArrow(color) {
+            const group = new THREE.Group();
+            
+            // 箭桿
+            const shaftGeo = new THREE.CylinderGeometry(0.8, 0.8, 4, 12);
+            const mat = new THREE.MeshLambertMaterial({ color: color });
+            const shaft = new THREE.Mesh(shaftGeo, mat);
+            shaft.rotation.z = -Math.PI / 2; // 指向 X
+            shaft.position.x = 2; 
+            
+            // 箭頭
+            const headGeo = new THREE.ConeGeometry(1.5, 3, 12);
+            const head = new THREE.Mesh(headGeo, mat);
+            head.rotation.z = -Math.PI / 2;
+            head.position.x = 5.5; 
+
+            group.add(shaft);
+            group.add(head);
+            return group;
+        }
+
+        function updateArrows(type, val) {
+            arrowGroup.clear(); 
+            const yPos = 2; 
+            const sideDist = blockLenX / 2 + 4; 
+
+            if (type === '正斷層') {
+                const color = 0xff4444; 
+                // 左箭頭指左 (向外)
+                const arrowL = createSolidArrow(color);
+                arrowL.position.set(-sideDist, yPos, 15);
+                arrowL.rotation.y = Math.PI; // 180度 -> 指向 -X
+                arrowGroup.add(arrowL);
+
+                // 右箭頭指右 (向外)
+                const arrowR = createSolidArrow(color);
+                arrowR.position.set(sideDist, yPos, 15);
+                arrowR.rotation.y = 0; // 0度 -> 指向 +X
+                arrowGroup.add(arrowR);
+
+            } else if (type === '逆斷層') {
+                const color = 0x4488ff;
+                // 左箭頭指右 (向內)
+                const arrowL = createSolidArrow(color);
+                arrowL.position.set(-sideDist, yPos, 15);
+                arrowL.rotation.y = 0; 
+                arrowGroup.add(arrowL);
+
+                // 右箭頭指左 (向內)
+                const arrowR = createSolidArrow(color);
+                arrowR.position.set(sideDist, yPos, 15);
+                arrowR.rotation.y = Math.PI; 
+                arrowGroup.add(arrowR);
+
+            } else if (type === '平移斷層') {
+                // 【修正】：完全反轉邏輯
+                const color = 0x44ff44; 
+                const arrowL = createSolidArrow(color);
+                arrowL.position.set(-sideDist, yPos, 15);
+                const arrowR = createSolidArrow(color);
+                arrowR.position.set(sideDist, yPos, 15);
+
+                if (val < -0.1) {
+                    // 左移 (Left Shift)
+                    // 原本是 Left->Front, Right->Back
+                    // 現在改為相反：Left->Back, Right->Front
+                    arrowL.rotation.y = -Math.PI / 2; // 指向 -Z (後)
+                    arrowR.rotation.y = Math.PI / 2; // 指向 +Z (前)
+                } else {
+                    // 右移 (Right Shift) - 預設
+                    // 原本是 Left->Back, Right->Front
+                    // 現在改為相反：Left->Front, Right->Back
+                    arrowL.rotation.y = Math.PI / 2; // 指向 +Z (前)
+                    arrowR.rotation.y = -Math.PI / 2; // 指向 -Z (後)
+                }
+
+                arrowGroup.add(arrowL);
+                arrowGroup.add(arrowR);
+            }
+        }
+
+        // --- 6. 互動邏輯 ---
+        const params = {
+            type: '正斷層',
+            reference: '兩者相對移動',
+            displacement: 0.0, 
+            strikeSlipAmount: 0.0, 
+            showArrows: true,
+            reset: function() { this.displacement = 0; this.strikeSlipAmount = 0; updateFault(); }
+        };
+
+        const gui = new GUI({ title: "地質構造控制台" });
+        gui.add(params, 'type', ['正斷層', '逆斷層', '平移斷層']).name('斷層類型').onChange(updateUI);
+        gui.add(params, 'reference', ['固定下盤', '固定上盤', '兩者相對移動']).name('觀察參照系').onChange(updateFault);
+        gui.add(params, 'showArrows').name('顯示受力方向').onChange(updateFault);
+
+        const dipSlipFolder = gui.addFolder('傾滑控制 (Dip-Slip)');
+        const strikeSlipFolder = gui.addFolder('平移控制 (Strike-Slip)');
+        dipSlipFolder.add(params, 'displacement', 0, 10, 0.1).name('錯動量 (m)').onChange(updateFault);
+        strikeSlipFolder.add(params, 'strikeSlipAmount', -8, 8, 0.1).name('左移 <---> 右移').onChange(updateFault);
+
+        const statusInfo = document.querySelector('#info p');
+
+        function updateUI() {
+            params.displacement = 0; params.strikeSlipAmount = 0;
+            if (params.type === '平移斷層') { dipSlipFolder.hide(); strikeSlipFolder.show(); } 
+            else { dipSlipFolder.show(); strikeSlipFolder.hide(); }
+            updateFault();
+        }
+
+        function updateFault() {
+            let dx = 0, dy = 0, dz = 0;
+            if (params.showArrows) { arrowGroup.visible = true; updateArrows(params.type, params.strikeSlipAmount); } 
+            else { arrowGroup.visible = false; }
+
+            if (params.type === '正斷層') {
+                const d = params.displacement; dx = -d; dy = -d;
+                statusInfo.textContent = `正斷層：受張力 (Tension) 拉張，上盤滑落`;
+            } else if (params.type === '逆斷層') {
+                const d = params.displacement; dx = d; dy = d;
+                statusInfo.textContent = `逆斷層：受壓力 (Compression) 擠壓，上盤逆衝`;
+            } else if (params.type === '平移斷層') {
+                const s = params.strikeSlipAmount; dz = -s; 
+                statusInfo.textContent = s > 0.1 ? `右移斷層：水平剪切` : (s < -0.1 ? `左移斷層：水平剪切` : `平移斷層：受剪力作用`);
+            }
+
+            if (params.reference === '固定下盤') { fwGroup.position.set(0, 0, 0); hwGroup.position.set(dx, dy, dz); } 
+            else if (params.reference === '固定上盤') { hwGroup.position.set(0, 0, 0); fwGroup.position.set(-dx, -dy, -dz); } 
+            else if (params.reference === '兩者相對移動') { hwGroup.position.set(dx/2, dy/2, dz/2); fwGroup.position.set(-dx/2, -dy/2, -dz/2); }
+        }
+
+        updateUI();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        animate();
+    </script>
+</body>
+</html>
