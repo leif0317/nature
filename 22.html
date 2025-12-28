@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光合作用互動模型 - 小粘製作 (分子放大版)</title>
+    <style>
+        :root {
+            --leaf-green: #4CAF50;
+            --chloroplast-green: #8BC34A;
+            --thylakoid-green: #2E7D32;
+            --sun-yellow: #FDD835;
+            --water-blue: #29B6F6;
+            --co2-grey: #78909C;
+            --sugar-white: #FAFAFA;
+            --hydrogen-orange: #FF9800;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", Arial, sans-serif;
+            background-color: #f1f8e9;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--thylakoid-green);
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            gap: 50px;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        /* --- 左側控制區 --- */
+        .sidebar {
+            width: 280px;
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+            z-index: 200;
+            height: 550px;
+        }
+
+        .sidebar h3 { margin-top: 0; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px;}
+
+        button {
+            padding: 15px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: var(--leaf-green);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            transition: 0.2s;
+            text-align: left;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 8px rgba(0,0,0,0.15); }
+        button:disabled { background-color: #CFD8DC; color: #90A4AE; cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        .status-box {
+            background: #E8F5E9;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 0.95em;
+            line-height: 1.5;
+            color: #2E7D32;
+            min-height: 80px;
+            border-left: 5px solid var(--leaf-green);
+        }
+
+        .signature {
+            margin-top: auto;
+            padding: 15px;
+            text-align: center;
+            color: white;
+            background-color: var(--leaf-green);
+            font-weight: bold;
+            font-size: 1.5em;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        /* --- 右側展示區 --- */
+        .stage {
+            position: relative;
+            width: 800px;
+            height: 650px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .chloroplast-label {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: var(--thylakoid-green);
+            margin-bottom: 15px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .chloroplast {
+            position: relative;
+            width: 700px;
+            height: 500px;
+            background-color: var(--chloroplast-green);
+            border-radius: 60px;
+            border: 8px solid var(--leaf-green);
+            display: flex;
+            overflow: visible;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.1);
+            z-index: 1;
+        }
+
+        .section { flex: 1; position: relative; }
+        .section.left { border-right: 2px dashed rgba(255,255,255,0.4); }
+
+        /* --- 字體縮小調整區 --- */
+        .section-title {
+            position: absolute;
+            top: 20px;
+            color: white;
+            font-weight: bold;
+            font-size: 1.8em; /* 縮小一點 */
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+            width: 100%;
+            text-align: center;
+        }
+
+        .thylakoid {
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 160px;
+            height: 220px;
+            background: var(--thylakoid-green);
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: rgba(255,255,255,0.95);
+            text-align: center;
+            font-weight: bold;
+            font-size: 2.5em; /* 從 3.5em 縮小 */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 2;
+        }
+
+        .calvin-cycle {
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 220px;
+            height: 220px;
+            border: 10px dashed rgba(255,255,255,0.7);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            font-size: 2.5em; /* 從 3.5em 縮小 */
+            animation: spin 20s linear infinite;
+        }
+
+        @keyframes spin { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+
+        /* --- 分子放大 2 倍區 --- */
+        .molecule {
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            font-weight: bold;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.3); /* 陰影加深 */
+            transition: all 1.5s ease-in-out;
+            opacity: 0;
+            z-index: 10;
+        }
+
+        /* 尺寸與字體都放大 */
+        .m-water { background: var(--water-blue); color: white; width: 90px; height: 90px; font-size: 24px; }
+        .m-o2 { background: #E1F5FE; color: #0277BD; width: 90px; height: 90px; border: 3px solid #0277BD; font-size: 24px;}
+        .m-h { background: var(--hydrogen-orange); color: white; width: 80px; height: 80px; font-size: 28px; border: 3px solid white;}
+        .m-co2 { background: var(--co2-grey); color: white; width: 90px; height: 90px; font-size: 24px;}
+        .m-sugar { background: var(--sugar-white); color: #333; width: 140px; height: 140px; border: 4px solid #ccc; font-size: 24px; text-align: center;}
+
+        /* --- 其他 --- */
+        .sun {
+            position: absolute;
+            top: 30px;
+            left: 0px;
+            width: 100px;
+            height: 100px;
+            background: var(--sun-yellow);
+            border-radius: 50%;
+            box-shadow: 0 0 60px var(--sun-yellow);
+            cursor: pointer;
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: #E65100;
+            text-align: center;
+            border: 4px solid #FFF176;
+            transition: transform 0.3s;
+        }
+        .sun:hover { transform: scale(1.1); }
+        .sun:active { transform: scale(0.95); }
+
+        .photon-beam {
+            position: absolute;
+            top: 80px; 
+            left: 50px;
+            width: 12px;
+            height: 0;
+            background: rgba(255, 235, 59, 0.9);
+            transform-origin: top center;
+            transform: rotate(-38deg); 
+            transition: height 0.4s ease-out;
+            pointer-events: none;
+            z-index: 5;
+            box-shadow: 0 0 20px white;
+            border-radius: 10px;
+        }
+
+        .note-label {
+            position: absolute;
+            background: rgba(255,255,255,0.95);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 14px; /* 標籤字體稍微放大 */
+            color: #444;
+            pointer-events: none;
+            opacity: 0;
+            transition: all 1.5s ease-in-out;
+            white-space: nowrap;
+            border: 1px solid #ddd;
+            z-index: 15;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🌿 植物光合作用工廠</h1>
+    </header>
+
+    <div class="container">
+        
+        <div class="sidebar">
+            <h3>實驗控制台</h3>
+            
+            <button id="btn-water" onclick="addWater()">1. 根部吸收水分 (H₂O)</button>
+            <button id="btn-sun-hint" onclick="hintSun()" disabled>2. 啟動光照 (點擊太陽)</button>
+            <button id="btn-co2" onclick="addCO2()" disabled>3. 吸收二氧化碳 (CO₂)</button>
+            <button id="btn-sugar" onclick="makeSugar()" disabled>4. 酵素合成葡萄糖</button>
+            
+            <button onclick="location.reload()" style="background-color: #f44336; margin-top: 20px; color: white;">🔄 重置模型</button>
+
+            <div class="status-box">
+                <span id="status-text">請依照順序操作：植物需要先從根部吸收水分...</span>
+            </div>
+
+            <div class="signature">小粘製作</div>
+        </div>
+
+        <div class="stage">
+            <div class="chloroplast-label">🍀 葉綠體 🍀</div>
+
+            <div class="sun" id="sun-btn" onclick="triggerLight()">
+                點擊<br>陽光
+            </div>
+            <div class="photon-beam" id="beam"></div>
+
+            <div class="chloroplast">
+                <div class="section left">
+                    <div class="section-title">光反應 (類囊體)</div>
+                    <div class="thylakoid">
+                        葉綠素
+                    </div>
+                </div>
+
+                <div class="section right">
+                    <div class="section-title">碳反應 (基質)</div>
+                    <div class="calvin-cycle" id="cycle">
+                        酵素
+                    </div>
+                </div>
+            </div>
+
+            <div id="water" class="molecule m-water" style="top: 10px; left: 210px;">H₂O</div>
+            <div id="water-label" class="note-label" style="top: -20px; left: 200px;">由根部吸收</div>
+
+            <div id="oxygen" class="molecule m-o2" style="top: 350px; left: 210px;">O₂</div>
+            <div id="oxygen-label" class="note-label" style="top: 350px; left: 290px;">由氣孔排出</div>
+
+            <div id="hydrogen" class="molecule m-h" style="top: 350px; left: 210px;">H</div>
+
+            <div id="co2" class="molecule m-co2" style="top: 10px; right: 130px;">CO₂</div>
+            <div id="co2-label" class="note-label" style="top: -20px; right: 110px;">由外部進入</div>
+
+            <div id="sugar" class="molecule m-sugar" style="top: 350px; right: 210px;">葡萄糖</div>
+            <div id="new-water" class="molecule m-water" style="top: 350px; right: 210px;">H₂O</div>
+
+        </div>
+    </div>
+
+    <script>
+        let step = 0; 
+        const statusText = document.getElementById('status-text');
+        const beam = document.getElementById('beam');
+
+        // 因為分子變大，移動目標位置需要微調
+        const targetWaterTop = '330px'; // 進入類囊體位置
+        const targetWaterLeft = '210px';
+        
+        const targetHLeft = '560px'; // 進入基質
+        
+        const targetO2Top = '630px'; // 排出位置
+        const targetO2Left = '180px';
+        const targetO2LabelTop = '660px';
+        const targetO2LabelLeft = '280px';
+        
+        const targetCo2Top = '330px'; // 進入基質位置
+        const targetCo2Right = '210px';
+        
+        const targetSugarTop = '500px'; // 產物停放位置
+        const targetSugarRight = '230px';
+        
+        const targetNewWaterTop = '520px'; // 產物停放位置
+        const targetNewWaterRight = '120px';
+
+
+        // 1. 加水
+        function addWater() {
+            step = 1;
+            const water = document.getElementById('water');
+            const waterLabel = document.getElementById('water-label');
+            water.style.opacity = '1';
+            waterLabel.style.opacity = '1';
+            setTimeout(() => {
+                water.style.top = targetWaterTop; 
+                statusText.innerText = "狀態：巨大的水分子已進入類囊體，準備被葉綠素吸收光能分解。";
+                document.getElementById('btn-water').disabled = true;
+                document.getElementById('btn-sun-hint').disabled = false;
+                document.getElementById('btn-sun-hint').style.background = "#FFEB3B";
+                document.getElementById('btn-sun-hint').style.color = "#333";
+            }, 100);
+        }
+
+        function hintSun() { alert("請直接點擊畫面左上角的「太陽」圖示！"); }
+
+        // 2. 觸發光反應
+        function triggerLight() {
+            if (step !== 1) return;
+            // 光束長度
+            beam.style.height = '420px'; 
+            statusText.innerText = "光反應進行中... 葉綠素吸收光能，直接將水分子分解！";
+
+            setTimeout(() => {
+                document.getElementById('water').style.opacity = '0';
+                document.getElementById('water-label').style.opacity = '0';
+                const o2 = document.getElementById('oxygen');
+                const h = document.getElementById('hydrogen');
+                const o2Label = document.getElementById('oxygen-label');
+                
+                o2.style.opacity = '1';
+                h.style.opacity = '1';
+
+                o2.style.top = targetO2Top;
+                o2.style.left = targetO2Left;
+                
+                o2Label.style.opacity = '1';
+                o2Label.style.top = targetO2LabelTop;
+                o2Label.style.left = targetO2LabelLeft;
+                
+                h.style.left = targetHLeft;
+
+                setTimeout(() => {
+                    statusText.innerHTML = "光反應完成！<br>1. O₂ 排出。<br>2. H (能量) 進入基質。";
+                    step = 2;
+                    beam.style.height = '0';
+                    document.getElementById('btn-sun-hint').disabled = true;
+                    document.getElementById('btn-sun-hint').style.background = "#CFD8DC";
+                    document.getElementById('btn-co2').disabled = false;
+                }, 1000);
+            }, 800);
+        }
+
+        // 3. 加 CO2
+        function addCO2() {
+            if (step !== 2) return;
+            const co2 = document.getElementById('co2');
+            const co2Label = document.getElementById('co2-label');
+            co2.style.opacity = '1';
+            co2Label.style.opacity = '1';
+            setTimeout(() => {
+                co2.style.top = targetCo2Top; 
+                co2.style.right = targetCo2Right;
+                statusText.innerText = "狀態：二氧化碳 (CO₂) 已進入基質，準備與酵素作用。";
+                step = 3;
+                document.getElementById('btn-co2').disabled = true;
+                document.getElementById('btn-sugar').disabled = false;
+                setTimeout(() => { co2Label.style.opacity = '0'; }, 1000);
+            }, 100);
+        }
+
+        // 4. 合成
+        function makeSugar() {
+            if (step !== 3) return;
+            statusText.innerText = "碳反應中：酵素催化 CO₂ 與 H 結合...";
+            document.getElementById('cycle').style.animationDuration = '1s';
+            const h = document.getElementById('hydrogen');
+            const co2 = document.getElementById('co2');
+            const sugar = document.getElementById('sugar');
+            const newWater = document.getElementById('new-water');
+
+            h.style.left = targetHLeft; co2.style.right = targetCo2Right; 
+            h.style.transform = 'scale(0.5)'; co2.style.transform = 'scale(0.5)';
+            h.style.opacity = '0'; co2.style.opacity = '0';
+
+            setTimeout(() => {
+                sugar.style.opacity = '1';
+                newWater.style.opacity = '1';
+                
+                sugar.style.top = targetSugarTop;
+                sugar.style.right = targetSugarRight;
+                
+                newWater.style.top = targetNewWaterTop;
+                newWater.style.right = targetNewWaterRight;
+
+                statusText.innerHTML = "<b>🎉 實驗成功！</b><br>在酵素幫助下，成功合成葡萄糖與水。";
+                document.getElementById('btn-sugar').disabled = true;
+                setTimeout(() => { document.getElementById('cycle').style.animationDuration = '20s'; }, 1000);
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
