@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>理化實驗室：微觀結構 3D 手控版</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #1e40af;
+            --accent: #f59e0b;
+            --text: #1f2937;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .creator-badge {
+            background-color: var(--accent);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1100px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: #e5e7eb;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #666;
+            transition: all 0.3s;
+            font-size: 1rem;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+        }
+
+        .content-section { display: none; }
+        .content-section.active { display: block; animation: fadeIn 0.4s ease-out; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: 0; } }
+
+        /* Lab Layout */
+        .lab-bench {
+            display: flex;
+            gap: 2rem;
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            align-items: flex-start;
+            min-height: 550px; /* Increased height */
+        }
+
+        .controls-panel {
+            flex: 1;
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .display-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            /* Default center for canvas tabs */
+            justify-content: center; 
+            min-height: 500px;
+            background: radial-gradient(circle at center, #fff, #f1f5f9);
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Fix 1: Isomer display alignment - Move to top */
+        #isomer-display {
+            justify-content: flex-start;
+            padding-top: 80px; /* Push down from top edge */
+        }
+
+        h2 { margin-top: 0; color: var(--secondary); border-bottom: 3px solid var(--accent); display: inline-block; padding-bottom: 5px; margin-bottom: 1rem;}
+        h3 { margin: 0 0 10px 0; color: #333; }
+
+        /* Buttons & Inputs */
+        .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 1rem; }
+        .action-btn {
+            padding: 12px;
+            background: white;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .action-btn:hover { border-color: var(--primary); background: #eff6ff; }
+        .action-btn.active { border-color: var(--primary); background: #eff6ff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+        .control-box { margin: 20px 0; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #eee;}
+        input[type=range] { width: 100%; cursor: pointer; margin-top: 10px; margin-bottom: 15px;}
+        label { font-weight: bold; font-size: 0.9rem; color: #555; }
+
+        /* Canvas & Info */
+        canvas { max-width: 100%; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
+        
+        .info-box {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1.2rem 2rem;
+            background: rgba(255,255,255,0.96);
+            border-radius: 12px;
+            text-align: center;
+            border-left: 6px solid var(--primary);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            width: 85%;
+            pointer-events: none;
+            transition: all 0.3s;
+        }
+
+        /* --- Isomer CSS Construction --- */
+        .molecule-wrapper {
+            position: relative;
+            /* Removed padding to allow better positioning via parent */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: scale(1.2); /* Make them a bit bigger */
+        }
+        
+        .atom {
+            width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold; font-size: 14px;
+            position: relative; z-index: 5;
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.3), 2px 2px 5px rgba(0,0,0,0.2);
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        .atom-c { background: #333; }
+        .atom-o { background: #e11d48; }
+        .atom-h { background: #bae6fd; color: #333; width: 28px; height: 28px; font-size: 12px; z-index: 5;}
+        
+        /* Bonds */
+        .bond-core { background: #64748b; position: absolute; z-index: 1; border-radius: 2px; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);}
+        .bond-link { 
+            position: absolute; background: #94a3b8; z-index: 2; transform-origin: 0 50%; height: 4px; border-radius: 2px;
+        }
+
+        .structure-box { display: flex; align-items: center; gap: 0px; /* Controlled by bonds now */ }
+        .group { position: relative; width: 40px; height: 40px; display:flex; justify-content:center; align-items:center; }
+
+        .footer { text-align: center; margin-top: 3rem; color: #9ca3af; padding-bottom: 2rem; border-top: 1px solid #e5e7eb; padding-top: 2rem;}
+
+        @media (max-width: 768px) {
+            .lab-bench { flex-direction: column; }
+            .display-panel { width: 100%; min-height: 350px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🧪 理化觀念實驗室</h1>
+    <div class="creator-badge">✨ 小粘製作 ✨</div>
+</header>
+
+<div class="container">
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('isotopes')">1. 同位素 (Isotopes)</button>
+        <button class="tab-btn" onclick="switchTab('allotropes')">2. 同素異形體 (Allotropes)</button>
+        <button class="tab-btn" onclick="switchTab('isomers')">3. 同分異構物 (Isomers)</button>
+    </div>
+
+    <div id="isotopes" class="content-section active">
+        <div class="lab-bench">
+            <div class="controls-panel">
+                <h2>參數設定</h2>
+                <div class="btn-group">
+                    <button class="action-btn active" onclick="setIsotopeElement('H', this)">
+                        <span class="action-icon" style="background:#2563eb; color:white; width:25px; height:25px; border-radius:50%; text-align:center;">H</span> 氫 (Hydrogen)
+                    </button>
+                    <button class="action-btn" onclick="setIsotopeElement('C', this)">
+                        <span class="action-icon" style="background:#333; color:white; width:25px; height:25px; border-radius:50%; text-align:center;">C</span> 碳 (Carbon)
+                    </button>
+                </div>
+
+                <div class="control-box">
+                    <label>調整中子數 (Neutrons): <strong id="iso-neutron-val" style="color:var(--primary); font-size:1.2em;">0</strong></label>
+                    <input type="range" id="neutron-slider" min="0" max="2" value="0" step="1">
+                    <p id="mass-number-display" style="font-size: 0.9rem; color: #555; margin-top: 5px;">質量數 = 質子 + 中子</p>
+                </div>
+
+                <div style="font-size: 0.9rem; color: #666; margin-top: 20px; background:#eef2ff; padding:10px; border-radius:8px;">
+                    <div style="display:flex; align-items:center; gap:5px; margin-bottom:5px"><span style="width:12px; height:12px; background:#ef4444; border-radius:50%; display:inline-block;"></span> 質子 (Proton)</div>
+                    <div style="display:flex; align-items:center; gap:5px; margin-bottom:5px"><span style="width:12px; height:12px; background:#6b7280; border-radius:50%; display:inline-block;"></span> 中子 (Neutron)</div>
+                    <div style="display:flex; align-items:center; gap:5px"><span style="width:12px; height:12px; background:blue; border-radius:50%; display:inline-block;"></span> 電子 (Electron)</div>
+                </div>
+            </div>
+
+            <div class="display-panel">
+                <canvas id="isoCanvas" width="400" height="400"></canvas>
+                <div class="info-box" id="iso-info"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="allotropes" class="content-section">
+        <div class="lab-bench">
+            <div class="controls-panel">
+                <h2>選擇結構</h2>
+                
+                <h3>碳 (Carbon) 系列 (3D)</h3>
+                <div class="btn-group">
+                    <button class="action-btn" onclick="setAllotrope('diamond', this)">💎 鑽石 (Diamond)</button>
+                    <button class="action-btn" onclick="setAllotrope('graphite', this)">✏️ 石墨 (Graphite)</button>
+                    <button class="action-btn" onclick="setAllotrope('c60', this)">⚽ 巴克球 (C60)</button>
+                </div>
+
+                <h3>氧 (Oxygen) 系列 (2D)</h3>
+                <div class="btn-group">
+                    <button class="action-btn" onclick="setAllotrope('oxygen', this)">💨 氧氣 (O₂)</button>
+                    <button class="action-btn" onclick="setAllotrope('ozone', this)">🛡️ 臭氧 (O₃)</button>
+                </div>
+
+                <div id="rotation-controls" class="control-box" style="display:none; background:#fff3cd; border-color:#ffeeba;">
+                    <h3 style="margin-bottom:15px;">🔄 3D 視角控制</h3>
+                    <label>↔️ 水平旋轉</label>
+                    <input type="range" id="rot-y" min="0" max="6.28" step="0.05" value="0">
+                    <label>↕️ 垂直旋轉</label>
+                    <input type="range" id="rot-x" min="-1.5" max="1.5" step="0.05" value="0.2">
+                </div>
+            </div>
+
+            <div class="display-panel" style="background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);">
+                <canvas id="alloCanvas" width="500" height="500"></canvas>
+                <div class="info-box" id="allo-info" style="bottom: 20px;">請點選左側按鈕開始觀察</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="isomers" class="content-section">
+        <div class="lab-bench">
+            <div class="controls-panel">
+                <h2>分子拼圖</h2>
+                <p>分子式相同，結構與性質卻大不同。</p>
+
+                <h3>C₂H₆O (分子量 46)</h3>
+                <div class="btn-group">
+                    <button class="action-btn" onclick="renderIsomer('ethanol', this)">🍺 乙醇 (酒精)</button>
+                    <button class="action-btn" onclick="renderIsomer('ether', this)">❄️ 甲醚</button>
+                </div>
+
+                <h3>C₄H₁₀ (分子量 58)</h3>
+                <div class="btn-group">
+                    <button class="action-btn" onclick="renderIsomer('butane', this)">🔥 正丁烷</button>
+                    <button class="action-btn" onclick="renderIsomer('isobutane', this)">💈 異丁烷</button>
+                </div>
+            </div>
+
+            <div class="display-panel" id="isomer-display">
+                <p style="color:#999; margin-top: 100px;">請選擇左側分子進行組裝</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="footer">
+    Designed for Science Class | <span style="color:var(--primary); font-weight:bold;">Made by 小粘</span>
+</div>
+
+<script>
+    let currentTab = 'isotopes';
+    let animationId = null;
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.content-section').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        event.target.classList.add('active');
+        currentTab = tabId;
+
+        if(animationId) cancelAnimationFrame(animationId);
+
+        if(tabId === 'isotopes') updateIsotope();
+        if(tabId === 'allotropes') {
+             const ctx = document.getElementById('alloCanvas').getContext('2d');
+             ctx.clearRect(0,0,alloCanvas.width,alloCanvas.height);
+             document.getElementById('allo-info').innerHTML = "請點選左側按鈕開始觀察";
+             document.getElementById('rotation-controls').style.display = 'none';
+        }
+    }
+
+    /* =========================================
+       1. ISOTOPES LOGIC
+       ========================================= */
+    const isoCanvas = document.getElementById('isoCanvas');
+    const isoCtx = isoCanvas.getContext('2d');
+    const nSlider = document.getElementById('neutron-slider');
+    let isoElement = 'H'; let isoProtons = 1;
+
+    function setIsotopeElement(el, btn) {
+        isoElement = el;
+        document.querySelectorAll('#isotopes .action-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (el === 'H') { nSlider.min = 0; nSlider.max = 2; nSlider.value = 0; isoProtons = 1; } 
+        else if (el === 'C') { nSlider.min = 6; nSlider.max = 8; nSlider.value = 6; isoProtons = 6; }
+        updateIsotope();
+    }
+    nSlider.addEventListener('input', updateIsotope);
+
+    function updateIsotope() {
+        const neutrons = parseInt(nSlider.value);
+        document.getElementById('iso-neutron-val').textContent = neutrons;
+        const box = document.getElementById('iso-info');
+        const massNum = document.getElementById('mass-number-display');
+        
+        if(isoElement === 'H') {
+            const names = ["氕 (H-1)", "氘 (H-2)", "氚 (H-3)"];
+            box.innerHTML = `<h3>${names[neutrons]}</h3><p>質子: 1 | 中子: ${neutrons}</p>`;
+            massNum.innerHTML = `質量數: ${1 + neutrons}`;
+        } else {
+            const mass = 6 + neutrons;
+            let desc = mass === 14 ? "具有放射性，用於考古學碳-14定年法。" : "穩定的碳同位素。";
+            box.innerHTML = `<h3>碳-${mass} (C-${mass})</h3><p>質子: 6 | 中子: ${neutrons}</p><p style="font-size:0.9em; color:#666">${desc}</p>`;
+            massNum.innerHTML = `質量數: ${mass}`;
+        }
+        drawAtom(isoProtons, neutrons);
+    }
+
+    function drawAtom(p, n) {
+        const w = isoCanvas.width; const h = isoCanvas.height; const cx = w/2, cy = h/2;
+        isoCtx.clearRect(0,0,w,h);
+        // Shells
+        isoCtx.beginPath(); isoCtx.strokeStyle = 'rgba(255,255,255,0.2)'; isoCtx.lineWidth=2; isoCtx.ellipse(cx, cy, 140, 50, 0, 0, 6.28); isoCtx.stroke();
+        if(isoElement === 'C') { isoCtx.beginPath(); isoCtx.ellipse(cx, cy, 80, 30, 0, 0, 6.28); isoCtx.stroke(); }
+        // Nucleus
+        for(let i=0; i<p+n; i++) {
+            let isProton = i < p;
+            let color = isProton ? '#ef4444' : '#6b7280';
+            let angle = i * 2.4; let dist = 8 * Math.sqrt(i);
+            let x = cx + dist * Math.cos(angle); let y = cy + dist * Math.sin(angle);
+            isoCtx.beginPath(); isoCtx.arc(x, y, 10, 0, 6.28); isoCtx.fillStyle = color; isoCtx.fill();
+            isoCtx.strokeStyle = 'white'; isoCtx.lineWidth=1; isoCtx.stroke();
+            isoCtx.fillStyle = 'white'; isoCtx.font = '10px Arial'; isoCtx.textAlign = 'center'; isoCtx.textBaseline='middle';
+            isoCtx.fillText(isProton?'P':'N', x, y);
+        }
+        // Electrons
+        let time = Date.now() * 0.002;
+        const drawE = (rx, ry, offset) => {
+            let ex = cx + rx * Math.cos(time + offset); let ey = cy + ry * Math.sin(time + offset);
+            isoCtx.beginPath(); isoCtx.fillStyle = '#60a5fa'; isoCtx.arc(ex, ey, 6, 0, 6.28); isoCtx.fill();
+            isoCtx.shadowColor = '#60a5fa'; isoCtx.shadowBlur = 10; isoCtx.fill(); isoCtx.shadowBlur = 0;
+        };
+        drawE(140, 50, 0);
+        if(isoElement === 'C') { drawE(140, 50, 2); drawE(140, 50, 3.5); drawE(140, 50, 5); drawE(80, 30, 1); drawE(80, 30, 2.5); }
+        if(currentTab === 'isotopes') requestAnimationFrame(() => drawAtom(p,n));
+    }
+
+    /* =========================================
+       2. ALLOTROPES LOGIC (3D Manual Control)
+       ========================================= */
+    const alloCanvas = document.getElementById('alloCanvas');
+    const alloCtx = alloCanvas.getContext('2d');
+    const rotYSlider = document.getElementById('rot-y');
+    const rotXSlider = document.getElementById('rot-x');
+    let alloType = '';
+    let rotY = 0; let rotX = 0.2; // Initial tilt
+
+    // Event listeners for manual rotation
+    rotYSlider.addEventListener('input', (e) => { rotY = parseFloat(e.target.value); drawAllotropeFrame(); });
+    rotXSlider.addEventListener('input', (e) => { rotX = parseFloat(e.target.value); drawAllotropeFrame(); });
+
+    function setAllotrope(type, btn) {
+        alloType = type;
+        document.querySelectorAll('#allotropes .action-btn').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+        
+        const info = document.getElementById('allo-info');
+        const controls = document.getElementById('rotation-controls');
+        let is3D = false;
+
+        if(type === 'diamond') { info.innerHTML = "<h3>💎 金剛石 (Diamond)</h3><p><b>立體網狀結構</b>。每個碳都緊緊抓住另外四個碳，硬度極高。</p>"; is3D = true; }
+        else if(type === 'graphite') { info.innerHTML = "<h3>✏️ 石墨 (Graphite)</h3><p><b>平面層狀結構</b>。層與層之間容易滑動。</p>"; is3D = true; }
+        else if(type === 'c60') { info.innerHTML = "<h3>⚽ 巴克球 (C60)</h3><p>60個碳組成的球體，結構安定。</p>"; is3D = true; }
+        else if(type === 'oxygen') { info.innerHTML = "<h3>💨 氧氣 (O₂)</h3><p>雙原子分子，助燃。</p>"; }
+        else if(type === 'ozone') { info.innerHTML = "<h3>🛡️ 臭氧 (O₃)</h3><p>三原子彎曲結構，吸收紫外線。</p>"; }
+
+        // Show/Hide Rotation Controls based on type
+        controls.style.display = is3D ? 'block' : 'none';
+        
+        // Reset sliders for consistent starting view
+        rotYSlider.value = 0; rotXSlider.value = 0.2;
+        rotY = 0; rotX = 0.2;
+
+        drawAllotropeFrame();
+    }
+
+    function drawAllotropeFrame() {
+        const w = alloCanvas.width; const h = alloCanvas.height;
+        alloCtx.clearRect(0,0,w,h);
+        // Removed automatic rotation Angle increment
+        if(alloType === 'diamond') drawDiamond(w, h);
+        else if(alloType === 'graphite') drawGraphite(w, h);
+        else if(alloType === 'c60') drawC60(w, h);
+        else if(alloType === 'oxygen') drawOxygen(w, h);
+        else if(alloType === 'ozone') drawOzone(w, h);
+    }
+
+    // Updated 3D Projection with X and Y rotation
+    function project3D(x, y, z, cx, cy) {
+        // Rotate around Y axis
+        let cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+        let x1 = x * cosY - z * sinY;
+        let z1 = x * sinY + z * cosY;
+        // Rotate around X axis
+        let cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+        let y2 = y * cosX - z1 * sinX;
+        let z2 = y * sinX + z1 * cosX;
+        
+        let scale = 400 / (400 + z2); // Perspective
+        return { x: cx + x1 * scale, y: cy + y2 * scale, r: Math.max(3, 10 * scale), z: z2 };
+    }
+
+    function drawDiamond(w, h) {
+        const cx = w/2, cy = h/2; let nodes = [];
+        let levels = 2;
+        for(let i=-levels; i<=levels; i++) {
+            let yBase = i * 50; let offset = (Math.abs(i)%2===1) ? 35 : 0;
+            for(let j=-levels; j<=levels; j++) {
+                for(let k=-levels; k<=levels; k++) {
+                    // Only draw points within a sphere radius to make it look like a chunk
+                    if(j*j + k*k + i*i < levels*levels*1.5) {
+                         nodes.push({x: j*70 + offset, y: yBase, z: k*70 + offset});
+                    }
+                }
+            }
+        }
+        renderNodes(nodes, cx, cy, '#cbd5e1', true);
+    }
+
+    function drawGraphite(w, h) {
+        const cx = w/2, cy = h/2; let nodes = [];
+        for(let layer=-1; layer<=1; layer++) {
+            let y = layer * 70; let shift = (layer%2===0) ? 0 : 30;
+            for(let x=-2; x<=2; x++) {
+                for(let z=-2; z<=2; z++) {
+                    nodes.push({x: x*60 + shift + (z%2)*30, y: y, z: z*50, layer: layer});
+                }
+            }
+        }
+        renderNodes(nodes, cx, cy, '#94a3b8', true, true);
+    }
+
+    function drawC60(w, h) {
+        const cx = w/2, cy = h/2; let nodes = [];
+        const phi = Math.PI * (3 - Math.sqrt(5)); const n = 60; const radius = 120;
+        for(let i=0; i<n; i++) {
+            let y = 1 - (i / (n - 1)) * 2; let r = Math.sqrt(1 - y * y);
+            let theta = phi * i;
+            nodes.push({x: Math.cos(theta)*r*radius, y: y*radius, z: Math.sin(theta)*r*radius});
+        }
+        renderNodes(nodes, cx, cy, '#64748b', true);
+    }
+
+    function renderNodes(nodes, cx, cy, color, connectNeighbors, isGraphite=false) {
+        let projected = nodes.map(n => ({...project3D(n.x, n.y, n.z, cx, cy), original: n}));
+        
+        alloCtx.strokeStyle = 'rgba(255,255,255,0.4)'; alloCtx.lineWidth = 2;
+        for(let i=0; i<nodes.length; i++) {
+            for(let j=i+1; j<nodes.length; j++) {
+                let dx = nodes[i].x - nodes[j].x; let dy = nodes[i].y - nodes[j].y; let dz = nodes[i].z - nodes[j].z;
+                let dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                let limit = 75;
+                if(isGraphite) {
+                    if(nodes[i].layer !== nodes[j].layer) continue; // Don't connect strong bonds between layers
+                    limit = 65;
+                }
+                if(dist < limit && dist > 10) {
+                    alloCtx.beginPath(); alloCtx.moveTo(projected[i].x, projected[i].y); alloCtx.lineTo(projected[j].x, projected[j].y); alloCtx.stroke();
+                }
+            }
+        }
+        if(isGraphite) {
+             alloCtx.setLineDash([2, 5]); alloCtx.strokeStyle = 'rgba(255,255,255,0.2)';
+             for(let i=0; i<projected.length; i+=5) { // Draw some weak bonds
+                 if(projected[i].original.layer < 1) {
+                      alloCtx.beginPath(); alloCtx.moveTo(projected[i].x, projected[i].y); alloCtx.lineTo(projected[i].x, projected[i].y + 50); alloCtx.stroke();
+                 }
+             }
+             alloCtx.setLineDash([]);
+        }
+
+        projected.sort((a, b) => b.z - a.z);
+        projected.forEach(p => {
+            let alpha = (p.z + 300) / 600; if(alpha < 0.3) alpha = 0.3;
+            alloCtx.beginPath(); alloCtx.arc(p.x, p.y, p.r, 0, 6.28);
+            alloCtx.fillStyle = color; alloCtx.globalAlpha = alpha; alloCtx.fill();
+            // Glow
+            alloCtx.lineWidth = 2; alloCtx.strokeStyle = 'rgba(255,255,255,0.3)'; alloCtx.stroke();
+            alloCtx.globalAlpha = 1;
+        });
+    }
+
+    function drawOxygen(w, h) {
+        const cx = w/2, cy = h/2;
+        alloCtx.fillStyle = '#e11d48';
+        alloCtx.beginPath(); alloCtx.arc(cx-30, cy, 25, 0, 6.28); alloCtx.fill();
+        alloCtx.beginPath(); alloCtx.arc(cx+30, cy, 25, 0, 6.28); alloCtx.fill();
+        alloCtx.fillStyle = 'rgba(255,255,255,0.8)'; alloCtx.fillRect(cx-25, cy-8, 50, 6); alloCtx.fillRect(cx-25, cy+2, 50, 6);
+        alloCtx.fillStyle = 'white'; alloCtx.font='14px Arial'; alloCtx.fillText('O', cx-35, cy+5); alloCtx.fillText('O', cx+25, cy+5);
+    }
+
+    function drawOzone(w, h) {
+        const cx = w/2, cy = h/2;
+        alloCtx.fillStyle = '#e11d48';
+        alloCtx.beginPath(); alloCtx.arc(cx, cy-30, 25, 0, 6.28); alloCtx.fill(); // Top
+        alloCtx.beginPath(); alloCtx.arc(cx-45, cy+30, 25, 0, 6.28); alloCtx.fill(); // Left
+        alloCtx.beginPath(); alloCtx.arc(cx+45, cy+30, 25, 0, 6.28); alloCtx.fill(); // Right
+        alloCtx.strokeStyle = 'rgba(255,255,255,0.8)'; alloCtx.lineWidth = 8;
+        alloCtx.beginPath(); alloCtx.moveTo(cx, cy-30); alloCtx.lineTo(cx-45, cy+30); alloCtx.stroke();
+        alloCtx.beginPath(); alloCtx.moveTo(cx-5, cy-30); alloCtx.lineTo(cx+40, cy+30); alloCtx.stroke(); // Doubleish
+        alloCtx.lineWidth = 4; alloCtx.beginPath(); alloCtx.moveTo(cx+5, cy-30); alloCtx.lineTo(cx+50, cy+30); alloCtx.stroke();
+    }
+
+    /* =========================================
+       3. ISOMERS LOGIC (Fix 2: Ether Structure)
+       ========================================= */
+    const isomerDisplay = document.getElementById('isomer-display');
+
+    function renderIsomer(type, btn) {
+        document.querySelectorAll('#isomers .action-btn').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+        let html = ''; let infoText = '';
+
+        if(type === 'ethanol') {
+            html = `
+            <div class="molecule-wrapper">
+                <div class="structure-box">
+                    ${createCH3()}
+                    <div class="bond-core" style="width:30px; height:8px; position:relative; left:-2px;"></div>
+                    ${createCH2()}
+                    <div class="bond-core" style="width:30px; height:8px; position:relative; left:-2px;"></div>
+                    <div class="group"><div class="atom atom-o">O</div></div>
+                    <div class="bond-core" style="width:30px; height:8px; position:relative; left:-2px;"></div>
+                    <div class="group"><div class="atom atom-h">H</div></div>
+                </div>
+            </div>`;
+            infoText = "<h3>🍺 乙醇 (酒精)</h3><p>有親水的 -OH 基團。溶於水，沸點 78°C。</p>";
+        } else if (type === 'ether') {
+            // Fix 2: Reworked Ether Structure for better symmetry and bonds
+            html = `
+            <div class="molecule-wrapper">
+                <div class="structure-box" style="gap:0;">
+                    ${createCH3(false)} <div class="bond-core" style="width:35px; height:8px; position:relative; left:-2px;"></div>
+                    <div class="group" style="z-index:6;"><div class="atom atom-o">O</div></div>
+                    <div class="bond-core" style="width:35px; height:8px; position:relative; left:2px;"></div>
+                    ${createCH3(true)} </div>
+            </div>`;
+            infoText = "<h3>❄️ 甲醚</h3><p>氧原子夾在中間的對稱結構 (C-O-C)。<br>極性低，沸點 -24°C (氣體)。</p>";
+        } else if (type === 'butane') {
+            html = `<div class="molecule-wrapper"><div class="structure-box">${createCH3()}<div class="bond-core" style="width:30px; height:8px; position:relative;left:-2px"></div>${createCH2()}<div class="bond-core" style="width:30px; height:8px; position:relative;left:-2px"></div>${createCH2()}<div class="bond-core" style="width:30px; height:8px; position:relative;left:-2px"></div>${createCH3(true)}</div></div>`;
+            infoText = "<h3>🔥 正丁烷</h3><p>直鏈結構。沸點 -0.5°C。</p>";
+        } else if (type === 'isobutane') {
+             html = `<div class="molecule-wrapper" style="flex-direction:column"><div style="display:flex; align-items:center;">${createCH3()}<div class="bond-core" style="width:30px; height:8px; position:relative;left:-2px"></div>${createCH_Center()}<div class="bond-core" style="width:30px; height:8px; position:relative;left:-2px"></div>${createCH3(true)}</div><div style="display:flex; flex-direction:column; align-items:center;"><div class="bond-core" style="width:8px; height:30px; margin-top:-2px; position:relative; top:-2px;"></div>${createCH3_Bottom()}</div></div>`;
+            infoText = "<h3>💈 異丁烷</h3><p>支鏈結構 (T型)。沸點 -11.7°C。</p>";
+        }
+        isomerDisplay.innerHTML = html + `<div class="info-box">${infoText}</div>`;
+    }
+
+    // Helper functions for CH groups (with slightly thicker bonds)
+    function createCH3(flipLeft=false) {
+        let sideH = flipLeft ? 'right:-35px' : 'left:-35px';
+        let sideBondPos = flipLeft ? 'right:-15px' : 'left:-15px';
+        return `
+        <div class="group">
+            <div class="atom atom-c">C</div>
+            <div class="bond-link" style="height:24px; width:6px; top:-20px; left:17px;"></div><div class="atom atom-h" style="position:absolute; top:-45px;">H</div>
+            <div class="bond-link" style="height:24px; width:6px; bottom:-20px; left:17px;"></div><div class="atom atom-h" style="position:absolute; bottom:-45px;">H</div>
+            <div class="bond-link" style="width:24px; height:6px; top:17px; ${sideBondPos};"></div><div class="atom atom-h" style="position:absolute; ${sideH};">H</div>
+        </div>`;
+    }
+    function createCH2() {
+        return `<div class="group"><div class="atom atom-c">C</div><div class="bond-link" style="height:24px; width:6px; top:-20px; left:17px;"></div><div class="atom atom-h" style="position:absolute; top:-45px;">H</div><div class="bond-link" style="height:24px; width:6px; bottom:-20px; left:17px;"></div><div class="atom atom-h" style="position:absolute; bottom:-45px;">H</div></div>`;
+    }
+    function createCH_Center() { return `<div class="group"><div class="atom atom-c">C</div><div class="bond-link" style="height:24px; width:6px; top:-20px; left:17px;"></div><div class="atom atom-h" style="position:absolute; top:-45px;">H</div></div>`; }
+    function createCH3_Bottom() { return `<div class="group"><div class="atom atom-c">C</div><div class="bond-link" style="height:24px; width:6px; bottom:-20px; left:17px;"></div><div class="atom atom-h" style="position:absolute; bottom:-45px;">H</div><div class="bond-link" style="width:24px; height:6px; top:17px; left:-15px;"></div><div class="atom atom-h" style="position:absolute; left:-35px;">H</div><div class="bond-link" style="width:24px; height:6px; top:17px; right:-15px;"></div><div class="atom atom-h" style="position:absolute; right:-35px;">H</div></div>`; }
+
+    // Init
+    setIsotopeElement('H', document.querySelector('.action-btn'));
+</script>
+</body>
+</html>
