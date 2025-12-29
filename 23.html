@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雙金屬實驗室：開關電路修正版</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+
+        .container {
+            position: relative;
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 700px;
+            width: 95%;
+            overflow: hidden;
+        }
+
+        .watermark {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            font-family: 'Kaiti TC', '楷體', serif;
+            font-size: 1.3em;
+            color: rgba(0, 0, 0, 0.12);
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 10;
+            border: 2px solid rgba(0,0,0,0.1);
+            padding: 2px 12px;
+            border-radius: 4px;
+            transform: rotate(-5deg);
+        }
+
+        h2 { margin-top: 0; color: #2c3e50; }
+        
+        .mode-switch {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .mode-btn {
+            padding: 10px 20px;
+            border: 2px solid #2980b9;
+            background: #fff;
+            color: #2980b9;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            font-size: 1em;
+        }
+
+        .mode-btn.active {
+            background: #2980b9;
+            color: white;
+            box-shadow: 0 4px 10px rgba(41, 128, 185, 0.3);
+        }
+
+        canvas {
+            background: radial-gradient(circle, #ffffff 0%, #f1f2f6 100%);
+            border: 2px solid #ecf0f1;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+        }
+
+        .slider-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type=range] {
+            flex-grow: 1;
+            height: 12px;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #3498db, #e74c3c);
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 26px;
+            height: 26px;
+            background: #fff;
+            border: 5px solid #34495e;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            margin-top: -2px;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .desc-text {
+            color: #666;
+            margin-bottom: 15px;
+            font-size: 0.95em;
+            min-height: 45px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="watermark">小粘製作</div>
+
+        <h2>雙金屬片實驗室</h2>
+        
+        <div class="mode-switch">
+            <button class="mode-btn active" onclick="setMode('switch')">實驗 1: 恆溫開關</button>
+            <button class="mode-btn" onclick="setMode('thermometer')">實驗 2: 直列溫度計</button>
+        </div>
+
+        <p id="description" class="desc-text"></p>
+
+        <canvas id="simCanvas" width="600" height="380"></canvas>
+
+        <div class="controls">
+            <div class="slider-wrapper">
+                <span style="color:#3498db">-30°C (冷)</span>
+                <input type="range" id="tempSlider" min="-30" max="150" value="25" step="1">
+                <span style="color:#e74c3c">150°C (熱)</span>
+            </div>
+            
+            <div class="info-panel">
+                <div id="tempDisplay">溫度: 25°C</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const slider = document.getElementById('tempSlider');
+        const tempDisplay = document.getElementById('tempDisplay');
+        const descText = document.getElementById('description');
+        const btns = document.querySelectorAll('.mode-btn');
+
+        let mode = 'switch'; // 預設設回開關以便檢查
+        let temperature = 25;
+        
+        // --- 顏色定義 ---
+        const colors = {
+            copper: '#e74c3c', // 銅 (紅)
+            iron: '#95a5a6',   // 鐵 (灰)
+            wire: '#546e7a',   // 導線顏色
+            battery: '#34495e'
+        };
+
+        function init() {
+            setMode('switch');
+        }
+
+        function setMode(newMode) {
+            mode = newMode;
+            btns.forEach(btn => {
+                if(btn.textContent.includes(newMode === 'switch' ? '開關' : '溫度計')) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            if (mode === 'switch') {
+                descText.innerHTML = "<b>恆溫開關原理：</b>僅在高溫時動作。<br>銅(紅)膨脹多，迫使金屬片向上彎曲，離開接點並斷開電路。";
+            } else {
+                descText.innerHTML = "<b>溫度計原理：</b>利用熱脹冷縮差異。<br>高溫時銅膨脹多→往上彎；低溫時銅冷縮多→往下彎。";
+            }
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. 背景環境色
+            if (temperature > 30) {
+                const alpha = Math.min((temperature - 30) / 400, 0.3);
+                ctx.fillStyle = `rgba(255, 69, 0, ${alpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else if (temperature < 15) {
+                const alpha = Math.min((15 - temperature) / 100, 0.3);
+                ctx.fillStyle = `rgba(52, 152, 219, ${alpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // 2. 物理參數
+            const startX = 100; // 右移一點給左側電路空間
+            const startY = 200; // 垂直中心
+            const stripLength = 260;
+            const layerH = 14; 
+
+            // 3. 計算彎曲
+            const deltaT = temperature - 25;
+            let isBent = Math.abs(deltaT) > 2;
+            const radius = isBent ? 14000 / Math.abs(deltaT) : Infinity;
+            const angle = isBent ? stripLength / radius : 0;
+            const cx = startX;
+            let cy;
+            let direction = 0; // 0:直, 1:上(熱), -1:下(冷)
+
+            if (deltaT > 2) { cy = startY - radius; direction = 1; } 
+            else if (deltaT < -2) { cy = startY + radius; direction = -1; }
+
+            // 4. 計算末端座標
+            let tipX, tipY;
+            if (!isBent) {
+                tipX = startX + stripLength; tipY = startY; 
+            } else {
+                const R_contact = radius; 
+                const rad = (Math.PI/2) - angle;
+                if (direction === 1) { // Up
+                   tipX = cx + R_contact * Math.cos(rad); tipY = cy + R_contact * Math.sin(rad); 
+                } else { // Down
+                   const radDown = -Math.PI/2 + angle;
+                   tipX = cx + R_contact * Math.cos(radDown); tipY = cy + R_contact * Math.sin(radDown);
+                }
+            }
+
+            // --- 繪製層級調整：先畫電路，再畫金屬片和牆壁 ---
+
+            if (mode === 'thermometer') {
+                drawThermometerScale(tipX, tipY);
+                drawLabels(startX, startY, isBent, direction);
+            } else {
+                // 在畫金屬片之前先畫開關電路的左半部
+                drawSwitchCircuitLeft(startX, startY);
+            }
+
+            // 5. 繪製金屬片 (核心)
+            if (!isBent) {
+                // 直線
+                ctx.fillStyle = colors.iron; ctx.fillRect(startX, startY - layerH, stripLength, layerH);
+                ctx.strokeStyle = '#333'; ctx.lineWidth=1; ctx.strokeRect(startX, startY - layerH, stripLength, layerH);
+                ctx.fillStyle = colors.copper; ctx.fillRect(startX, startY, stripLength, layerH);
+                ctx.strokeRect(startX, startY, stripLength, layerH);
+                ctx.beginPath(); ctx.moveTo(startX+stripLength, startY-layerH); ctx.lineTo(startX+stripLength, startY+layerH); ctx.stroke();
+            } else {
+                // 彎曲
+                if (direction === 1) { // 熱：往上
+                    drawBentPart(ctx, cx, cy, radius - layerH, radius, angle, -1, colors.iron); 
+                    drawBentPart(ctx, cx, cy, radius, radius + layerH, angle, -1, colors.copper);
+                } else { // 冷：往下
+                    drawBentPart(ctx, cx, cy, radius, radius + layerH, angle, 1, colors.iron); 
+                    drawBentPart(ctx, cx, cy, radius - layerH, radius, angle, 1, colors.copper);
+                }
+            }
+
+            // 6. 固定牆 (蓋在金屬片和左側電路之上)
+            ctx.fillStyle = '#2c3e50';
+            ctx.fillRect(startX - 30, startY - 40, 30, 80);
+            ctx.fillStyle = '#bdc3c7';
+            ctx.beginPath(); ctx.arc(startX - 15, startY - 15, 5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(startX - 15, startY + 15, 5, 0, Math.PI*2); ctx.fill();
+
+            // 7. 繪製開關電路的右半部 (在最上層)
+            if (mode === 'switch') {
+                drawSwitchCircuitRight(startX, startY, stripLength, layerH, isBent, direction);
+            }
+        }
+
+        // ================== 輔助繪圖函數 ==================
+
+        function drawBentPart(ctx, cx, cy, rIn, rOut, angle, dir, color) {
+            ctx.beginPath(); ctx.fillStyle = color; ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+            let startAngle, endAngle;
+            if (dir === -1) { // Up
+                startAngle = Math.PI / 2; endAngle = startAngle - angle;
+                ctx.arc(cx, cy, rOut, startAngle, endAngle, true); 
+                ctx.lineTo(cx + rIn * Math.cos(endAngle), cy + rIn * Math.sin(endAngle)); 
+                ctx.arc(cx, cy, rIn, endAngle, startAngle, false); 
+            } else { // Down
+                startAngle = -Math.PI / 2; endAngle = startAngle + angle;
+                ctx.arc(cx, cy, rOut, startAngle, endAngle, false); 
+                ctx.lineTo(cx + rIn * Math.cos(endAngle), cy + rIn * Math.sin(endAngle)); 
+                ctx.arc(cx, cy, rIn, endAngle, startAngle, true); 
+            }
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+
+        // --- 開關模式專用函數 ---
+        
+        function drawSwitchCircuitLeft(startX, startY) {
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = colors.wire;
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            // 電池到金屬片固定端中心
+            ctx.moveTo(startX - 50, 60); 
+            ctx.lineTo(startX - 50, startY); 
+            ctx.lineTo(startX, startY); 
+            ctx.stroke();
+            
+            // 繪製電池
+            drawBattery(startX - 50, 60);
+        }
+
+        function drawSwitchCircuitRight(startX, startY, stripLength, layerH, isBent, direction) {
+            const contactX = startX + stripLength - 20;
+            // 接觸面高度設在25度時金屬片的下緣
+            const contactLevelY = startY + layerH; 
+            
+            // 判斷接觸：如果明顯向上彎曲(direction=1)，則斷開
+            // 這裡設定一個溫度閾值(例如32度)作為斷開點，讓視覺上金屬片離開接點
+            const isConnected = !(isBent && direction === 1 && temperature > 32);
+
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = colors.wire;
+            ctx.lineJoin = 'round';
+            
+            // 繪製右側電路：接點 -> 燈泡 -> 電池負極
+            ctx.beginPath();
+            ctx.moveTo(contactX, contactLevelY);
+            ctx.lineTo(contactX + 40, contactLevelY);
+            ctx.lineTo(contactX + 40, 60);
+            ctx.lineTo(startX - 20, 60);
+            ctx.stroke();
+
+            // 繪製固定接點結構
+            ctx.fillStyle = '#555';
+            ctx.fillRect(contactX - 5, contactLevelY, 10, 20); // 接點座
+            
+            // 繪製接觸觸點 (金色/暗色)
+            ctx.beginPath();
+            ctx.arc(contactX, contactLevelY, 4, 0, Math.PI*2);
+            ctx.fillStyle = isConnected ? '#f1c40f' : '#7f8c8d';
+            ctx.fill();
+            // 接觸時的火花光暈
+            if(isConnected) {
+                 ctx.beginPath(); ctx.arc(contactX, contactLevelY, 6, 0, Math.PI*2);
+                 ctx.fillStyle = 'rgba(241, 196, 15, 0.3)'; ctx.fill();
+            }
+
+            // 燈泡
+            drawLightbulb(contactX + 40, 60, isConnected);
+            
+            // 狀態文字
+            ctx.font = "bold 16px Microsoft JhengHei";
+            ctx.fillStyle = isConnected ? '#27ae60' : '#c0392b';
+            ctx.textAlign = 'left';
+            ctx.fillText(isConnected ? "通路 (燈亮)" : "斷路 (燈滅)", contactX + 60, 65);
+        }
+
+        function drawBattery(x, y) {
+            ctx.fillStyle = '#ecf0f1'; ctx.strokeStyle = colors.battery; ctx.lineWidth = 2;
+            ctx.fillRect(x - 15, y - 15, 30, 30); ctx.strokeRect(x - 15, y - 15, 30, 30);
+            ctx.fillStyle = colors.battery; ctx.fillRect(x + 15, y - 5, 4, 10);
+            ctx.font = 'bold 16px Arial'; ctx.fillText("+", x - 5, y + 6);
+        }
+
+        function drawLightbulb(x, y, isOn) {
+            ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI*2);
+            ctx.fillStyle = isOn ? '#f1c40f' : '#bdc3c7';
+            if(isOn) { ctx.shadowBlur = 20; ctx.shadowColor = "#f1c40f"; }
+            ctx.fill(); ctx.shadowBlur = 0;
+            ctx.fillStyle='#555'; ctx.fillRect(x-8, y+15, 16, 10);
+        }
+
+        // --- 溫度計模式專用函數 (保持不變) ---
+        function drawThermometerScale(tipX, tipY) {
+            const scaleX = canvas.width - 60; const zeroY = 200; 
+            ctx.fillStyle = '#34495e'; ctx.fillRect(scaleX, 30, 10, 340);
+            ctx.font = '12px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            const steps = [-30, 0, 25, 50, 100, 150];
+            steps.forEach(t => {
+                const yPos = zeroY - (t - 25) * 1.2; 
+                ctx.beginPath(); ctx.moveTo(scaleX, yPos); ctx.lineTo(scaleX + 15, yPos);
+                ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.fillStyle = '#666'; ctx.fillText(t + "°C", scaleX + 20, yPos);
+            });
+            ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.lineTo(scaleX, tipY);
+            ctx.strokeStyle = 'rgba(231, 76, 60, 0.5)'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+            ctx.beginPath(); ctx.moveTo(scaleX - 10, tipY - 5); ctx.lineTo(scaleX, tipY); ctx.lineTo(scaleX - 10, tipY + 5);
+            ctx.fillStyle = '#e74c3c'; ctx.fill();
+        }
+
+        function drawLabels(startX, startY, isBent, direction) {
+            if (Math.abs(temperature - 25) > 10) {
+                ctx.font = "bold 14px Microsoft JhengHei"; ctx.textAlign = "center";
+                let labelX = startX + 120; let labelYTop, labelYBot;
+                if (!isBent) { labelYTop = startY - 25; labelYBot = startY + 35; } 
+                else {
+                    if (direction === 1) { labelYTop = startY - 60; labelYBot = startY + 20; } 
+                    else { labelYTop = startY - 20; labelYBot = startY + 60; }
+                }
+                if (temperature > 25) {
+                    ctx.fillStyle = colors.iron; ctx.fillText("鐵 (膨脹少)", labelX, labelYTop);
+                    ctx.fillStyle = colors.copper; ctx.fillText("銅 (膨脹多)", labelX, labelYBot);
+                } else {
+                    ctx.fillStyle = colors.iron; ctx.fillText("鐵 (冷縮少)", labelX, labelYTop);
+                    ctx.fillStyle = colors.copper; ctx.fillText("銅 (冷縮多)", labelX, labelYBot);
+                }
+            }
+        }
+
+        init();
+        
+        slider.addEventListener('input', (e) => {
+            temperature = parseInt(e.target.value);
+            tempDisplay.textContent = `溫度: ${temperature}°C`;
+            if(temperature > 25) tempDisplay.style.color = '#c0392b';
+            else if(temperature < 25) tempDisplay.style.color = '#2980b9';
+            else tempDisplay.style.color = '#333';
+            draw();
+        });
+    </script>
+</body>
+</html>
