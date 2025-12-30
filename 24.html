@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoBalance 6.1: 修正金字塔版</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --energy-theme: #27ae60;
+            --toxin-theme: #c0392b;
+            --lvl1: #2ecc71;
+            --lvl2: #f1c40f;
+            --lvl3: #3498db;
+            --lvl4: #9b59b6;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden; /* 禁止全頁卷軸 */
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- 頂部導航 --- */
+        header {
+            background: white;
+            padding: 10px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+            z-index: 100;
+        }
+
+        .mode-switch {
+            display: flex;
+            background: #eee;
+            border-radius: 30px;
+            padding: 3px;
+        }
+
+        .mode-btn {
+            padding: 8px 20px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .mode-btn.active { box-shadow: 0 2px 5px rgba(0,0,0,0.2); color: white; }
+        .mode-btn.e-mode.active { background: var(--energy-theme); }
+        .mode-btn.t-mode.active { background: var(--toxin-theme); }
+
+        .global-settings {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .zoom-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: #f0f0f0;
+            padding: 5px 10px;
+            border-radius: 8px;
+        }
+
+        /* --- 主舞台 --- */
+        #stage {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center; /* 垂直置中 */
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 60px);
+            overflow: hidden;
+        }
+
+        #scaler {
+            width: 90%;
+            height: 90%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform-origin: center center;
+            transition: transform 0.2s ease;
+        }
+
+        /* --- 通用卡片 --- */
+        .level-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            display: flex;
+            position: relative;
+            transition: all 0.5s ease;
+            border: 2px solid transparent;
+        }
+
+        .icon-box {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.5rem; color: white; margin-right: 10px; flex-shrink: 0;
+        }
+        .l1 .icon-box { background: var(--lvl1); }
+        .l2 .icon-box { background: var(--lvl2); }
+        .l3 .icon-box { background: var(--lvl3); }
+        .l4 .icon-box { background: var(--lvl4); }
+
+        .info h3 { margin: 0; font-size: 1rem; color: #333; }
+        .info p { margin: 0; font-size: 0.8rem; color: #777; }
+
+        /* ============================
+           MODE A: 能量金字塔 (Energy)
+           修正：由下(低階)到上(高階)
+        ============================ */
+        .view-energy {
+            display: flex;
+            flex-direction: column; /* 正常由上到下排列 (HTML順序: L4 -> L1) */
+            align-items: center;
+            gap: 2px;
+            width: 600px;
+        }
+
+        .view-energy .level-card {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            height: 75px;
+        }
+
+        /* 金字塔寬度控制 */
+        .view-energy .l1 { width: 100%; }
+        .view-energy .l2 { width: 80%; }
+        .view-energy .l3 { width: 60%; }
+        .view-energy .l4 { width: 40%; }
+
+        /* 能量傳遞箭頭 */
+        .energy-arrow {
+            color: var(--energy-theme);
+            font-weight: bold;
+            font-size: 0.8rem;
+            text-align: center;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: floatUp 1.5s infinite ease-in-out;
+            z-index: 0;
+        }
+
+        /* 散失箭頭 (向右 90%) */
+        .loss-arrow {
+            position: absolute;
+            right: -90px;
+            top: 50%; transform: translateY(-50%);
+            width: 80px;
+            color: #e67e22;
+            display: flex; align-items: center;
+            font-size: 0.75rem; font-weight: bold;
+        }
+        .loss-svg { width: 40px; height: 20px; fill: none; stroke: #e67e22; stroke-width: 2; stroke-dasharray: 3; }
+
+        /* ============================
+           MODE B: 毒素累積 (Toxin)
+           橫向排列，左(低) -> 右(高)
+        ============================ */
+        .view-toxin {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .view-toxin .level-card {
+            flex-direction: column;
+            width: 220px;
+            height: 400px; /* 固定高度 */
+        }
+
+        .view-toxin .card-header {
+            display: flex; align-items: center; margin-bottom: 10px;
+        }
+
+        /* 胃袋視覺區 */
+        .diet-container {
+            background: #f9f9f9;
+            border: 1px dashed #ccc;
+            border-radius: 8px;
+            flex-grow: 1;
+            margin-bottom: 10px;
+            padding: 5px;
+            overflow-y: auto;
+            display: flex;
+            align-content: flex-start;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        
+        .prey-item { font-size: 1.2rem; animation: pop 0.3s; }
+
+        .control-area {
+            background: #eee;
+            padding: 8px;
+            border-radius: 8px;
+        }
+        .control-area label { font-size: 0.8rem; display: block; }
+        .control-area input { width: 100%; cursor: pointer; }
+        
+        .toxin-display {
+            font-size: 1.2rem; font-weight: bold; color: var(--toxin-theme); text-align: right; margin-bottom: 5px;
+        }
+
+        /* --- 動畫與通用 --- */
+        @keyframes floatUp { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-3px);} }
+        @keyframes pop { 0%{transform:scale(0);} 100%{transform:scale(1);} }
+        
+        .hidden { display: none !important; }
+        .danger { border-color: red !important; background-color: #fff0f0 !important; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="mode-switch">
+        <button class="mode-btn e-mode active" onclick="switchMode('energy')">📐 能量金字塔</button>
+        <button class="mode-btn t-mode" onclick="switchMode('toxin')">☠️ 毒素累積鏈</button>
+    </div>
+
+    <div class="global-settings">
+        <div id="ctrl-energy">
+            ☀️ 太陽能量: <input type="range" id="sunInput" min="5000" max="50000" value="20000" step="1000" oninput="updateEnergy()">
+            <span id="sunVal" style="font-weight:bold; color:var(--energy-theme)">20000</span>
+        </div>
+        <div id="ctrl-toxin" class="hidden">
+            🏭 環境毒素: <input type="range" id="toxinInput" min="0" max="1" value="0.1" step="0.05" oninput="updateToxin()">
+            <span id="toxinVal" style="font-weight:bold; color:var(--toxin-theme)">0.1 ppm</span>
+        </div>
+        
+        <div class="zoom-control">
+            🔍 縮放: <input type="range" min="0.5" max="1.5" step="0.1" value="1" oninput="setScale(this.value)">
+        </div>
+    </div>
+</header>
+
+<div id="stage">
+    <div id="scaler">
+        
+        <div id="view-energy" class="view-energy">
+            
+            <div class="level-card l4">
+                <div style="display:flex;align-items:center;">
+                    <div class="icon-box">🦅</div>
+                    <div class="info"><h3>頂級掠食者</h3></div>
+                </div>
+                <div style="color:var(--energy-theme);font-weight:bold;" id="e-val-4">0 kcal</div>
+                <div class="loss-arrow">
+                    <svg class="loss-svg"><path d="M0,10 Q20,0 40,10" /></svg> 90%
+                </div>
+            </div>
+
+            <div class="energy-arrow">⬆ 10% 傳遞</div>
+
+            <div class="level-card l3">
+                <div style="display:flex;align-items:center;">
+                    <div class="icon-box">🐟</div>
+                    <div class="info"><h3>次級消費者</h3></div>
+                </div>
+                <div style="color:var(--energy-theme);font-weight:bold;" id="e-val-3">0 kcal</div>
+                <div class="loss-arrow">
+                    <svg class="loss-svg"><path d="M0,10 Q20,0 40,10" /></svg> 90%
+                </div>
+            </div>
+
+            <div class="energy-arrow">⬆ 10% 傳遞</div>
+
+            <div class="level-card l2">
+                <div style="display:flex;align-items:center;">
+                    <div class="icon-box">🦐</div>
+                    <div class="info"><h3>初級消費者</h3></div>
+                </div>
+                <div style="color:var(--energy-theme);font-weight:bold;" id="e-val-2">0 kcal</div>
+                <div class="loss-arrow">
+                    <svg class="loss-svg"><path d="M0,10 Q20,0 40,10" /></svg> 90%
+                </div>
+            </div>
+
+            <div class="energy-arrow">⬆ 10% 傳遞</div>
+
+            <div class="level-card l1">
+                <div style="display:flex;align-items:center;">
+                    <div class="icon-box">🌿</div>
+                    <div class="info"><h3>生產者</h3></div>
+                </div>
+                <div style="color:var(--energy-theme);font-weight:bold;" id="e-val-1">0 kcal</div>
+                <div class="loss-arrow">
+                    <svg class="loss-svg"><path d="M0,10 Q20,0 40,10" /></svg> 90%
+                </div>
+            </div>
+
+        </div>
+
+        <div id="view-toxin" class="view-toxin hidden">
+            
+            <div class="level-card l1">
+                <div class="card-header">
+                    <div class="icon-box">🌿</div>
+                    <div class="info"><h3>生產者</h3><p>吸收環境毒素</p></div>
+                </div>
+                <div class="diet-container" style="justify-content:center; align-items:center; color:#999;">
+                    (直接吸收)
+                </div>
+                <div class="toxin-display" id="t-conc-1">0.1 ppm</div>
+                <div class="control-area" style="opacity:0; pointer-events: none;">
+                    <label>Placeholder</label>
+                    <input type="range">
+                </div>
+            </div>
+
+            <div class="level-card l2" id="t-card-2">
+                <div class="card-header">
+                    <div class="icon-box">🦐</div>
+                    <div class="info"><h3>初級消費者</h3><p>吃藻類</p></div>
+                </div>
+                <div class="diet-container" id="diet-2"></div>
+                <div class="toxin-display" id="t-conc-2">0.0 ppm</div>
+                <div class="control-area">
+                    <label>攝食數量: <span id="count-2">5</span></label>
+                    <input type="range" id="eat-1" min="1" max="12" value="5" oninput="updateToxin()">
+                </div>
+            </div>
+
+            <div class="level-card l3" id="t-card-3">
+                <div class="card-header">
+                    <div class="icon-box">🐟</div>
+                    <div class="info"><h3>次級消費者</h3><p>吃磷蝦</p></div>
+                </div>
+                <div class="diet-container" id="diet-3"></div>
+                <div class="toxin-display" id="t-conc-3">0.0 ppm</div>
+                <div class="control-area">
+                    <label>攝食數量: <span id="count-3">3</span></label>
+                    <input type="range" id="eat-2" min="1" max="8" value="3" oninput="updateToxin()">
+                </div>
+            </div>
+
+            <div class="level-card l4" id="t-card-4">
+                <div class="card-header">
+                    <div class="icon-box">🦅</div>
+                    <div class="info"><h3>頂級掠食者</h3><p>吃小魚</p></div>
+                </div>
+                <div class="diet-container" id="diet-4"></div>
+                <div class="toxin-display" id="t-conc-4">0.0 ppm</div>
+                <div class="control-area">
+                    <label>攝食數量: <span id="count-4">2</span></label>
+                    <input type="range" id="eat-3" min="1" max="5" value="2" oninput="updateToxin()">
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // --- 系統初始化 ---
+    function switchMode(mode) {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`.mode-btn.${mode === 'energy' ? 'e-mode' : 't-mode'}`).classList.add('active');
+
+        const ctrlE = document.getElementById('ctrl-energy');
+        const ctrlT = document.getElementById('ctrl-toxin');
+        const viewE = document.getElementById('view-energy');
+        const viewT = document.getElementById('view-toxin');
+
+        if (mode === 'energy') {
+            viewE.classList.remove('hidden');
+            viewT.classList.add('hidden');
+            ctrlE.classList.remove('hidden');
+            ctrlT.classList.add('hidden');
+            updateEnergy(); 
+        } else {
+            viewE.classList.add('hidden');
+            viewT.classList.remove('hidden');
+            ctrlE.classList.add('hidden');
+            ctrlT.classList.remove('hidden');
+            updateToxin(); 
+        }
+    }
+
+    function setScale(val) {
+        document.getElementById('scaler').style.transform = `scale(${val})`;
+    }
+
+    // --- 能量運算邏輯 (10% 定律) ---
+    function updateEnergy() {
+        const sun = parseInt(document.getElementById('sunInput').value);
+        document.getElementById('sunVal').innerText = sun;
+
+        const e1 = sun;
+        const e2 = Math.round(e1 * 0.1);
+        const e3 = Math.round(e2 * 0.1);
+        const e4 = Math.round(e3 * 0.1);
+
+        document.getElementById('e-val-1').innerText = e1.toLocaleString() + " kcal";
+        document.getElementById('e-val-2').innerText = e2.toLocaleString() + " kcal";
+        document.getElementById('e-val-3').innerText = e3.toLocaleString() + " kcal";
+        document.getElementById('e-val-4').innerText = e4.toLocaleString() + " kcal";
+    }
+
+    // --- 毒素運算邏輯 (攝食倍數放大) ---
+    function updateToxin() {
+        const env = parseFloat(document.getElementById('toxinInput').value);
+        document.getElementById('toxinVal').innerText = env.toFixed(2) + " ppm";
+
+        const n2 = parseInt(document.getElementById('eat-1').value); 
+        const n3 = parseInt(document.getElementById('eat-2').value); 
+        const n4 = parseInt(document.getElementById('eat-3').value); 
+
+        document.getElementById('count-2').innerText = n2;
+        document.getElementById('count-3').innerText = n3;
+        document.getElementById('count-4').innerText = n4;
+
+        const c1 = env;
+        const c2 = c1 * n2;
+        const c3 = c2 * n3;
+        const c4 = c3 * n4;
+
+        updateToxinCard('1', c1, null);
+        updateToxinCard('2', c2, 't-card-2');
+        updateToxinCard('3', c3, 't-card-3');
+        updateToxinCard('4', c4, 't-card-4');
+
+        renderDiet('diet-2', '🌿', n2);
+        renderDiet('diet-3', '🦐', n3);
+        renderDiet('diet-4', '🐟', n4);
+    }
+
+    function updateToxinCard(id, val, cardId) {
+        const el = document.getElementById(`t-conc-${id}`);
+        el.innerText = val.toFixed(2) + " ppm";
+        
+        if (cardId) {
+            const card = document.getElementById(cardId);
+            // 當數值超過一定程度顯示危險紅
+            if (val > 20) card.classList.add('danger');
+            else card.classList.remove('danger');
+        }
+    }
+
+    function renderDiet(containerId, icon, count) {
+        const div = document.getElementById(containerId);
+        div.innerHTML = ''; 
+        for(let i=0; i<count; i++) {
+            const span = document.createElement('span');
+            span.className = 'prey-item';
+            span.innerText = icon;
+            span.style.animationDelay = (i * 0.05) + 's';
+            div.appendChild(span);
+        }
+    }
+
+    // 啟動預設
+    switchMode('energy');
+</script>
+
+</body>
+</html>
