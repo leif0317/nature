@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>名師生物教室：細胞滲透作用 (小粘製作)</title>
+    <style>
+        /* --- 基礎環境設定 --- */
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background-color: #f0f4f8; text-align: center; padding: 20px;
+            padding-bottom: 60px; /* 留位置給屬名 */
+        }
+        h1 { color: #2c3e50; margin-bottom: 10px; }
+        
+        .lab-bench {
+            display: flex; justify-content: center; gap: 60px;
+            margin-top: 40px; flex-wrap: wrap;
+        }
+        .beaker {
+            width: 280px; height: 340px;
+            border: 4px solid #3498db; border-top: none; border-radius: 0 0 30px 30px;
+            background-color: rgba(52, 152, 219, 0.1);
+            position: relative; display: flex; justify-content: center; align-items: center;
+            transition: background-color 2s; overflow: hidden;
+        }
+        .label {
+            position: absolute; bottom: -40px; font-weight: bold; font-size: 1.2em; color: #555;
+        }
+        
+        svg { overflow: visible; transition: all 4s ease; }
+
+        /* --- 動物細胞 --- */
+        #animal-path {
+            fill: #e74c3c; stroke: #c0392b; stroke-width: 2;
+            transform-origin: center;
+            transition: transform 4s ease, fill 0.5s;
+        }
+        .animal-burst-state { fill: #c0392b !important; }
+
+        /* --- 植物細胞 --- */
+        #plant-wall-path {
+            fill: none;
+            stroke: #27ae60;
+            stroke-width: 8;
+            stroke-linejoin: round;
+            transition: d 4s cubic-bezier(0.25, 0.8, 0.25, 1), stroke-width 4s, stroke 4s;
+        }
+        #plant-membrane-path {
+            fill: #a3e4d7; fill-opacity: 0.8;
+            stroke: #16a085; stroke-width: 2;
+            transition: d 4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        /* --- 控制面板 --- */
+        .controls {
+            margin-top: 30px; padding: 20px; background: white; border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: inline-block;
+        }
+        button {
+            padding: 12px 24px; margin: 0 8px; font-size: 1em; cursor: pointer;
+            border: none; border-radius: 8px; color: white; font-weight: bold;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.95); }
+        #btn-hyper { background-color: #f39c12; }
+        #btn-iso { background-color: #3498db; }
+        #btn-hypo { background-color: #9b59b6; }
+        .description {
+            margin-top: 25px; font-size: 1.3em; color: #d35400; font-weight: bold; min-height: 1.5em;
+        }
+
+        /* --- 🌟 屬名樣式 (新增) 🌟 --- */
+        .creator-badge {
+            margin-top: 60px;
+            display: inline-block;
+            background: #2c3e50; /* 深藍色底 */
+            color: #f1c40f;       /* 金色字 */
+            padding: 15px 50px;
+            border-radius: 50px;  /* 膠囊形狀 */
+            font-size: 1.5rem;
+            font-weight: 900;
+            letter-spacing: 2px;
+            box-shadow: 0 10px 20px rgba(44, 62, 80, 0.3); /* 立體陰影 */
+            border: 4px solid #f1c40f; /* 金色邊框 */
+            transform: rotate(-2deg); /* 稍微歪一點點比較活潑 */
+            transition: transform 0.3s;
+            cursor: default;
+        }
+        .creator-badge:hover {
+            transform: rotate(0deg) scale(1.05); /* 滑鼠移過去會變正變大 */
+        }
+
+        /* --- 顆粒系統 --- */
+        .water-particle {
+            position: absolute; width: 8px; height: 8px; background-color: #3498db;
+            border-radius: 50%; opacity: 0; pointer-events: none; z-index: 1;
+        }
+        @keyframes particleFlowOut {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); left: 50%; top: 50%; }
+            100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1.2); left: 50%; top: 50%; }
+        }
+        @keyframes particleFlowIn {
+            0% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1.2); left: 50%; top: 50%; }
+            20% { opacity: 1; }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); left: 50%; top: 50%; }
+        }
+        .p-out .water-particle { animation: particleFlowOut 2s infinite linear; }
+        .p-in .water-particle { animation: particleFlowIn 2s infinite linear; }
+
+        /* --- 背景顏色狀態 --- */
+        .bg-hyper { background-color: rgba(243, 156, 18, 0.4); }
+        .bg-hypo { background-color: rgba(155, 89, 182, 0.1); }
+
+    </style>
+</head>
+<body>
+
+    <h1>🔬 生物實驗室(細胞的滲透作用) </h1>
+    <p>觀察重點：植物細胞壁展現出「堅韌」的特性，只會微微外凸！</p>
+
+    <div class="controls">
+        <button id="btn-hyper" onclick="runExperiment('hyper')">高張溶液 (濃鹽水)</button>
+        <button id="btn-iso" onclick="runExperiment('iso')">等張溶液 (生理食鹽水)</button>
+        <button id="btn-hypo" onclick="runExperiment('hypo')">低張溶液 (清水)</button>
+    </div>
+
+    <div class="description" id="status-text">請選擇溶液，觀察最真實的微彎張力...</div>
+
+    <div class="lab-bench">
+        <div class="beaker" id="beaker-animal">
+            <svg width="160" height="160" viewBox="0 0 200 200">
+                <path id="animal-path" d="M 100 100 m -60 0 a 60 60 0 1 0 120 0 a 60 60 0 1 0 -120 0" />
+            </svg>
+            <div class="label">動物細胞</div>
+        </div>
+
+        <div class="beaker" id="beaker-plant">
+            <svg width="180" height="180" viewBox="0 0 200 200">
+                <path id="plant-membrane-path" />
+                <path id="plant-wall-path" />
+            </svg>
+            <div class="label">植物細胞</div>
+        </div>
+    </div>
+
+    <div class="creator-badge">
+        ✨ 小粘製作 ✨
+    </div>
+
+    <script>
+        let burstTimer;
+        
+        // --- 核心路徑數據 (V6.0 寫實微彎版) ---
+        const plantPathNormal = "M 40 40 Q 100 40 160 40 Q 160 100 160 160 Q 100 160 40 160 Q 40 100 40 40 Z";
+        // 微彎版：控制點從 40 拉到 25 (只差 15px)
+        const plantPathTurgid = "M 40 40 Q 100 25 160 40 Q 175 100 160 160 Q 100 175 40 160 Q 25 100 40 40 Z";
+        const plantPathShrinkMembrane = "M 55 55 Q 100 65 145 55 Q 135 100 145 145 Q 100 135 55 145 Q 65 100 55 55 Z";
+
+        const animalPathNormal = "M 100 100 m -60 0 a 60 60 0 1 0 120 0 a 60 60 0 1 0 -120 0";
+        const animalPathBurst = "M 100 40 A 60 60 0 1 0 160 100 L 150 90 L 140 80 L 130 60 L 120 50 Z"; 
+
+        // 初始化
+        document.getElementById('plant-wall-path').setAttribute('d', plantPathNormal);
+        document.getElementById('plant-membrane-path').setAttribute('d', plantPathNormal);
+
+        // 顆粒系統
+        function createParticles(containerId, direction) {
+            const container = document.getElementById(containerId);
+            container.querySelectorAll('.water-particle').forEach(p => p.remove());
+            if(direction === 'none') {
+                container.classList.remove('p-out', 'p-in'); return;
+            }
+            for (let i = 0; i < 40; i++) { 
+                let p = document.createElement('div');
+                p.className = 'water-particle';
+                let angle = Math.random() * Math.PI * 2;
+                let distance = 100 + Math.random() * 100;
+                p.style.setProperty('--tx', Math.cos(angle) * distance + 'px');
+                p.style.setProperty('--ty', Math.sin(angle) * distance + 'px');
+                p.style.animationDelay = Math.random() * 2 + 's';
+                container.appendChild(p);
+            }
+            container.classList.remove('p-out', 'p-in');
+            container.classList.add(direction === 'out' ? 'p-out' : 'p-in');
+        }
+
+        function resetLab() {
+            clearTimeout(burstTimer);
+            const animalPath = document.getElementById('animal-path');
+            const plantWall = document.getElementById('plant-wall-path');
+            const plantMembrane = document.getElementById('plant-membrane-path');
+            const beakers = document.querySelectorAll('.beaker');
+
+            animalPath.setAttribute('d', animalPathNormal);
+            animalPath.style.transform = "scale(1)"; 
+            animalPath.classList.remove('animal-burst-state');
+
+            plantWall.style.d = `path("${plantPathNormal}")`;
+            plantMembrane.style.d = `path("${plantPathNormal}")`;
+            plantWall.style.stroke = "#27ae60"; 
+            plantWall.style.strokeWidth = "8px";
+
+            beakers.forEach(b => b.className = 'beaker');
+            createParticles('beaker-animal', 'none');
+            createParticles('beaker-plant', 'none');
+        }
+
+        function runExperiment(type) {
+            resetLab();
+            setTimeout(() => {
+                const animalPath = document.getElementById('animal-path');
+                const plantWall = document.getElementById('plant-wall-path');
+                const plantMembrane = document.getElementById('plant-membrane-path');
+                const beakers = document.querySelectorAll('.beaker');
+                const text = document.getElementById('status-text');
+
+                if (type === 'hyper') {
+                    text.innerHTML = "⚠️ 高張溶液：植物質壁分離。細胞壁很硬，完全維持原狀。";
+                    beakers.forEach(b => b.classList.add('bg-hyper'));
+                    animalPath.style.transform = "scale(0.6)";
+                    plantWall.style.d = `path("${plantPathNormal}")`; 
+                    plantMembrane.style.d = `path("${plantPathShrinkMembrane}")`;
+                    createParticles('beaker-animal', 'out');
+                    createParticles('beaker-plant', 'out');
+
+                } else if (type === 'iso') {
+                    text.innerHTML = "✅ 等張溶液：細胞外形維持穩定。";
+
+                } else if (type === 'hypo') {
+                    text.innerHTML = "💧 低張溶液：注意看植物細胞壁！只會「微微彎曲」，因為纖維素非常強韌！";
+                    beakers.forEach(b => b.classList.add('bg-hypo'));
+                    createParticles('beaker-animal', 'in');
+                    createParticles('beaker-plant', 'in');
+
+                    // 植物細胞：微彎版
+                    plantWall.style.d = `path("${plantPathTurgid}")`; 
+                    plantMembrane.style.d = `path("${plantPathTurgid}")`; 
+                    plantWall.style.stroke = "#2ecc71";
+                    
+                    // 動物細胞：變大 -> 破裂定格
+                    animalPath.style.transform = "scale(1.5)";
+                    burstTimer = setTimeout(() => {
+                        createParticles('beaker-animal', 'none');
+                        animalPath.setAttribute('d', animalPathBurst);
+                        animalPath.classList.add('animal-burst-state');
+                        text.innerHTML = "💥 砰！紅血球破裂！植物細胞則維持著「微彎」的狀態。";
+                    }, 3800);
+                }
+            }, 50);
+        }
+    </script>
+</body>
+</html>
