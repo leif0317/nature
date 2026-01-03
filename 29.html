@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V14 小粘顯微鏡 (對焦系統版)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a1a2e; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh;}
+        
+        /* Layout */
+        #container-3d { flex: 2; position: relative; border-right: 2px solid #333; }
+        #panel-2d { 
+            flex: 1; background: #151515; display: flex; flex-direction: column; align-items: center; 
+            padding: 15px; box-shadow: -5px 0 15px rgba(0,0,0,0.5); min-width: 320px; overflow-y: auto; position: relative;
+        }
+
+        /* --- 新增：左側對焦控制區 --- */
+        .focus-controls {
+            position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
+            display: flex; gap: 15px; background: rgba(0,0,0,0.6); padding: 15px;
+            border-radius: 10px; border: 1px solid #555; z-index: 20;
+        }
+        .focus-slider-group {
+            display: flex; flex-direction: column; align-items: center; height: 200px;
+        }
+        .focus-label { font-size: 12px; color: #4db8ff; margin-bottom: 5px; font-weight: bold; }
+        /* 直式滑桿樣式 */
+        input[type=range][orient=vertical] {
+            writing-mode: bt-lr; -webkit-appearance: slider-vertical; width: 8px; height: 100%; padding: 0 5px;
+        }
+
+        /* 3D 縮放鈕 (移到左下角) */
+        .zoom-controls {
+            position: absolute; left: 20px; bottom: 20px; display: flex; gap: 10px; z-index: 20;
+        }
+        .zoom-btn {
+            width: 35px; height: 35px; background: rgba(0,0,0,0.6); color: white; border: 1px solid #555;
+            border-radius: 5px; font-size: 18px; cursor: pointer; transition: 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .zoom-btn:hover { background: #4db8ff; color: #000; }
+
+        /* 右側 玻片導航圖 */
+        .slide-preview-container {
+            width: 200px; height: 60px; background: rgba(255,255,255,0.1);
+            border: 1px solid #555; border-radius: 4px; margin-bottom: 15px;
+            position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .preview-glass {
+            width: 180px; height: 50px; background: rgba(255,255,255,0.8);
+            border-radius: 2px; position: relative;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        .preview-specimen {
+            width: 30px; height: 30px; background: #e67e22; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 8px; color: black; font-weight: bold;
+            font-family: 'Microsoft JhengHei', sans-serif; white-space: nowrap; overflow: hidden;
+        }
+        #preview-target {
+            width: 6px; height: 6px; background: red; border-radius: 50%;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            border: 1px solid white; box-shadow: 0 0 4px red; transition: top 0.1s, left 0.1s;
+        }
+
+        /* 觀察視窗 */
+        .eyepiece-view {
+            width: 260px; height: 260px; border-radius: 50%; background-color: #000;
+            border: 8px solid #34495e; overflow: hidden; position: relative; margin-bottom: 15px;
+            box-shadow: inset 0 0 60px rgba(0,0,0,1); flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #slide-plane {
+            width: 260px; height: 260px; position: relative;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.5s;
+            /* 預設模糊 (CSS filter 會在 JS 中動態更新) */
+            filter: blur(10px); 
+        }
+        .onion-texture {
+            position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background-color: #e67e22; 
+            background-image: linear-gradient(135deg, rgba(255,255,255,0.3) 25%, transparent 25%), linear-gradient(225deg, rgba(255,255,255,0.3) 25%, transparent 25%), linear-gradient(45deg, rgba(255,255,255,0.3) 25%, transparent 25%), linear-gradient(315deg, rgba(255,255,255,0.3) 25%, transparent 25%);
+            background-size: 50px 50px; filter: brightness(1.0) contrast(1.2); z-index: 1;
+        }
+        .specimen-text {
+            position: absolute; z-index: 2; color: #000; font-weight: bold; font-size: 24px;
+            text-align: center; white-space: nowrap; font-family: 'Microsoft JhengHei', sans-serif;
+            opacity: 0.8; pointer-events: none;
+        }
+        .pointer {
+            position: absolute; top: 50%; left: 50%; width: 80px; height: 2px; background: rgba(0,0,0,0.7);
+            transform: rotate(-45deg); transform-origin: left; pointer-events: none; z-index: 10;
+        }
+
+        .control-group { width: 100%; margin-bottom: 15px; background: #222; padding: 12px; border-radius: 8px; box-sizing: border-box;}
+        h3 { margin-top: 0; color: #4db8ff; border-bottom: 1px solid #444; padding-bottom: 5px; font-size: 1.0em;}
+        label { display: block; margin-top: 5px; color: #ccc; font-size: 0.85em;}
+        
+        button.btn-main { width: 100%; padding: 8px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button.btn-main:hover { background: #2ecc71; }
+        input[type=range] { width: 100%; cursor: pointer; accent-color: #4db8ff; }
+
+        .stage-controls { display: flex; align-items: center; justify-content: center; gap: 15px; background: #1a1a1a; padding: 10px; border-radius: 8px; }
+        
+        #info-overlay {
+            position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8); z-index: 10;
+        }
+        #signature {
+            position: absolute; bottom: 20px; right: 20px; color: #ffd700; font-size: 1.5em; font-weight: bold;
+            text-shadow: 2px 2px 4px #000; pointer-events: none; font-family: 'Microsoft JhengHei', sans-serif; z-index: 20;
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="container-3d">
+        <div id="info-overlay">
+            <h1>🔬 V14 小粘顯微鏡 (對焦系統)</h1>
+            <p style="font-size: 0.8em; color: #ffd700;">左側控制清晰度 | 3D 載物台連動</p>
+        </div>
+
+        <div class="focus-controls">
+            <div class="focus-slider-group">
+                <div class="focus-label">粗調</div>
+                <input type="range" id="focus-coarse" min="0" max="100" value="0" orient="vertical">
+            </div>
+            <div class="focus-slider-group">
+                <div class="focus-label">細調</div>
+                <input type="range" id="focus-fine" min="0" max="100" value="50" orient="vertical">
+            </div>
+        </div>
+
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="zoom3D('in')">＋</button>
+            <button class="zoom-btn" onclick="zoom3D('out')">－</button>
+        </div>
+    </div>
+
+    <div id="panel-2d">
+        <h3>📍 玻片導航</h3>
+        <div class="slide-preview-container">
+            <div class="preview-glass">
+                <div class="preview-specimen">小粘<br>好帥</div>
+                <div id="preview-target"></div>
+            </div>
+        </div>
+
+        <h3>👁️ 顯微視野</h3>
+        <div class="eyepiece-view">
+            <div id="slide-plane">
+                <div class="onion-texture"></div>
+                <div class="specimen-text">小粘好帥</div>
+            </div>
+            <div class="pointer"></div>
+        </div>
+        
+        <div class="control-group">
+            <h3>1. 標本與倍率</h3>
+            <button id="btn-load-slide" class="btn-main" onclick="toggleSlide()">📥 放入小粘玻片</button>
+            <div style="display:flex; justify-content:space-between; margin-top:10px;">
+                <span id="slide-status" style="color:#777; font-size:0.8em;">無標本</span>
+                <span id="mag-display" style="color:#fff; font-weight:bold;">40x</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>2. 載物台移動</h3>
+            <div class="stage-controls">
+                <div style="text-align:center;">
+                    <label>▲ 前</label>
+                    <input type="range" id="stage-y" min="0" max="100" value="50" orient="vertical">
+                    <label>▼ 後</label>
+                </div>
+                <div style="flex:1; text-align:center;">
+                    <label>◀ 左 --- 右 ▶</label>
+                    <input type="range" id="stage-x" min="0" max="100" value="50">
+                    <small style="color:#e74c3c; display:block; margin-top:5px; font-size:0.8em;">(玻片右移 ➔ 視野左移)</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>3. 光圈亮度</h3>
+            <label>🌑 暗 --------- 亮 🌕</label>
+            <input type="range" id="diaphragm-control" min="0" max="100" value="80">
+        </div>
+
+        <div id="signature">小粘製作</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+        let camera, scene, renderer, controls;
+        let slideGroup, turretGroup, diaphragmDisc, stageGroup; // 加入 stageGroup 以便整體上下移動
+        let raycaster, mouse;
+        let objectives = []; 
+        let targetTurretRotation = Math.PI;
+
+        let state = {
+            hasSlide: false, magIndex: 0, 
+            stageX: 50, stageY: 50, lightLevel: 80,
+            focusCoarse: 0, focusFine: 50 // 新增對焦狀態
+        };
+
+        const MAG_LEVELS = [
+            { name: "4x", scale: 1.0, total: "40x", color: "#d63031", rot: Math.PI },
+            { name: "10x", scale: 2.5, total: "100x", color: "#f1c40f", rot: Math.PI + (Math.PI*2/3) },
+            { name: "40x", scale: 10.0, total: "400x", color: "#0984e3", rot: Math.PI + (Math.PI*4/3) }
+        ];
+
+        // UI Refs
+        const slidePlane = document.getElementById('slide-plane');
+        const previewTarget = document.getElementById('preview-target');
+        const sliderX = document.getElementById('stage-x');
+        const sliderY = document.getElementById('stage-y');
+        const sliderCoarse = document.getElementById('focus-coarse');
+        const sliderFine = document.getElementById('focus-fine');
+        const sliderLight = document.getElementById('diaphragm-control');
+        const btnSlide = document.getElementById('btn-load-slide');
+        const txtStatus = document.getElementById('slide-status');
+        const txtMag = document.getElementById('mag-display');
+
+        init();
+        animate();
+        setupUI();
+
+        window.zoom3D = (type) => {
+            if(!camera || !controls) return;
+            const direction = new THREE.Vector3(); camera.getWorldDirection(direction);
+            camera.position.addScaledVector(direction, type === 'in' ? 2.0 : -2.0);
+            controls.update();
+        };
+
+        function createSpecimenTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#e67e22'; ctx.beginPath(); ctx.arc(128, 128, 120, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#000000'; ctx.font = 'bold 40px "Microsoft JhengHei", Arial';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('小粘好帥', 128, 128);
+            const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; return tex;
+        }
+
+        function createLabelTexture(text, bgColor) {
+            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256; const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#d0d0d0'; ctx.fillRect(0,0, 512, 256); ctx.fillStyle = bgColor; ctx.fillRect(0, 40, 512, 50);
+            ctx.fillStyle = '#000000'; ctx.font = 'bold 80px Arial'; ctx.textAlign = 'center'; ctx.fillText(text, 256, 180);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createMaterials() {
+            return {
+                bodyBlack: new THREE.MeshPhysicalMaterial({ color: 0x151515, metalness: 0.3, roughness: 0.4 }),
+                chrome: new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.9, roughness: 0.1 }),
+                glass: new THREE.MeshPhysicalMaterial({ color: 0xaaccff, transmission: 0.9, transparent: true }),
+                slideGlass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, transmission: 0.9, transparent: true, opacity: 0.6 }),
+                redKnob: new THREE.MeshStandardMaterial({ color: 0xc0392b, metalness: 0.1, roughness: 0.6 }),
+                yellowPlastic: new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.1, roughness: 0.4 }),
+                mirror: new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1.0, roughness: 0 }),
+                specimenTextured: new THREE.MeshBasicMaterial({ map: createSpecimenTexture(), transparent: true })
+            };
+        }
+
+        function buildMicroscope(materials) {
+            const microscope = new THREE.Group();
+            
+            // Base
+            const base = new THREE.Group();
+            base.add(new THREE.Mesh(new THREE.BoxGeometry(2, 1, 7), materials.bodyBlack).translateX(-2.2).translateY(0.5).translateZ(1));
+            base.add(new THREE.Mesh(new THREE.BoxGeometry(2, 1, 7), materials.bodyBlack).translateX(2.2).translateY(0.5).translateZ(1));
+            base.add(new THREE.Mesh(new THREE.BoxGeometry(6.4, 1, 2.5), materials.bodyBlack).translateY(0.5).translateZ(-1.5));
+            microscope.add(base);
+
+            // *** Stage Group (for Focus Movement) ***
+            stageGroup = new THREE.Group();
+            const stageY = 5.5; // Base height of stage
+            stageGroup.position.y = 0; // Relative offset, will be animated
+
+            const stageShape = new THREE.Shape();
+            stageShape.moveTo(-3, -2.5); stageShape.lineTo(3, -2.5); stageShape.lineTo(3, 2.5); stageShape.lineTo(-3, 2.5); stageShape.lineTo(-3, -2.5);
+            stageShape.holes.push(new THREE.Path().absarc(0, 0, 0.4, 0, Math.PI * 2, true)); 
+            const stage = new THREE.Mesh(new THREE.ExtrudeGeometry(stageShape, { depth: 0.2, bevelEnabled: false }), materials.bodyBlack);
+            stage.rotation.x = Math.PI / 2; stage.position.set(0, stageY, 1.0);
+            stageGroup.add(stage);
+
+            // Slide
+            slideGroup = new THREE.Group();
+            const slideGlass = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.05, 0.8), materials.slideGlass);
+            const specimenGeo = new THREE.CircleGeometry(0.25, 32);
+            const specimen = new THREE.Mesh(specimenGeo, materials.specimenTextured);
+            specimen.rotation.x = -Math.PI / 2; specimen.position.y = 0.03; 
+            slideGroup.add(slideGlass, specimen);
+            slideGroup.position.set(0, stageY + 0.15, 1.0);
+            slideGroup.visible = false; 
+            stageGroup.add(slideGroup); // Add slide to stage group so it moves with focus
+
+            // Clips
+            stageGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 2), materials.chrome).position.set(1.8, stageY+0.15, 1.0));
+            stageGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 2), materials.chrome).position.set(-1.8, stageY+0.15, 1.0));
+
+            // Diaphragm
+            const discShape = new THREE.Shape(); discShape.absarc(0, 0, 1.6, 0, Math.PI*2, false);
+            [0.05, 0.10, 0.15, 0.20, 0.25].forEach((size, i) => { const angle = (i/5)*Math.PI*2; const h = new THREE.Path(); h.absarc(Math.cos(angle)*1.3, Math.sin(angle)*1.3, size, 0, Math.PI*2, true); discShape.holes.push(h); });
+            diaphragmDisc = new THREE.Mesh(new THREE.ExtrudeGeometry(discShape, { depth: 0.05, bevelEnabled: false }), materials.bodyBlack);
+            diaphragmDisc.rotation.x = Math.PI / 2; diaphragmDisc.position.set(1.3, stageY - 0.2, 1.0); 
+            stageGroup.add(diaphragmDisc); // Diaphragm also moves with stage
+
+            microscope.add(stageGroup);
+
+            // Arm & Knobs
+            const armGroup = new THREE.Group();
+            const arm = new THREE.Mesh(new THREE.BoxGeometry(2, 9, 2), materials.bodyBlack);
+            arm.position.set(0, 6.5, -2); arm.rotation.x = THREE.MathUtils.degToRad(15); armGroup.add(arm);
+            const knobL = new THREE.Group(); knobL.position.set(-2, 5, -2);
+            knobL.add(new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.8), materials.redKnob).rotateZ(Math.PI/2));
+            knobL.add(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.2), materials.redKnob).rotateZ(Math.PI/2)); armGroup.add(knobL);
+            const knobR = new THREE.Group(); knobR.position.set(2, 5, -2);
+            knobR.add(new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.8), materials.redKnob).rotateZ(Math.PI/2));
+            knobR.add(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.2), materials.redKnob).rotateZ(Math.PI/2)); armGroup.add(knobR);
+            microscope.add(armGroup);
+
+            // Turret
+            const turretConnector = new THREE.Mesh(new THREE.BoxGeometry(2, 1, 3), materials.bodyBlack);
+            turretConnector.position.set(0, 9.0, -0.5); turretConnector.rotation.x = THREE.MathUtils.degToRad(15); microscope.add(turretConnector);
+            turretGroup = new THREE.Group(); turretGroup.position.set(0, 8.2, 1.8);
+            turretGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 0.4, 32), materials.chrome));
+            [0, 1, 2].forEach(i => {
+                const data = MAG_LEVELS[i]; const angle = i === 0 ? 90 : (i === 1 ? 210 : 330); const len = i === 0 ? 1.2 : (i === 1 ? 1.8 : 2.2);
+                const w = new THREE.Group(); const rad = THREE.MathUtils.degToRad(angle); w.position.set(Math.cos(rad)*0.8, -0.2, Math.sin(rad)*0.8);
+                const s = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, len, 32), new THREE.MeshStandardMaterial({ map: createLabelTexture(data.name, data.color), metalness: 0.5, roughness: 0.5 }));
+                s.position.y = -len/2; s.rotation.y = rad - Math.PI/2; 
+                const hitBox = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, len, 8), new THREE.MeshBasicMaterial({visible:false}));
+                hitBox.position.y = -len/2; hitBox.userData = { isObj: true, index: i }; w.add(s, hitBox); turretGroup.add(w); objectives.push(hitBox);
+            });
+            turretGroup.rotation.y = Math.PI; microscope.add(turretGroup);
+
+            // Eyepiece & Mirror
+            const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 4, 32), materials.bodyBlack);
+            tube.position.set(0, 11.0, -0.5); tube.rotation.x = THREE.MathUtils.degToRad(-45);
+            const eyepiece = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.5, 32), materials.yellowPlastic);
+            eyepiece.position.set(0, 2.25, 0); const hole = new THREE.Mesh(new THREE.CircleGeometry(0.35, 32), new THREE.MeshBasicMaterial({color:0x000000}));
+            hole.position.y = 0.26; hole.rotation.x = -Math.PI/2; eyepiece.add(hole); tube.add(eyepiece); microscope.add(tube);
+            const mirrorGroup = new THREE.Group(); mirrorGroup.position.set(0, 2.0, 1);
+            const mirror = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.15, 32), materials.mirror);
+            mirror.rotation.x = THREE.MathUtils.degToRad(30); mirrorGroup.add(mirror); microscope.add(mirrorGroup);
+
+            return microscope;
+        }
+
+        function init() {
+            const container = document.getElementById('container-3d');
+            scene = new THREE.Scene(); scene.background = new THREE.Color(0x1a1a2e);
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(8, 7, 10);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            container.appendChild(renderer.domElement);
+            scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(renderer)).texture;
+            scene.add(new THREE.PointLight(0xffffff, 50).translateY(10));
+
+            const mat = createMaterials();
+            const microscope = buildMicroscope(mat);
+            scene.add(microscope);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 6, 0); controls.enableZoom = true; controls.enableDamping = true;
+
+            raycaster = new THREE.Raycaster(); mouse = new THREE.Vector2();
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix(); renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+            container.addEventListener('click', on3DClick);
+        }
+
+        function update2DView() {
+            if (!state.hasSlide) { slidePlane.style.opacity = 0; previewTarget.style.display = 'none'; return; }
+            slidePlane.style.opacity = 1; previewTarget.style.display = 'block';
+
+            // 1. 移動 (反向)
+            const offsetX = (50 - state.stageX) * 2.0; 
+            const offsetY = (state.stageY - 50) * 2.0; 
+            
+            // 2. 縮放
+            const currentScale = MAG_LEVELS[state.magIndex].scale;
+            
+            // 3. 亮度
+            const brightness = state.lightLevel / 100 * 1.5;
+
+            // 4. 模糊 (Focus)
+            // 目標：Coarse 50, Fine 50 為最清晰 (100分)
+            // Coarse 權重高 (每格偏差 2px blur)，Fine 權重低 (每格偏差 0.1px blur)
+            const coarseDiff = Math.abs(state.focusCoarse - 50);
+            const fineDiff = Math.abs(state.focusFine - 50);
+            
+            // 總模糊度 (0 ~ 100+)
+            let blurAmount = (coarseDiff * 4) + (fineDiff * 0.2);
+            
+            // 應用 CSS
+            slidePlane.style.transform = `scale(${currentScale}) translate(${offsetX}px, ${offsetY}px)`;
+            slidePlane.style.filter = `blur(${blurAmount}px) brightness(${brightness}) contrast(1.2)`;
+
+            previewTarget.style.left = `${state.stageX}%`;
+            previewTarget.style.top = `${100 - state.stageY}%`;
+        }
+
+        function update3DSlidePos() {
+            if(!slideGroup || !stageGroup) return;
+            const x3d = -((state.stageX - 50) / 50) * 2.0; 
+            const z3d = 1.0 + ((state.stageY - 50) / 50) * 1.0; 
+            slideGroup.position.x = x3d; slideGroup.position.z = z3d;
+
+            // 3D 載物台上下移動 (模擬對焦)
+            // Coarse 0~100. 假設 50 是原點。移動範圍 +/- 0.5
+            const stageHeightOffset = (state.focusCoarse - 50) * 0.01;
+            stageGroup.position.y = stageHeightOffset;
+        }
+
+        function setupUI() {
+            window.toggleSlide = () => {
+                state.hasSlide = !state.hasSlide; slideGroup.visible = state.hasSlide;
+                if(state.hasSlide) {
+                    btnSlide.innerText = "📤 取出小粘玻片"; btnSlide.style.background = "#e74c3c";
+                    txtStatus.innerText = "觀測中: 小粘好帥"; txtStatus.style.color = "#2ecc71";
+                } else {
+                    btnSlide.innerText = "📥 放入小粘玻片"; btnSlide.style.background = "#27ae60";
+                    txtStatus.innerText = "無標本"; txtStatus.style.color = "#777";
+                }
+                update2DView();
+            };
+            const onStageMove = () => {
+                state.stageX = parseInt(sliderX.value); state.stageY = parseInt(sliderY.value);
+                update3DSlidePos(); update2DView();
+            };
+            const onFocusChange = () => {
+                state.focusCoarse = parseInt(sliderCoarse.value);
+                state.focusFine = parseInt(sliderFine.value);
+                update3DSlidePos(); update2DView();
+            };
+
+            sliderLight.addEventListener('input', () => {
+                state.lightLevel = parseInt(sliderLight.value);
+                if(diaphragmDisc) diaphragmDisc.rotation.z = THREE.MathUtils.degToRad(state.lightLevel * 3.6);
+                update2DView();
+            });
+            sliderX.addEventListener('input', onStageMove); sliderY.addEventListener('input', onStageMove);
+            sliderCoarse.addEventListener('input', onFocusChange); sliderFine.addEventListener('input', onFocusChange);
+        }
+
+        function on3DClick(event) {
+            const container = document.getElementById('container-3d');
+            mouse.x = (event.clientX / container.clientWidth) * 2 - 1; mouse.y = -(event.clientY / container.clientHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(objectives);
+            if (intersects.length > 0) {
+                const index = intersects[0].object.userData.index; state.magIndex = index;
+                targetTurretRotation = MAG_LEVELS[index].rot;
+                txtMag.innerText = MAG_LEVELS[index].total; txtMag.style.color = MAG_LEVELS[index].color;
+                update2DView();
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate); controls.update();
+            if(turretGroup && Math.abs(targetTurretRotation - turretGroup.rotation.y) > 0.001) 
+                turretGroup.rotation.y += (targetTurretRotation - turretGroup.rotation.y) * 0.1;
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
