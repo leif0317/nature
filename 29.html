@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V21 小粘顯微鏡 (3D反向移動版)</title>
+    <title>V28 小粘顯微鏡 (Y軸視野修正版)</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #1a1a2e; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh;}
         
@@ -13,7 +13,7 @@
             padding: 15px; box-shadow: -5px 0 15px rgba(0,0,0,0.5); min-width: 320px; overflow-y: auto; position: relative;
         }
 
-        /* 左側控制項 */
+        /* Controls */
         .focus-controls { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); display: flex; gap: 15px; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 10px; border: 1px solid #555; z-index: 20; }
         .focus-slider-group { display: flex; flex-direction: column; align-items: center; height: 200px; }
         .focus-label { font-size: 12px; color: #4db8ff; margin-bottom: 5px; font-weight: bold; }
@@ -23,26 +23,23 @@
         .zoom-btn { width: 35px; height: 35px; background: rgba(0,0,0,0.6); color: white; border: 1px solid #555; border-radius: 5px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; user-select: none;}
         .zoom-btn:hover { background: #4db8ff; color: #000; }
 
-        /* 右側 導航圖 */
+        /* Nav Preview */
         .slide-preview-container { width: 200px; height: 60px; background: rgba(255,255,255,0.1); border: 1px solid #555; border-radius: 4px; margin-bottom: 15px; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
         .preview-glass { width: 180px; height: 50px; background: rgba(255,255,255,0.8); border-radius: 2px; position: relative; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
         .preview-content { width: 100px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: black; font-family: 'Times New Roman', serif; text-align: center; overflow: hidden; }
         #preview-target { width: 6px; height: 6px; background: red; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 1px solid white; box-shadow: 0 0 4px red; transition: top 0.1s, left 0.1s; z-index: 10; }
 
-        /* 觀察視窗 */
+        /* Eyepiece View */
         .eyepiece-view { width: 260px; height: 260px; border-radius: 50%; background-color: #000; border: 8px solid #34495e; overflow: hidden; position: relative; margin-bottom: 15px; box-shadow: inset 0 0 60px rgba(0,0,0,1); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
         #slide-plane { width: 260px; height: 260px; position: relative; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.5s; filter: blur(10px); }
 
-        /* 2D 貼圖樣式 */
+        /* Textures */
         .texture-onion { position: absolute; width: 200%; height: 200%; background-color: #e67e22; background-image: linear-gradient(135deg, rgba(255,255,255,0.3) 25%, transparent 25%), linear-gradient(225deg, rgba(255,255,255,0.3) 25%, transparent 25%); background-size: 50px 50px; }
         .text-onion { position: absolute; z-index: 2; color: #000; font-weight: bold; font-size: 24px; pointer-events: none; font-family: 'Microsoft JhengHei'; }
-        
         .texture-letter { position: absolute; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.9); display: flex; align-items: center; justify-content: center; color: black; font-family: 'Times New Roman', serif; font-size: 80px; font-weight: bold; letter-spacing: 5px; }
-        
         .human-figure-container { position: relative; width: 100px; height: 200px; display: flex; justify-content: center; align-items: center; }
         .human-body { font-size: 150px; line-height: 1; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5)); }
         .hidden-flower { position: absolute; font-size: 10px; color: #e74c3c; opacity: 0; transition: opacity 0.3s ease-in-out; pointer-events: none; }
-
         .pointer { position: absolute; top: 50%; left: 50%; width: 80px; height: 2px; background: rgba(0,0,0,0.7); transform: rotate(-45deg); transform-origin: left; pointer-events: none; z-index: 10; }
 
         /* UI */
@@ -73,8 +70,8 @@
 
     <div id="container-3d">
         <div id="info-overlay">
-            <h1>🔬 V21 小粘顯微鏡</h1>
-            <p style="font-size: 0.8em; color: #ffd700;">3D 顯微鏡模擬器 </p>
+            <h1>🔬 3D複試顯微鏡</h1>
+            <p style="font-size: 0.8em; color: #ffd700;">觀察影像移動方向</p>
         </div>
         
         <div class="focus-controls">
@@ -129,7 +126,7 @@
                 <div style="flex:1; text-align:center;">
                     <label>◀ 左 --- 右 ▶</label>
                     <input type="range" id="stage-x" min="0" max="100" value="50">
-                    <small style="color:#e74c3c; display:block; margin-top:5px; font-size:0.8em;">(玻片右移 ➔ 視野左移)</small>
+                    <small style="color:#e74c3c; display:block; margin-top:5px; font-size:0.8em;">(XY軸視野移動皆相反)</small>
                 </div>
             </div>
         </div>
@@ -248,7 +245,10 @@
             const slideGlass = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.05, 0.8), materials.slideGlass);
             const specimenGeo = new THREE.CircleGeometry(0.25, 32);
             specimenMesh = new THREE.Mesh(specimenGeo, materials.specimenMat); 
-            specimenMesh.rotation.x = -Math.PI / 2; specimenMesh.position.y = 0.03; 
+            // V27/V28: 3D 玻片圖案顛倒 (Z軸轉 180度)
+            specimenMesh.rotation.x = -Math.PI / 2; 
+            specimenMesh.rotation.z = Math.PI; 
+            specimenMesh.position.y = 0.03; 
             slideGroup.add(slideGlass, specimenMesh);
             slideGroup.position.set(0, stageY + 0.15, 1.0);
             slideGroup.visible = false; stageGroup.add(slideGroup);
@@ -352,19 +352,25 @@
                 missionHint.style.display = 'block';
             }
 
-            // 2D 視野保持 V20 的物理正確倒像 (滑桿右 -> 視野左)
+            // V27: X軸 (滑桿右 -> 視野左)
             const offsetX = (state.stageX - 50) * 2.0; 
-            const offsetY = (state.stageY - 50) * 2.0; 
+            
+            // V28 修正：Y軸 (滑桿前 -> 視野前/上)
+            // 滑桿前(100) -> 偏移負值 -> 轉180(座標軸向下) -> 負值代表向上移動
+            const offsetY = -(state.stageY - 50) * 2.0; 
+            
             const currentScale = MAG_LEVELS[state.magIndex].scale;
             const brightness = state.lightLevel / 100 * 1.5;
-            const coarseDiff = Math.abs(state.focusCoarse - 50); const fineDiff = Math.abs(state.focusFine - 50);
-            let blurAmount = (coarseDiff * 4) + (fineDiff * 0.2);
             
+            // V26: 完美對焦依然有輕微模糊
+            let focalPlane = 50.4; 
+            let currentFocus = state.focusCoarse + (state.focusFine - 50) * 0.05;
+            let focusDist = Math.abs(currentFocus - focalPlane);
+            let blurAmountFinal = focusDist * 10;
+
             slidePlane.style.transform = `rotate(180deg) scale(${currentScale}) translate(${offsetX}px, ${offsetY}px)`;
-            slidePlane.style.filter = `blur(${blurAmount}px) brightness(${brightness}) contrast(1.2)`;
-            
-            previewTarget.style.left = `${state.stageX}%`; 
-            previewTarget.style.top = `${100 - state.stageY}%`;
+            slidePlane.style.filter = `blur(${blurAmountFinal}px) brightness(${brightness}) contrast(1.2)`;
+            previewTarget.style.left = `${state.stageX}%`; previewTarget.style.top = `${100 - state.stageY}%`;
 
             if (state.slideType === 'human-flowers') {
                 const flowers = slidePlane.querySelectorAll('.hidden-flower');
@@ -378,13 +384,11 @@
             }
         }
 
-        // V21 修改：3D 玻片移動方向反轉
+        // 3D 玻片移動 (反向) - 保持 V26/V27 邏輯
         function update3DSlidePos() {
             if(!slideGroup || !stageGroup) return;
-            // 滑桿右(100) -> 3D左(-X)
-            const x3d = -((state.stageX - 50) / 50) * 2.0; // 加上負號
-            // 滑桿前(100) -> 3D後(Z減少)
-            const z3d = 1.0 - ((state.stageY - 50) / 50) * 1.0; // 將 + 改為 -
+            const x3d = -((state.stageX - 50) / 50) * 2.0; 
+            const z3d = 1.0 + ((state.stageY - 50) / 50) * 1.0; 
             slideGroup.position.x = x3d; slideGroup.position.z = z3d;
             const stageHeightOffset = (state.focusCoarse - 50) * 0.01;
             stageGroup.position.y = stageHeightOffset;
