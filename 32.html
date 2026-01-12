@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>國中理化：金屬活性與化學反應虛擬實驗室</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            scroll-behavior: smooth;
+        }
+
+        /* 氣泡動畫 */
+        @keyframes floatUp {
+            0% { bottom: 0; opacity: 0; transform: scale(0.5); }
+            50% { opacity: 1; }
+            100% { bottom: 100%; opacity: 0; transform: scale(1.2); }
+        }
+        .bubble {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(148, 163, 184, 0.8);
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 40;
+        }
+        
+        /* 金屬析出物動畫（淡入） */
+        @keyframes precipitate {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .precipitate-layer {
+            animation: precipitate 2s ease-in forwards;
+        }
+
+        /* 燒杯液體過度效果 */
+        .liquid-color {
+            transition: background-color 1.5s ease;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex flex-col min-h-screen">
+
+    <header class="bg-blue-600 text-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4 md:gap-0">
+            
+            <div class="flex items-center gap-3">
+                <h1 class="text-xl md:text-2xl font-bold flex items-center gap-2">
+                    🧪 國中理化：金屬活性大作戰
+                </h1>
+                <span class="bg-blue-800 text-blue-100 text-xs px-2 py-1 rounded border border-blue-400 font-medium tracking-wide shadow-sm transform hover:scale-105 transition cursor-default">
+                    小粘製作
+                </span>
+            </div>
+
+            <nav class="hidden md:block">
+                <ul class="flex space-x-6 text-sm font-medium">
+                    <li><a href="#concept" class="hover:text-blue-200 transition">活性觀念</a></li>
+                    <li><a href="#lab" class="hover:text-blue-200 transition">虛擬實驗</a></li>
+                    <li><a href="#quiz" class="hover:text-blue-200 transition">隨堂測驗</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8 space-y-12 flex-grow">
+
+        <section id="concept" class="bg-white rounded-2xl shadow-md p-6">
+            <div class="mb-6 border-l-4 border-yellow-400 pl-4">
+                <h2 class="text-2xl font-bold text-slate-800">1. 金屬活性序 (Activity Series)</h2>
+                <p class="text-slate-600 mt-2">
+                    金屬活性代表金屬失去電子的傾向。活性由左至右遞減。<br>
+                    <strong class="text-blue-600">特別注意：氫 (H) 的位置</strong>，排在氫前面的金屬可與酸反應產生氫氣。
+                </p>
+            </div>
+
+            <div class="overflow-x-auto pb-4">
+                <div class="flex space-x-4 min-w-max px-2" id="element-container">
+                    </div>
+            </div>
+            
+            <div class="mt-4 p-4 bg-blue-50 rounded-lg text-sm text-blue-800">
+                💡 <strong>小提示：</strong> 請找找看「氫 (H)」在哪裡？它是判斷金屬是否會跟酸反應的重要分界線喔！
+            </div>
+        </section>
+
+        <section id="lab" class="bg-white rounded-2xl shadow-md p-6">
+            <div class="mb-6 border-l-4 border-green-500 pl-4">
+                <h2 class="text-2xl font-bold text-slate-800">2. 虛擬實驗室</h2>
+                <p class="text-slate-600 mt-2">選擇一種金屬和一種溶液，觀察置換反應的現象。</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-1 space-y-6">
+                    <div>
+                        <h3 class="text-lg font-semibold mb-3 flex items-center">
+                            <span class="bg-slate-200 text-slate-700 rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">1</span>
+                            選擇金屬
+                        </h3>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="selectMetal('Mg')" id="btn-Mg" class="metal-btn p-3 border-2 rounded-lg hover:bg-slate-50 transition text-center focus:outline-none">
+                                <div class="font-bold text-xl">Mg</div>
+                                <div class="text-xs text-slate-500">鎂帶</div>
+                            </button>
+                            <button onclick="selectMetal('Zn')" id="btn-Zn" class="metal-btn p-3 border-2 rounded-lg hover:bg-slate-50 transition text-center focus:outline-none">
+                                <div class="font-bold text-xl">Zn</div>
+                                <div class="text-xs text-slate-500">鋅片</div>
+                            </button>
+                            <button onclick="selectMetal('Cu')" id="btn-Cu" class="metal-btn p-3 border-2 rounded-lg hover:bg-slate-50 transition text-center focus:outline-none">
+                                <div class="font-bold text-xl">Cu</div>
+                                <div class="text-xs text-slate-500">銅片</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-semibold mb-3 flex items-center">
+                            <span class="bg-slate-200 text-slate-700 rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">2</span>
+                            選擇溶液
+                        </h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="selectSolution('HCl')" id="btn-HCl" class="solution-btn p-3 border-2 rounded-lg hover:bg-slate-50 transition text-center focus:outline-none">
+                                <div class="font-bold text-lg">HCl</div>
+                                <div class="text-xs text-slate-500">稀鹽酸</div>
+                            </button>
+                            <button onclick="selectSolution('CuSO4')" id="btn-CuSO4" class="solution-btn p-3 border-2 rounded-lg hover:bg-slate-50 transition text-center focus:outline-none">
+                                <div class="font-bold text-lg">CuSO₄</div>
+                                <div class="text-xs text-slate-500">硫酸銅</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button onclick="startReaction()" id="start-btn" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        開始反應
+                    </button>
+                    
+                    <button onclick="resetLab()" class="w-full py-2 text-slate-500 underline text-sm hover:text-slate-700">
+                        重置實驗
+                    </button>
+                </div>
+
+                <div class="lg:col-span-2 bg-slate-100 rounded-xl p-6 flex flex-col items-center justify-center relative min-h-[400px]">
+                    
+                    <div class="relative w-48 h-64 border-b-4 border-l-4 border-r-4 border-slate-300 rounded-b-xl bg-white overflow-hidden shadow-inner">
+                        <div id="beaker-liquid" class="liquid-color absolute bottom-0 left-0 w-full h-3/4 bg-slate-200 opacity-80 transition-colors duration-1000"></div>
+                        
+                        <div id="precipitate-layer" class="hidden absolute bottom-4 left-1/2 transform -translate-x-1/2 w-16 h-16 bg-red-800 rounded opacity-80 z-20"></div>
+
+                        <div id="metal-display" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-16 h-8 bg-gray-400 border border-gray-500 shadow-md transition-all duration-500 z-10 hidden">
+                            <span class="flex justify-center items-center h-full text-xs font-bold text-white shadow-text" id="metal-label"></span>
+                        </div>
+
+                        <div id="bubble-container" class="absolute bottom-12 left-0 w-full h-1/2 overflow-hidden pointer-events-none z-30"></div>
+                    </div>
+                    
+                    <div id="result-text" class="mt-6 p-4 bg-white rounded-lg shadow-sm w-full border border-slate-200 hidden">
+                        <h4 class="font-bold text-lg mb-1" id="result-title">實驗結果</h4>
+                        <p class="text-slate-600" id="result-desc"></p>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <section id="quiz" class="bg-white rounded-2xl shadow-md p-6">
+            <div class="mb-6 border-l-4 border-red-500 pl-4">
+                <h2 class="text-2xl font-bold text-slate-800">3. 隨堂小測驗</h2>
+                <p class="text-slate-600 mt-2">測試看看你是否掌握了活性大小的概念！</p>
+            </div>
+
+            <div id="quiz-container" class="space-y-6">
+                </div>
+            
+            <div id="quiz-result" class="mt-6 hidden p-4 bg-green-100 text-green-800 rounded-lg text-center font-bold">
+                </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-slate-800 text-slate-300 py-6 mt-12 text-center">
+        <div class="container mx-auto px-4">
+            <p class="text-sm">© 2024 國中理化互動教學模組 | 專為教學演示設計</p>
+        </div>
+    </footer>
+
+    <script>
+        // ==========================================
+        // 1. 觀念圖卡資料與渲染
+        // ==========================================
+        const elements = [
+            { symbol: 'K', name: '鉀', color: 'bg-purple-100 border-purple-300', desc: '活性極大，放入水中會劇烈燃燒，需保存在礦物油中。' },
+            { symbol: 'Na', name: '鈉', color: 'bg-purple-100 border-purple-300', desc: '活性大，放入水中會產生氫氣並游動，需保存在礦物油中。' },
+            { symbol: 'Ca', name: '鈣', color: 'bg-red-100 border-red-300', desc: '活性稍大，與水反應產生氫氣，溶液呈鹼性。' },
+            { symbol: 'Mg', name: '鎂', color: 'bg-orange-100 border-orange-300', desc: '燃燒時發出強烈白光，可與熱水或酸劇烈反應。' },
+            { symbol: 'Al', name: '鋁', color: 'bg-orange-100 border-orange-300', desc: '表面易形成緻密氧化層保護內部，故抗腐蝕。' },
+            { symbol: 'Zn', name: '鋅', color: 'bg-yellow-100 border-yellow-300', desc: '常見金屬，與酸反應速率適中，常作為實驗室製氫氣來源。' },
+            { symbol: 'Fe', name: '鐵', color: 'bg-yellow-100 border-yellow-300', desc: '在潮濕空氣中易生鏽，與稀酸反應產生氫氣。' },
+            // 氫 (H)
+            { symbol: 'H', name: '氫', color: 'bg-gray-200 border-gray-400', desc: '【非金屬】酸的活性參考點。排在它前面的金屬可與稀酸反應產生氫氣。' },
+            { symbol: 'Cu', name: '銅', color: 'bg-green-100 border-green-300', desc: '活性小於氫，故不與稀鹽酸反應，導電性極佳。' },
+            { symbol: 'Ag', name: '銀', color: 'bg-blue-100 border-blue-300', desc: '活性極小，易與硫化物反應變黑。' },
+            { symbol: 'Au', name: '金', color: 'bg-slate-100 border-slate-300', desc: '活性最小，化學性質最穩定，永不生鏽。' }
+        ];
+
+        const container = document.getElementById('element-container');
+
+        elements.forEach(el => {
+            const card = document.createElement('div');
+            const isNonMetal = el.symbol === 'H';
+            const shapeClass = isNonMetal ? 'rounded-full border-dashed' : 'rounded-xl';
+            const ringClass = isNonMetal ? 'ring-2 ring-slate-400' : '';
+
+            card.className = `group relative flex-shrink-0 w-24 h-32 ${el.color} ${shapeClass} ${ringClass} border-2 flex flex-col items-center justify-center cursor-pointer hover:scale-105 transition-transform shadow-sm`;
+            card.innerHTML = `
+                <span class="text-3xl font-bold text-slate-800">${el.symbol}</span>
+                <span class="text-sm text-slate-600">${el.name}</span>
+                
+                <div class="absolute bottom-full mb-2 w-48 bg-slate-800 text-white text-xs p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center">
+                    ${el.desc}
+                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+        // ==========================================
+        // 2. 虛擬實驗室邏輯
+        // ==========================================
+        let selectedMetal = null;
+        let selectedSolution = null;
+
+        const metalData = {
+            'Mg': { name: '鎂', color: '#C0C0C0' },
+            'Zn': { name: '鋅', color: '#708090' },
+            'Cu': { name: '銅', color: '#B87333' }
+        };
+
+        const solutionData = {
+            'HCl': { name: '稀鹽酸', color: 'bg-transparent', displayColor: 'rgba(148, 163, 184, 0.5)' }, 
+            'CuSO4': { name: '硫酸銅', color: 'bg-blue-400', displayColor: 'rgba(59, 130, 246, 0.6)' }
+        };
+
+        function selectMetal(metal) {
+            selectedMetal = metal;
+            document.querySelectorAll('.metal-btn').forEach(btn => btn.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50'));
+            document.getElementById(`btn-${metal}`).classList.add('ring-2', 'ring-blue-500', 'bg-blue-50');
+            checkStartButton();
+            
+            const display = document.getElementById('metal-display');
+            display.style.backgroundColor = metalData[metal].color;
+            display.classList.remove('hidden');
+            document.getElementById('metal-label').innerText = metal;
+        }
+
+        function selectSolution(sol) {
+            selectedSolution = sol;
+            document.querySelectorAll('.solution-btn').forEach(btn => btn.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50'));
+            document.getElementById(`btn-${sol}`).classList.add('ring-2', 'ring-blue-500', 'bg-blue-50');
+            
+            const liquid = document.getElementById('beaker-liquid');
+            liquid.style.backgroundColor = solutionData[sol].displayColor;
+            
+            checkStartButton();
+        }
+
+        function checkStartButton() {
+            if (selectedMetal && selectedSolution) {
+                document.getElementById('start-btn').disabled = false;
+            }
+        }
+
+        function resetLab() {
+            selectedMetal = null;
+            selectedSolution = null;
+            
+            document.querySelectorAll('.metal-btn, .solution-btn').forEach(btn => btn.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50'));
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('metal-display').classList.add('hidden');
+            document.getElementById('beaker-liquid').style.backgroundColor = 'rgba(230, 240, 255, 0.3)';
+            document.getElementById('bubble-container').innerHTML = '';
+            document.getElementById('precipitate-layer').className = 'hidden absolute bottom-4 left-1/2 transform -translate-x-1/2 w-16 h-16 bg-red-800 rounded opacity-80 z-20';
+            document.getElementById('result-text').classList.add('hidden');
+            
+            const display = document.getElementById('metal-display');
+            display.style.transform = 'translate(-50%, 0)';
+            display.style.opacity = '1';
+        }
+
+        function createBubbles(intensity) {
+            const container = document.getElementById('bubble-container');
+            container.innerHTML = '';
+            
+            let count = 0;
+            let intervalTime = 0;
+            
+            if (intensity === 'high') { count = 40; intervalTime = 50; }
+            else if (intensity === 'medium') { count = 20; intervalTime = 150; }
+            else { return; }
+
+            let i = 0;
+            const interval = setInterval(() => {
+                if (i >= count) { clearInterval(interval); return; }
+                
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble';
+                const size = Math.random() * 12 + 6;
+                bubble.style.width = `${size}px`;
+                bubble.style.height = `${size}px`;
+                bubble.style.left = `${Math.random() * 80 + 10}%`;
+                bubble.style.animation = `floatUp ${Math.random() * 1 + 1}s linear`;
+                
+                container.appendChild(bubble);
+                setTimeout(() => bubble.remove(), 2000);
+                i++;
+            }, intervalTime);
+        }
+
+        function startReaction() {
+            if (!selectedMetal || !selectedSolution) return;
+
+            document.getElementById('bubble-container').innerHTML = '';
+            document.getElementById('precipitate-layer').classList.add('hidden');
+            const resultBox = document.getElementById('result-text');
+            const resultTitle = document.getElementById('result-title');
+            const resultDesc = document.getElementById('result-desc');
+            const liquid = document.getElementById('beaker-liquid');
+            
+            resultBox.classList.remove('hidden');
+            
+            if (selectedSolution === 'HCl') {
+                if (selectedMetal === 'Mg') {
+                    resultTitle.innerHTML = '🔥 反應劇烈！';
+                    resultDesc.innerHTML = '鎂的活性遠大於<strong>氫(H)</strong>，反應非常劇烈，產生大量無色無味的<strong>氫氣</strong>氣泡。<br>方程式：Mg + 2HCl → MgCl₂ + H₂↑';
+                    createBubbles('high');
+                } else if (selectedMetal === 'Zn') {
+                    resultTitle.innerHTML = '⚡ 反應溫和';
+                    resultDesc.innerHTML = '鋅的活性大於<strong>氫(H)</strong>，產生穩定的<strong>氫氣</strong>氣泡。<br>方程式：Zn + 2HCl → ZnCl₂ + H₂↑';
+                    createBubbles('medium');
+                } else if (selectedMetal === 'Cu') {
+                    resultTitle.innerHTML = '❌ 沒有反應';
+                    resultDesc.innerHTML = '銅排在<strong>氫(H)</strong>的後面，活性較小，因此無法置換出酸中的氫，不會產生氣泡。';
+                }
+            } else if (selectedSolution === 'CuSO4') {
+                if (selectedMetal === 'Mg') {
+                    resultTitle.innerHTML = '🧪 發生置換反應';
+                    resultDesc.innerHTML = '鎂的活性大於銅，置換出銅金屬。你會看到溶液藍色逐漸變淡，金屬表面附著<strong>紅棕色固體(銅)</strong>。<br>方程式：Mg + CuSO₄ → MgSO₄ + Cu';
+                    
+                    liquid.style.backgroundColor = 'rgba(230, 240, 255, 0.4)';
+                    setTimeout(() => {
+                        const ppt = document.getElementById('precipitate-layer');
+                        ppt.classList.remove('hidden');
+                        ppt.classList.add('precipitate-layer');
+                    }, 500);
+
+                } else if (selectedMetal === 'Zn') {
+                    resultTitle.innerHTML = '🧪 發生置換反應';
+                    resultDesc.innerHTML = '鋅的活性大於銅，置換出銅金屬。溶液藍色變淡，金屬表面附著<strong>紅棕色固體(銅)</strong>。<br>方程式：Zn + CuSO₄ → ZnSO₄ + Cu';
+                    
+                    liquid.style.backgroundColor = 'rgba(230, 240, 255, 0.4)';
+                    setTimeout(() => {
+                        const ppt = document.getElementById('precipitate-layer');
+                        ppt.classList.remove('hidden');
+                        ppt.classList.add('precipitate-layer');
+                    }, 500);
+
+                } else if (selectedMetal === 'Cu') {
+                    resultTitle.innerHTML = '❌ 沒有反應';
+                    resultDesc.innerHTML = '銅放入硫酸銅溶液中，因為是相同元素，不會發生化學反應。';
+                }
+            }
+        }
+
+        // ==========================================
+        // 3. 測驗邏輯
+        // ==========================================
+        const questions = [
+            {
+                q: '1. 下列哪一種金屬的活性最大，放入水中會產生劇烈反應？',
+                options: ['銅 (Cu)', '鐵 (Fe)', '鉀 (K)', '金 (Au)'],
+                ans: 2
+            },
+            {
+                q: '2. 將鋅片放入硫酸銅溶液中，會觀察到什麼現象？',
+                options: ['產生大量氣泡', '鋅片表面有紅棕色銅析出', '溶液變成深藍色', '沒有任何反應'],
+                ans: 1
+            },
+            {
+                q: '3. 銅片放入稀鹽酸中，為什麼沒有氣泡產生？',
+                options: ['因為銅的活性比氫小', '因為銅太硬了', '因為鹽酸濃度太低', '因為銅表面有氧化層'],
+                ans: 0
+            }
+        ];
+
+        const quizContainer = document.getElementById('quiz-container');
+
+        questions.forEach((item, index) => {
+            const qDiv = document.createElement('div');
+            qDiv.className = 'border-b border-slate-200 pb-4 last:border-0';
+            
+            let optionsHtml = '';
+            item.options.forEach((opt, i) => {
+                optionsHtml += `
+                    <label class="flex items-center space-x-3 cursor-pointer p-2 rounded hover:bg-slate-50">
+                        <input type="radio" name="q${index}" value="${i}" class="form-radio text-blue-600 h-4 w-4">
+                        <span class="text-slate-700">${opt}</span>
+                    </label>
+                `;
+            });
+
+            qDiv.innerHTML = `
+                <p class="font-bold text-lg mb-3 text-slate-800">${item.q}</p>
+                <div class="space-y-1 pl-2">
+                    ${optionsHtml}
+                </div>
+                <div id="feedback-${index}" class="mt-2 text-sm font-bold hidden"></div>
+            `;
+            quizContainer.appendChild(qDiv);
+        });
+
+        const submitBtn = document.createElement('button');
+        submitBtn.innerText = '送出答案';
+        submitBtn.className = 'mt-4 px-6 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded shadow transition';
+        submitBtn.onclick = checkQuiz;
+        quizContainer.appendChild(submitBtn);
+
+        function checkQuiz() {
+            let score = 0;
+            questions.forEach((item, index) => {
+                const radios = document.getElementsByName(`q${index}`);
+                let val = -1;
+                radios.forEach(r => { if(r.checked) val = parseInt(r.value); });
+                
+                const feedback = document.getElementById(`feedback-${index}`);
+                feedback.classList.remove('hidden', 'text-green-600', 'text-red-500');
+                
+                if (val === item.ans) {
+                    score++;
+                    feedback.innerText = '✅ 答對了！';
+                    feedback.classList.add('text-green-600');
+                } else {
+                    feedback.innerText = `❌ 答錯了，正確答案是：${item.options[item.ans]}`;
+                    feedback.classList.add('text-red-500');
+                }
+            });
+
+            const resultDiv = document.getElementById('quiz-result');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `你的得分： ${score} / ${questions.length}`;
+        }
+    </script>
+</body>
+</html>
