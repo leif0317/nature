@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V27 雙眼解剖顯微鏡 </title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #2c3e50; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh;}
+        
+        #container-3d { flex: 2; position: relative; border-right: 2px solid #444; overflow: hidden; cursor: crosshair; }
+        #panel-2d { 
+            flex: 1; background: #1e1e1e; display: flex; flex-direction: column; align-items: center; 
+            padding: 15px; box-shadow: -5px 0 15px rgba(0,0,0,0.5); min-width: 420px; overflow-y: auto; position: relative;
+        }
+
+        /* Tooltip */
+        #tooltip {
+            position: absolute; background-color: rgba(0, 0, 0, 0.85); color: #f1c40f;
+            padding: 6px 10px; border-radius: 4px; border: 1px solid #f1c40f;
+            font-size: 13px; pointer-events: none; display: none; z-index: 100;
+            white-space: nowrap; transform: translate(15px, 15px);
+        }
+
+        /* 雙眼視野 */
+        .binocular-container {
+            width: 380px; height: 380px; position: relative; margin-bottom: 15px;
+            display: flex; justify-content: center; align-items: center;
+            background: #111; border-radius: 10px; border: 2px solid #555; overflow: hidden; flex-shrink: 0;
+        }
+        .viewport {
+            width: 340px; height: 340px; border-radius: 50%; border: 5px solid #333; 
+            position: absolute; top: 15px; overflow: hidden;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.9); background-color: #000;
+            mix-blend-mode: screen; transition: transform 0.1s, filter 0.1s;
+        }
+        .view-left { left: 50%; transform: translateX(-50%); z-index: 10; border-color: #e74c3c;} 
+        .view-right { left: 50%; transform: translateX(-50%); z-index: 10; border-color: #3498db;} 
+        .view-image { width: 100%; height: 100%; background-size: cover; background-position: center; transform-origin: center; }
+
+        /* UI Controls */
+        .control-group { width: 100%; margin-bottom: 12px; background: #2b2b2b; padding: 10px; border-radius: 8px; box-sizing: border-box;}
+        h3 { margin-top: 0; color: #f1c40f; border-bottom: 1px solid #444; padding-bottom: 5px; font-size: 0.9em;}
+        label { display: block; margin-top: 5px; color: #ccc; font-size: 0.8em; display: flex; justify-content: space-between;}
+        button.btn-main { width: 100%; padding: 8px; margin-bottom: 5px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s;}
+        .btn-active { background: #27ae60; color: white; box-shadow: 0 0 10px rgba(46, 204, 113, 0.5); }
+        input[type=range] { width: 100%; cursor: pointer; accent-color: #f1c40f; margin: 5px 0;}
+
+        /* Side Sliders (3D Overlay) */
+        .side-controls { 
+            position: absolute; left: 20px; top: 50%; transform: translateY(-50%); 
+            display: flex; gap: 15px; z-index: 20; 
+            background: rgba(0,0,0,0.3); padding: 10px; border-radius: 15px;
+        }
+        .slider-v-group { display: flex; flex-direction: column; align-items: center; height: 280px; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 10px; border: 1px solid #555;}
+        .slider-v-group label { writing-mode: vertical-rl; text-orientation: mixed; margin-bottom: 10px; color: #fff; font-weight: bold; font-size: 12px;}
+        input[type=range][orient=vertical] { writing-mode: bt-lr; -webkit-appearance: slider-vertical; width: 8px; height: 100%; }
+
+        #info-overlay { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); z-index: 10; }
+        #signature { position: absolute; bottom: 20px; right: 20px; color: #f1c40f; font-size: 1.2em; font-weight: bold; pointer-events: none; text-shadow: 1px 1px 2px black;}
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="container-3d">
+        <div id="tooltip"></div>
+        <div id="info-overlay">
+            <h1>🔬 V27 專業解剖顯微鏡</h1>
+            <p style="font-size: 0.9em; color: #ddd;">正立立體影像</p>
+        </div>
+        
+        <div class="side-controls">
+            <div class="slider-v-group">
+                <label style="color:#f1c40f;">調節輪 (Focus)</label>
+                <input type="range" id="focus-knob" min="0" max="100" value="40" orient="vertical">
+            </div>
+            <div class="slider-v-group">
+                <label style="color:#e74c3c;">眼焦調整器 (Diopter)</label>
+                <input type="range" id="diopter-knob" min="-30" max="30" value="20" orient="vertical">
+            </div>
+            <div class="slider-v-group">
+                <label style="color:#3498db;">倍率調整輪 (Zoom)</label>
+                <input type="range" id="zoom-knob" min="1" max="4" step="0.1" value="1" orient="vertical">
+            </div>
+            <div class="slider-v-group">
+                <label style="color:#2ecc71;">眼距調整器 (IPD)</label>
+                <input type="range" id="ipd-knob" min="0" max="100" value="30" orient="vertical">
+            </div>
+        </div>
+    </div>
+
+    <div id="panel-2d">
+        <h3>👁️ 雙眼視野 (正像)</h3>
+        <div class="binocular-container">
+            <div class="viewport view-left" id="vp-left">
+                <div class="view-image" id="img-left"></div>
+            </div>
+            <div class="viewport view-right" id="vp-right">
+                <div class="view-image" id="img-right"></div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <h3>1. 標本與光源</h3>
+            <button class="btn-main btn-active">🪰 蒼蠅 (Musca domestica)</button>
+            <label>上光源亮度 (Top Light)</label>
+            <input type="range" id="light-control" min="0" max="100" value="80">
+        </div>
+
+        <div class="control-group">
+            <h3>2. 載物台移動</h3>
+            <label><span>左</span> <span>右</span></label>
+            <input type="range" id="stage-x" min="0" max="100" value="50">
+            <label><span>前</span> <span>後</span></label>
+            <input type="range" id="stage-y" min="0" max="100" value="50">
+            <small style="color:#f1c40f; font-size:0.8em; display:block; margin-top:5px;">(影像移動方向與控制桿相同)</small>
+        </div>
+        <div id="signature">小粘製作</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+        // 全域變數宣告
+        let camera, scene, renderer, controls;
+        let microscopeHead, specimenGroup, topLight, bulbMesh; 
+        let tubeL, tubeR, diopterRing, zoomRing, focusKnobL, focusKnobR;
+        let flyModel;
+        
+        // Raycaster
+        let raycaster, mouse;
+        const interactiveObjects = [];
+        const tooltip = document.getElementById('tooltip');
+
+        let state = {
+            focus: 40, diopter: 20, zoom: 1.0, 
+            stageX: 50, stageY: 50, light: 80, ipd: 30
+        };
+
+        // DOM Elements
+        let vpLeft, vpRight, imgLeft, imgRight;
+        
+        init(); 
+        
+        function init() {
+            const container = document.getElementById('container-3d');
+            scene = new THREE.Scene(); scene.background = new THREE.Color(0x2c3e50);
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(0, 8, 12);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            container.appendChild(renderer.domElement);
+            
+            raycaster = new THREE.Raycaster(); mouse = new THREE.Vector2();
+            container.addEventListener('mousemove', onMouseMove, false);
+
+            scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(renderer)).texture;
+            
+            const mats = createMaterials(); 
+            scene.add(buildMicroscope(mats));
+            
+            specimenGroup = new THREE.Group(); specimenGroup.position.set(0, 0.6, 1); scene.add(specimenGroup);
+            flyModel = createFlyModel(mats); specimenGroup.add(flyModel);
+            
+            controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 3, 0); controls.enableDamping = true;
+            window.addEventListener('resize', () => { camera.aspect = container.clientWidth / container.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(container.clientWidth, container.clientHeight); });
+
+            setTimeout(() => {
+                setupUI();
+                generateFlyImage();
+                updateView(); 
+                animate();
+            }, 100);
+        }
+
+        function createMaterials() {
+            return {
+                bodyWhite: new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.2 }),
+                metalBlack: new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4 }),
+                chrome: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.0, metalness: 1.0 }),
+                flyBody: new THREE.MeshStandardMaterial({ color: 0x111111 }),
+                flyEye: new THREE.MeshStandardMaterial({ color: 0xaa0000, flatShading: true, metalness: 0.5 }),
+                wing: new THREE.MeshPhysicalMaterial({ color: 0xffffff, transmission: 0.9, opacity: 0.6, transparent: true, side: THREE.DoubleSide }),
+                bulbOn: new THREE.MeshBasicMaterial({ color: 0xffffee }),
+                knurled: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 })
+            };
+        }
+
+        function addInteractive(mesh, name) {
+            mesh.name = name; interactiveObjects.push(mesh);
+        }
+
+        function buildMicroscope(mats) {
+            const scope = new THREE.Group();
+            
+            const base = new THREE.Mesh(new THREE.BoxGeometry(6, 0.5, 8), mats.bodyWhite); base.position.y = 0.25; scope.add(base);
+            const knobGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+            const lightKnob1 = new THREE.Mesh(knobGeo, mats.metalBlack); lightKnob1.position.set(-2, 0.65, 3); scope.add(lightKnob1);
+            const lightKnob2 = new THREE.Mesh(knobGeo, mats.metalBlack); lightKnob2.position.set(2, 0.65, 3); scope.add(lightKnob2);
+            addInteractive(lightKnob1, "光源調節輪"); addInteractive(lightKnob2, "光源調節輪");
+
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 8), mats.chrome); post.position.set(0, 4, -2.5); scope.add(post); 
+            const plate = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.1), mats.metalBlack); plate.position.set(0, 0.55, 1); scope.add(plate);
+            addInteractive(plate, "載物台");
+            
+            microscopeHead = new THREE.Group(); microscopeHead.position.set(0, 4, 0);
+            const block = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 3), mats.metalBlack); block.position.set(0, 0, -2.5); microscopeHead.add(block);
+            
+            const focusKnobGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.5, 16);
+            focusKnobL = new THREE.Mesh(focusKnobGeo, mats.metalBlack); focusKnobL.rotation.z = Math.PI/2; focusKnobL.position.set(-1.2, 0, -2.5);
+            microscopeHead.add(focusKnobL); addInteractive(focusKnobL, "調節輪");
+            
+            focusKnobR = new THREE.Mesh(focusKnobGeo, mats.metalBlack); focusKnobR.rotation.z = Math.PI/2; focusKnobR.position.set(1.2, 0, -2.5);
+            microscopeHead.add(focusKnobR); addInteractive(focusKnobR, "調節輪");
+
+            const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3.5), mats.bodyWhite); arm.rotation.x = Math.PI/2; arm.position.set(0, 0, -1); microscopeHead.add(arm);
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.0, 3.5), mats.bodyWhite); body.position.set(0, 0, 1.5); microscopeHead.add(body);
+            
+            const objCover = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.8, 0.2), mats.metalBlack); objCover.position.set(0, -1.8, 1.5); microscopeHead.add(objCover);
+            addInteractive(objCover, "物鏡");
+
+            zoomRing = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 0.6, 24), mats.knurled);
+            zoomRing.position.set(0, -1.2, 1.5); microscopeHead.add(zoomRing);
+            addInteractive(zoomRing, "倍率調節輪");
+
+            tubeL = new THREE.Group(); tubeL.rotation.x = Math.PI/4; tubeL.position.set(-0.6, 2.0, 1.5);
+            const tMeshL = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.5), mats.metalBlack); tMeshL.position.set(0, 0, 0); 
+            const eyeMeshL = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5), mats.metalBlack); eyeMeshL.position.set(0, 1.3, 0); 
+            tubeL.add(tMeshL, eyeMeshL); addInteractive(eyeMeshL, "目鏡");
+
+            tubeR = new THREE.Group(); tubeR.rotation.x = Math.PI/4; tubeR.position.set(0.6, 2.0, 1.5);
+            const tMeshR = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.5), mats.metalBlack);
+            diopterRing = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.3, 16), mats.knurled); diopterRing.position.set(0, 1.0, 0);
+            const eyeMeshR = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5), mats.metalBlack); eyeMeshR.position.set(0, 1.3, 0);
+            tubeR.add(tMeshR, diopterRing, eyeMeshR);
+            addInteractive(eyeMeshR, "目鏡"); addInteractive(diopterRing, "眼焦調整器");
+
+            microscopeHead.add(tubeL, tubeR);
+
+            const lightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.5), mats.metalBlack);
+            lightArm.position.set(-1.5, -1.0, 0.5); lightArm.rotation.z = 0.5; microscopeHead.add(lightArm);
+            const lightHead = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.0, 16, 1, true), mats.metalBlack);
+            lightHead.position.set(-1.8, -1.8, 0.5); 
+            lightHead.rotation.z = 0.8; 
+            lightHead.rotation.x = 0; 
+            microscopeHead.add(lightHead);
+            addInteractive(lightHead, "上光源");
+            bulbMesh = new THREE.Mesh(new THREE.SphereGeometry(0.3), mats.bulbOn); bulbMesh.position.set(0, -0.3, 0); lightHead.add(bulbMesh);
+
+            topLight = new THREE.SpotLight(0xffffff, 80); topLight.position.set(-1.8, -2.0, 0.5); topLight.target.position.set(0, -3.4, 1); topLight.angle = 0.4; topLight.penumbra = 0.5;
+            microscopeHead.add(topLight); microscopeHead.add(topLight.target);
+
+            scope.add(microscopeHead); return scope;
+        }
+
+        function createFlyModel(mats) {
+            const fly = new THREE.Group();
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 32, 32), mats.flyBody); head.position.set(0, 0, 0.7); fly.add(head);
+            const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), mats.flyEye); eyeL.position.set(-0.15, 0.1, 0.8); eyeL.scale.set(1, 1.2, 1); fly.add(eyeL);
+            const eyeR = eyeL.clone(); eyeR.position.set(0.15, 0.1, 0.8); fly.add(eyeR);
+            const thorax = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 0.5), mats.flyBody); thorax.rotation.x = Math.PI/2; fly.add(thorax);
+            const abdomen = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.7), mats.flyBody); abdomen.rotation.x = Math.PI/2.2; abdomen.position.set(0, -0.1, -0.7); fly.add(abdomen);
+
+            const wingShape = new THREE.Shape();
+            wingShape.moveTo(0, 0);
+            wingShape.quadraticCurveTo(0.2, 0.4, 0.8, 0.4); 
+            wingShape.quadraticCurveTo(1.5, 0.3, 1.6, 0);   
+            wingShape.quadraticCurveTo(1.5, -0.3, 0.8, -0.4); 
+            wingShape.quadraticCurveTo(0.2, -0.4, 0, 0);    
+            const wingGeo = new THREE.ShapeGeometry(wingShape);
+
+            // 向後收攏 (保持不變)
+            const wingL = new THREE.Mesh(wingGeo, mats.wing);
+            wingL.position.set(-0.1, 0.45, 0.1); 
+            wingL.rotation.set(-Math.PI/2, 0, 2.8); 
+            fly.add(wingL);
+
+            const wingR = new THREE.Mesh(wingGeo, mats.wing);
+            wingR.position.set(0.1, 0.45, 0.1);
+            wingR.rotation.set(-Math.PI/2, 0, -2.8);
+            wingR.scale.set(-1, 1, 1); 
+            fly.add(wingR);
+
+            return fly;
+        }
+
+        function generateFlyImage() {
+            const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 1024; const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1a1a1a'; ctx.fillRect(0, 0, 1024, 1024);
+            ctx.strokeStyle = '#222'; ctx.lineWidth = 15; ctx.lineCap = 'round';
+            for(let i=0; i<3; i++) {
+                ctx.beginPath(); ctx.moveTo(512, 520); ctx.quadraticCurveTo(400, 400 + i*100, 280, 350 + i*180); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(512, 520); ctx.quadraticCurveTo(624, 400 + i*100, 744, 350 + i*180); ctx.stroke();
+            }
+            ctx.save(); ctx.translate(512, 530); 
+            for(let side of [-1, 1]) {
+                ctx.save(); ctx.scale(side, 1); ctx.rotate(2.6); 
+                ctx.beginPath(); ctx.moveTo(20, 0); ctx.quadraticCurveTo(200, -180, 450, -100); ctx.quadraticCurveTo(500, 0, 450, 100); ctx.quadraticCurveTo(200, 150, 20, 20); ctx.closePath();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; ctx.fill();
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)'; ctx.lineWidth = 3; ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(30, 10); ctx.quadraticCurveTo(250, -80, 440, -50); ctx.moveTo(30, 10); ctx.quadraticCurveTo(250, 50, 440, 30); ctx.moveTo(150, -30); ctx.lineTo(250, -100); ctx.lineWidth = 2; ctx.stroke();
+                ctx.restore();
+            }
+            ctx.restore();
+            ctx.fillStyle = '#111'; ctx.beginPath(); ctx.ellipse(512, 620, 110, 190, 0, 0, Math.PI*2); ctx.fill(); 
+            ctx.beginPath(); ctx.ellipse(512, 450, 120, 130, 0, 0, Math.PI*2); ctx.fill(); 
+            const drawEye = (x, y) => {
+                const grad = ctx.createRadialGradient(x, y, 10, x, y, 80); grad.addColorStop(0, '#ff4444'); grad.addColorStop(1, '#880000');
+                ctx.fillStyle = grad; ctx.beginPath(); ctx.ellipse(x, y, 75, 95, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = 'rgba(0,0,0,0.2)'; for(let i=x-75; i<x+75; i+=8) for(let j=y-95; j<y+95; j+=8) if (Math.hypot((i-x)/0.75, (j-y)/0.95) < 95) ctx.fillRect(i, j, 6, 6);
+            };
+            drawEye(435, 370); drawEye(589, 370);
+            const dataUrl = canvas.toDataURL(); 
+            imgLeft = document.getElementById('img-left'); imgRight = document.getElementById('img-right');
+            if(imgLeft) imgLeft.style.backgroundImage = `url(${dataUrl})`; 
+            if(imgRight) imgRight.style.backgroundImage = `url(${dataUrl})`;
+        }
+
+        function onMouseMove(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            tooltip.style.left = event.clientX + 'px'; tooltip.style.top = event.clientY + 'px';
+        }
+
+        function checkIntersections() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(interactiveObjects, true);
+            if (intersects.length > 0) {
+                const hit = intersects[0].object;
+                if(hit.name) { tooltip.innerHTML = hit.name; tooltip.style.display = 'block'; document.body.style.cursor = 'pointer'; }
+            } else { tooltip.style.display = 'none'; document.body.style.cursor = 'default'; }
+        }
+
+        function setupUI() {
+            vpLeft = document.getElementById('vp-left');
+            vpRight = document.getElementById('vp-right');
+            const ids = ['stage-x', 'stage-y', 'focus-knob', 'diopter-knob', 'zoom-knob', 'ipd-knob', 'light-control'];
+            
+            const update = () => {
+                const el = (id) => document.getElementById(id);
+                state.stageX = parseInt(el('stage-x').value);
+                state.stageY = parseInt(el('stage-y').value);
+                state.focus = parseInt(el('focus-knob').value);
+                state.diopter = parseInt(el('diopter-knob').value);
+                state.zoom = parseFloat(el('zoom-knob').value);
+                state.ipd = parseInt(el('ipd-knob').value);
+                state.light = parseInt(el('light-control').value);
+                updateView();
+            };
+
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.addEventListener('input', update);
+            });
+        }
+
+        function updateView() {
+            if(!vpLeft || !flyModel) return;
+
+            // IPD 
+            const ipdShift = (state.ipd - 30) * 2.5; 
+            vpLeft.style.transform = `translateX(calc(-50% - ${ipdShift}px))`;
+            vpRight.style.transform = `translateX(calc(-50% + ${ipdShift}px))`;
+            if(tubeL) tubeL.position.x = -0.5 - (state.ipd/100)*0.3; 
+            if(tubeR) tubeR.position.x = 0.5 + (state.ipd/100)*0.3;
+            
+            // 2D Movement 
+            const offsetX = (50 - state.stageX) * 2; 
+            const offsetY = (50 - state.stageY) * 2; 
+            
+            const scale = 1 + (state.zoom - 1) * 3;
+            const parallax = 25; 
+            
+            // 2D View 
+            if(imgLeft) imgLeft.style.transform = `rotate(180deg) scale(${scale}) translate(${offsetX + parallax}px, ${offsetY}px)`; 
+            if(imgRight) imgRight.style.transform = `rotate(180deg) scale(${scale}) translate(${offsetX - parallax}px, ${offsetY}px)`;
+            
+            // Blur & Light
+            const zoomShift = (state.zoom - 1) * 5; 
+            const leftBlur = Math.abs(state.focus - 50 + zoomShift) * 0.5;
+            const rightBlur = Math.abs(state.focus + (state.diopter * 0.5) - 50 + zoomShift) * 0.5;
+            vpLeft.style.filter = `blur(${leftBlur}px)`; vpRight.style.filter = `blur(${rightBlur}px)`;
+            if(imgLeft) imgLeft.style.filter = `brightness(${state.light/100})`;
+            if(imgRight) imgRight.style.filter = `brightness(${state.light/100})`;
+
+            // 3D Parts
+            if(microscopeHead) microscopeHead.position.y = 3.0 + (state.focus / 100) * 2.0;
+            if(diopterRing) diopterRing.rotation.y = state.diopter * 0.1; 
+            if(zoomRing) zoomRing.rotation.y = state.zoom * 2;
+            if(focusKnobL) { focusKnobL.rotation.x = state.focus * 0.1; focusKnobR.rotation.x = state.focus * 0.1; }
+
+            // V27 修正: 3D 移動改為同向 (滑桿左->3D左; 滑桿前->3D前/靠近)
+            if(specimenGroup) {
+                specimenGroup.position.x = (state.stageX - 50) / 50 * 1.5;
+                specimenGroup.position.z = 1.0 + ((state.stageY - 50) / 50 * 1.5); 
+            }
+            if(topLight) topLight.intensity = state.light; 
+            if(bulbMesh) bulbMesh.material.color.setHSL(0.16, 1, state.light/100); 
+        }
+
+        function animate() { requestAnimationFrame(animate); controls.update(); checkIntersections(); renderer.render(scene, camera); }
+    </script>
+</body>
+</html>
