@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>離子化合物配對練習表</title>
+    <title>離子化合物配對練習</title>
     <style>
         :root {
             --primary-color: #2c3e50;
@@ -29,36 +29,261 @@
             overflow: hidden;
         }
 
-        /* 頂部控制區 */
-        .top-bar {
+        /* --- 頂部區域 --- */
+        .top-section {
             background: white;
-            padding: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             z-index: 1000;
             flex-shrink: 0;
+            padding-bottom: 10px;
         }
+
+        .header-title { padding: 10px 10px 5px 10px; }
 
         h1 {
             color: var(--primary-color);
-            margin: 5px 0;
+            margin: 0 0 5px 0;
             font-size: 1.2rem;
         }
         
-        .subtitle {
-            color: #7f8c8d;
-            margin-bottom: 8px;
-            font-size: 0.8rem;
-            display: block;
-        }
+        .subtitle { color: #7f8c8d; font-size: 0.8rem; }
 
-        .controls {
+        /* 分頁按鈕 */
+        .nav-tabs {
             display: flex;
             justify-content: center;
-            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+            padding: 0 10px;
+        }
+
+        .tab-btn {
+            padding: 6px 16px;
+            border: 2px solid var(--accent-color);
+            background: transparent;
+            color: var(--accent-color);
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        /* --- 視圖容器 --- */
+        .view-container {
+            flex-grow: 1;
+            overflow: hidden;
+            position: relative;
+            background: var(--bg-color);
+        }
+
+        .view-section {
+            display: none;
+            height: 100%;
+            flex-direction: column;
+        }
+        
+        .view-section.active-view { display: flex; }
+
+        /* --- 表格模式樣式 --- */
+        .table-scroll-area {
+            flex-grow: 1;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 10px;
+            background: #fff;
+        }
+
+        .table-controls {
+            padding: 10px;
+            background: #f9f9f9;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: center;
             gap: 8px;
             flex-wrap: wrap;
         }
 
+        table { border-collapse: separate; border-spacing: 0; margin: 0 auto; }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 4px;
+            text-align: center;
+            vertical-align: middle;
+            min-width: 105px;
+            height: 70px;
+        }
+
+        th {
+            background-color: #ecf0f1;
+            color: var(--primary-color);
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        /* Sticky Headers */
+        th.corner-header { position: sticky; left: 0; top: 0; z-index: 30; background: #fff; border-right: 2px solid var(--border-color); border-bottom: 2px solid var(--border-color); }
+        th.col-header { position: sticky; top: 0; z-index: 20; background: var(--header-bg); border-bottom: 2px solid var(--border-color); }
+        th.row-header { position: sticky; left: 0; z-index: 20; background: var(--header-bg); border-right: 2px solid var(--border-color); }
+
+        /* --- 測驗模式樣式 --- */
+        .quiz-config-panel {
+            background: white;
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 15px;
+            background: #f0f2f5;
+            padding: 5px;
+            border-radius: 20px;
+        }
+
+        .radio-label {
+            padding: 5px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .radio-label input { display: none; }
+        
+        .radio-label.checked {
+            background: white;
+            color: var(--accent-color);
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .quiz-btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .quiz-scroll-area {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 15px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* 橫式題型卡片設計 */
+        .quiz-card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            border: 1px solid #e0e0e0;
+            animation: fadeIn 0.4s ease-out;
+            
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        /* === 關鍵修改：題目顯示區域 === 
+           加強了字體大小和化學式的排版
+        */
+        .quiz-question-part {
+            display: flex;
+            align-items: center;
+            font-size: 1.5rem; /* 字體放大 */
+            font-family: "Times New Roman", Times, serif;
+            color: var(--primary-color);
+            flex-grow: 1;
+            min-width: 120px;
+            line-height: 1.8; /* 增加行高，避免上標被切掉 */
+            letter-spacing: 1px; /* 增加字距，避免數字太擠 */
+        }
+
+        /* === 關鍵修改：上標與下標的精準定位 === 
+           讓 sup 飛高一點，sub 沉低一點，並縮小字體
+        */
+        .quiz-question-part sup {
+            font-size: 0.6em;       /* 縮小電荷數字 */
+            vertical-align: baseline; 
+            position: relative;
+            top: -0.6em;            /* 明顯向上拉 */
+            margin-left: 1px;       /* 與字母稍微分開 */
+            font-weight: bold;      /* 稍微加粗更清晰 */
+        }
+
+        .quiz-question-part sub {
+            font-size: 0.6em;
+            vertical-align: baseline;
+            position: relative;
+            bottom: -0.25em;        /* 明顯向下拉 */
+            margin-left: 0px;
+            color: #555;            /* 原子個數顏色稍微淡一點點，區分層次 */
+        }
+
+        .q-index {
+            font-size: 0.8rem;
+            color: #bdc3c7;
+            margin-right: 12px;
+            font-weight: normal;
+            font-family: sans-serif;
+            min-width: 25px;
+            letter-spacing: 0;
+        }
+
+        /* 輸入部分 (右側) */
+        .quiz-input-part {
+            flex-grow: 1;
+            min-width: 140px;
+            position: relative;
+        }
+
+        .quiz-input {
+            width: 100%;
+            height: 42px;
+            border: 1px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            text-align: center;
+            background: #fafafa;
+        }
+
+        .arrow-icon {
+            margin: 0 10px;
+            color: #95a5a6;
+            font-size: 1.2rem;
+            position: relative;
+            top: -2px; /* 微調箭頭垂直置中 */
+        }
+
+        /* 反饋訊息 */
+        .quiz-feedback {
+            width: 100%;
+            font-size: 0.9rem;
+            text-align: right;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .quiz-card.checked .quiz-feedback { display: block; }
+
+        /* 通用元件 */
         button {
             background-color: var(--accent-color);
             color: white;
@@ -70,10 +295,30 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.15);
             touch-action: manipulation;
         }
-
         button:active { transform: scale(0.95); }
         button.check-btn { background-color: var(--success-color); }
         button.reset-btn { background-color: #95a5a6; }
+
+        input:focus { border-color: var(--accent-color); outline: none; background: #fff; }
+        
+        .correct .quiz-input { background-color: #d4edda; border-color: #28a745; color: #155724; font-weight: bold; }
+        .incorrect .quiz-input { background-color: #f8d7da; border-color: #dc3545; color: #721c24; }
+        
+        .answer-reveal {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.9rem;
+            color: #27ae60;
+            font-weight: bold;
+            display: none;
+            background: rgba(255,255,255,0.9);
+            padding: 2px 5px;
+        }
+        
+        .show-answers .answer-reveal { display: block; }
+        .show-answers input { color: transparent; }
 
         .creator-badge {
             font-size: 0.75rem;
@@ -82,159 +327,80 @@
             padding: 4px 8px;
             border-radius: 10px;
             font-weight: bold;
-        }
-
-        /* 表格捲動區域 */
-        .table-scroll-area {
-            flex-grow: 1;
-            overflow: auto;
-            -webkit-overflow-scrolling: touch;
-            padding: 10px;
-            background: #fff;
-        }
-
-        table {
-            border-collapse: separate;
-            border-spacing: 0;
-            margin: 0 auto;
-        }
-
-        th, td {
-            border: 1px solid var(--border-color);
-            padding: 4px;
-            text-align: center;
-            vertical-align: middle;
-            
-            /* --- 關鍵修改：加寬到 105px --- */
-            min-width: 105px;  
-            height: 70px; /* 稍微加高一點讓手指好點 */
-            position: relative;
-        }
-
-        /* Headers Styling */
-        th {
-            background-color: #ecf0f1;
-            color: var(--primary-color);
-            font-weight: bold;
-            font-size: 1.05rem;
-            white-space: nowrap; /* 確保標題（如 CH3COO-）不會換行 */
+            display: inline-block;
+            margin-top: 5px;
         }
         
-        /* 凍結窗格邏輯 */
-        th.corner-header {
-            position: sticky;
-            left: 0;
-            top: 0;
-            z-index: 30;
-            background-color: #fff;
-            border-right: 2px solid var(--border-color);
-            border-bottom: 2px solid var(--border-color);
-        }
+        /* 表格內的一般 sup/sub 維持原樣，避免把表格撐太高 */
+        table sup { font-size: 0.75em; vertical-align: super; }
+        table sub { font-size: 0.75em; vertical-align: sub; }
+        #chemistryTable input { height: 34px; font-size: 16px; width: 95%; }
 
-        th.col-header {
-            position: sticky;
-            top: 0;
-            z-index: 20;
-            background-color: var(--header-bg);
-            border-bottom: 2px solid var(--border-color);
-        }
-
-        th.row-header {
-            position: sticky;
-            left: 0;
-            z-index: 20;
-            background-color: var(--header-bg);
-            border-right: 2px solid var(--border-color);
-        }
-
-        /* Input Styling */
-        .cell-content {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-            width: 100%;
-        }
-
-        input {
-            width: 95%; /* 稍微加寬 */
-            height: 34px;
-            padding: 0 5px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            text-align: center;
-            font-size: 16px; /* 保持 16px */
-            background: #fcfcfc;
-            color: #333;
-        }
-
-        input:focus {
-            border-color: var(--accent-color);
-            background: #fff;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-        }
-
-        .correct input {
-            background-color: #d4edda;
-            border-color: #28a745;
-            color: #155724;
-            font-weight: bold;
-        }
-
-        .incorrect input {
-            background-color: #f8d7da;
-            border-color: #dc3545;
-            color: #721c24;
-        }
-
-        .answer-reveal {
-            font-weight: bold;
-            color: var(--primary-color);
-            font-size: 0.95rem;
-            display: none;
-            line-height: 1.2;
-            word-break: break-all;
-        }
-
-        .show-answers .answer-reveal { display: block; }
-        .show-answers input { display: none; }
-
-        .blocked {
-            background: repeating-linear-gradient(
-                -45deg,
-                #f0f0f0,
-                #f0f0f0 5px,
-                #dbdbdb 5px,
-                #dbdbdb 10px
-            );
-        }
-        
-        sup, sub { font-size: 0.75em; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
     </style>
 </head>
 <body>
 
-    <div class="top-bar">
-        <h1>離子化合物配對</h1>
-        <span class="subtitle">輸入化學式 (如 NaCl) 或中文</span>
-        <div class="controls">
-            <button class="check-btn" onclick="checkAnswers()">檢查</button>
-            <button class="reset-btn" onclick="resetTable()">重置</button>
-            <button onclick="toggleMode()">解答</button>
-            <div class="creator-badge">✎ 小粘製作</div>
+    <div class="top-section">
+        <div class="header-title">
+            <h1>離子化合物配對</h1>
+            <span class="subtitle">小粘製作</span>
+        </div>
+        
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchView('table')">表格練習</button>
+            <button class="tab-btn" onclick="switchView('quiz')">隨機測驗</button>
         </div>
     </div>
 
-    <div class="table-scroll-area">
-        <table id="chemistryTable">
-            </table>
-        <div style="height: 50px;"></div>
+    <div class="view-container">
+        
+        <div id="view-table" class="view-section active-view">
+            <div class="table-controls">
+                <button class="check-btn" onclick="checkTableAnswers()">檢查</button>
+                <button class="reset-btn" onclick="resetTable()">重置</button>
+                <button onclick="toggleTableMode()">解答</button>
+            </div>
+            <div class="table-scroll-area">
+                <table id="chemistryTable"></table>
+                <div style="height: 50px;"></div>
+            </div>
+        </div>
+
+        <div id="view-quiz" class="view-section">
+            <div class="quiz-config-panel">
+                <div class="radio-group">
+                    <label class="radio-label checked" onclick="setQuizType('ions', this)">
+                        <input type="radio" name="qType" value="ions" checked> 離子組合
+                    </label>
+                    <label class="radio-label" onclick="setQuizType('name', this)">
+                        <input type="radio" name="qType" value="name"> 中文名稱
+                    </label>
+                </div>
+
+                <div class="quiz-btn-group">
+                    <button class="quiz-mode-btn" onclick="startQuiz(3)">🎲 3 題</button>
+                    <button class="quiz-mode-btn" onclick="startQuiz(5)">🎲 5 題</button>
+                </div>
+            </div>
+            
+            <div id="quiz-area" class="quiz-scroll-area">
+                <div style="text-align: center; margin-top: 50px; color: #95a5a6;">
+                    請選擇題型並開始測驗
+                </div>
+            </div>
+
+            <div id="quiz-actions" class="table-controls" style="display:none; border-top: 1px solid #eee;">
+                <button class="check-btn" onclick="checkQuizAnswers()">交卷</button>
+                <button onclick="toggleQuizAnswers()">解答</button>
+            </div>
+        </div>
+
     </div>
 
     <script>
+        // --- 資料設定 ---
         const cations = [
             { id: 'H', label: 'H<sup>+</sup>', charge: 1, name: '氫' },
             { id: 'Na', label: 'Na<sup>+</sup>', charge: 1, name: '鈉' },
@@ -270,42 +436,40 @@
             'H_PO4': { formula: 'H3PO4', name: '磷酸' }
         };
 
+        let currentQuizType = 'ions'; 
+
+        // --- 初始化與表格邏輯 ---
         function initTable() {
             const table = document.getElementById('chemistryTable');
-            
             let headerRow = '<thead><tr><th class="corner-header"></th>';
-            cations.forEach(cat => {
-                headerRow += `<th class="col-header">${cat.label}</th>`;
-            });
-            headerRow += '</tr></thead>';
-            table.innerHTML = headerRow;
+            cations.forEach(cat => headerRow += `<th class="col-header">${cat.label}</th>`);
+            headerRow += '</tr></thead><tbody>';
 
-            let tbody = '<tbody>';
             anions.forEach(anion => {
-                tbody += `<tr><th class="row-header">${anion.label}</th>`;
+                let row = `<tr><th class="row-header">${anion.label}</th>`;
                 cations.forEach(cation => {
                     const cellId = `${cation.id}_${anion.id}`;
                     if (blockedCells.includes(cellId)) {
-                        tbody += `<td class="blocked"></td>`;
+                        row += `<td class="blocked"></td>`;
                     } else {
                         const answer = calculateAnswer(cation, anion);
-                        tbody += `
+                        row += `
                             <td class="cell" data-formula="${answer.formula}" data-name="${answer.name}">
                                 <div class="cell-content">
-                                    <input type="text" class="input-formula" autocomplete="off" autocapitalize="off" autocorrect="off">
+                                    <input type="text" autocomplete="off" autocapitalize="off" autocorrect="off">
                                     <div class="answer-reveal">
                                         <div>${formatFormula(answer.formula)}</div>
                                         <div style="font-size:0.75em; color:#7f8c8d;">${answer.name}</div>
                                     </div>
                                 </div>
-                            </td>
-                        `;
+                            </td>`;
                     }
                 });
-                tbody += '</tr>';
+                row += '</tr>';
+                headerRow += row;
             });
-            tbody += '</tbody>';
-            table.innerHTML += tbody;
+            headerRow += '</tbody>';
+            table.innerHTML = headerRow;
         }
 
         function calculateAnswer(cat, an) {
@@ -342,37 +506,161 @@
         function gcd(a, b) { return !b ? a : gcd(b, a % b); }
         function formatFormula(str) { return str.replace(/(\d+)/g, '<sub>$1</sub>'); }
 
-        function checkAnswers() {
-            document.querySelectorAll('.input-formula').forEach(input => {
-                const cell = input.closest('td');
-                const userVal = input.value.trim();
-                let isCorrect = false;
-                
-                if (userVal.toLowerCase() === cell.dataset.formula.toLowerCase()) isCorrect = true;
-                if (userVal === cell.dataset.name) isCorrect = true;
-                // 寬容處理 HCl/HCL
-                if (userVal.toUpperCase() === cell.dataset.formula.toUpperCase()) isCorrect = true;
+        // --- 介面控制 ---
+        function switchView(mode) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active-view'));
+            document.getElementById(`view-${mode}`).classList.add('active-view');
+        }
 
-                cell.classList.remove('correct', 'incorrect');
-                if (userVal !== "") {
-                    cell.classList.add(isCorrect ? 'correct' : 'incorrect');
-                }
+        function setQuizType(type, element) {
+            currentQuizType = type;
+            document.querySelectorAll('.radio-label').forEach(el => el.classList.remove('checked'));
+            element.classList.add('checked');
+            document.getElementById('quiz-area').innerHTML = '<div style="text-align: center; margin-top: 50px; color: #95a5a6;">請點擊上方按鈕開始新題型測驗</div>';
+            document.getElementById('quiz-actions').style.display = 'none';
+        }
+
+        // --- 表格模式功能 ---
+        function checkTableAnswers() {
+            document.querySelectorAll('#view-table input').forEach(input => {
+                const cell = input.closest('td');
+                const val = input.value.trim();
+                if(!val) { cell.classList.remove('correct','incorrect'); return; }
+                
+                let isCorrect = false;
+                if(val.toLowerCase() === cell.dataset.formula.toLowerCase()) isCorrect = true;
+                if(val === cell.dataset.name) isCorrect = true;
+                if(val.toUpperCase() === cell.dataset.formula.toUpperCase()) isCorrect = true;
+
+                cell.classList.toggle('correct', isCorrect);
+                cell.classList.toggle('incorrect', !isCorrect);
             });
         }
 
         function resetTable() {
-            document.querySelectorAll('input').forEach(i => {
+            document.querySelectorAll('#view-table input').forEach(i => {
                 i.value = '';
                 i.closest('td').classList.remove('correct', 'incorrect');
             });
             document.querySelector('.table-scroll-area').classList.remove('show-answers');
         }
-
-        function toggleMode() {
+        function toggleTableMode() {
             document.querySelector('.table-scroll-area').classList.toggle('show-answers');
         }
 
+        // --- 測驗模式邏輯 ---
+        function startQuiz(count) {
+            const quizArea = document.getElementById('quiz-area');
+            quizArea.innerHTML = '';
+            quizArea.classList.remove('show-answers');
+            
+            let questions = [];
+            let attempts = 0;
+            
+            while (questions.length < count && attempts < 1000) {
+                attempts++;
+                const catIdx = Math.floor(Math.random() * cations.length);
+                const anIdx = Math.floor(Math.random() * anions.length);
+                const cation = cations[catIdx];
+                const anion = anions[anIdx];
+                const cellId = `${cation.id}_${anion.id}`;
+
+                if (blockedCells.includes(cellId)) continue;
+                if (questions.some(q => q.id === cellId)) continue;
+                questions.push({ cation, anion, id: cellId });
+            }
+
+            questions.forEach((q, index) => {
+                const ans = calculateAnswer(q.cation, q.anion);
+                const card = document.createElement('div');
+                card.className = 'quiz-card';
+                
+                let questionHtml = '';
+                let placeholder = '';
+                
+                if (currentQuizType === 'ions') {
+                    // .label 屬性中已包含 <sup> 標籤，透過 CSS 會顯示在右上角
+                    questionHtml = `
+                        <span class="q-index">${index+1}.</span>
+                        ${q.cation.label} + ${q.anion.label}
+                        <span class="arrow-icon">&rarr;</span>
+                    `;
+                    placeholder = '寫化學式';
+                } else {
+                    questionHtml = `
+                        <span class="q-index">${index+1}.</span>
+                        ${ans.name}
+                        <span class="arrow-icon">=</span>
+                    `;
+                    placeholder = '寫化學式';
+                }
+
+                card.innerHTML = `
+                    <div class="quiz-question-part">
+                        ${questionHtml}
+                    </div>
+                    <div class="quiz-input-part" data-formula="${ans.formula}" data-name="${ans.name}">
+                        <input type="text" class="quiz-input" placeholder="${placeholder}" autocomplete="off" autocapitalize="off" autocorrect="off">
+                        <div class="answer-reveal">
+                            ${formatFormula(ans.formula)}
+                        </div>
+                    </div>
+                    <div class="quiz-feedback"></div>
+                `;
+                quizArea.appendChild(card);
+            });
+
+            document.getElementById('quiz-actions').style.display = 'flex';
+        }
+
+        function checkQuizAnswers() {
+            document.querySelectorAll('.quiz-input').forEach(input => {
+                const inputPart = input.parentElement;
+                const card = inputPart.parentElement;
+                const feedback = card.querySelector('.quiz-feedback');
+                
+                const formula = inputPart.dataset.formula;
+                const name = inputPart.dataset.name;
+                const val = input.value.trim();
+
+                let isCorrect = false;
+                
+                if (currentQuizType === 'ions') {
+                    if (val.toLowerCase() === formula.toLowerCase()) isCorrect = true;
+                    if (val === name) isCorrect = true;
+                    if (val.toUpperCase() === formula.toUpperCase()) isCorrect = true;
+                } else {
+                    if (val.toLowerCase() === formula.toLowerCase()) isCorrect = true;
+                    if (val.toUpperCase() === formula.toUpperCase()) isCorrect = true;
+                }
+
+                card.classList.remove('correct', 'incorrect');
+                card.classList.add('checked');
+                
+                if (val === "") {
+                    feedback.textContent = "未作答";
+                    feedback.style.color = "#95a5a6";
+                } else if (isCorrect) {
+                    card.classList.add('correct');
+                    feedback.textContent = "正確！👏";
+                    feedback.style.color = "#27ae60";
+                } else {
+                    card.classList.add('incorrect');
+                    // 這裡使用 innerHTML 確保 "答案是..." 的化學式也能正確顯示下標
+                    feedback.innerHTML = `答案是 ${formatFormula(formula)}`; 
+                    feedback.style.color = "#c0392b";
+                }
+            });
+        }
+
+        function toggleQuizAnswers() {
+            document.getElementById('quiz-area').classList.toggle('show-answers');
+        }
+
         window.onload = initTable;
+
     </script>
 </body>
 </html>
