@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>原子模型演進史 | Atomic Models Interactive</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #38bdf8;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --highlight: #22d3ee;
+            --font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 1.5rem;
+            background: linear-gradient(to right, #0f172a, #1e293b, #0f172a);
+            border-bottom: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        h1 {
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: var(--accent-color);
+            font-size: 1.8rem;
+            margin-bottom: 0.3rem;
+        }
+
+        /* 新增署名樣式 */
+        .credit {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            letter-spacing: 1.5px;
+            opacity: 0.8;
+            font-weight: 400;
+        }
+
+        /* Main Layout */
+        main {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            padding: 1rem;
+            gap: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media (min-width: 900px) {
+            main {
+                flex-direction: row;
+                align-items: stretch;
+                height: 80vh;
+            }
+        }
+
+        /* Navigation / Timeline */
+        .nav-panel {
+            flex: 1;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+
+        .nav-title {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .timeline-btn {
+            background: transparent;
+            border: 1px solid #475569;
+            color: var(--text-muted);
+            padding: 1rem;
+            text-align: left;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .timeline-btn:hover {
+            border-color: var(--accent-color);
+            background-color: rgba(56, 189, 248, 0.05);
+            color: var(--text-main);
+        }
+
+        .timeline-btn.active {
+            background: linear-gradient(90deg, rgba(56, 189, 248, 0.1), transparent);
+            border-left: 4px solid var(--accent-color);
+            border-color: transparent;
+            color: var(--highlight);
+            font-weight: bold;
+        }
+
+        .timeline-btn .year {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            display: block;
+        }
+
+        /* Visualization Area */
+        .viz-panel {
+            flex: 2;
+            background-color: #000;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            border: 1px solid #334155;
+            min-height: 300px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Info Overlay */
+        .info-panel {
+            flex: 1;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow-y: auto;
+            border: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .model-header {
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 0.5rem;
+        }
+
+        .model-name {
+            font-size: 1.5rem;
+            color: var(--accent-color);
+        }
+
+        .model-desc {
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            font-size: 1rem;
+        }
+
+        .pros-cons {
+            font-size: 0.9rem;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+
+        .tag.pro { background-color: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .tag.con { background-color: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+        ul {
+            padding-left: 1.2rem;
+            margin-bottom: 1rem;
+        }
+        
+        li { margin-bottom: 0.3rem; color: var(--text-muted); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>原子模型演進史</h1>
+    <div class="credit">小粘製作</div>
+</header>
+
+<main>
+    <section class="nav-panel">
+        <div class="nav-title">選擇模型</div>
+        <button class="timeline-btn active" onclick="setModel('dalton')">
+            <span class="year">1803</span>
+            道爾頓 Dalton
+        </button>
+        <button class="timeline-btn" onclick="setModel('thomson')">
+            <span class="year">1897</span>
+            湯木生 Thomson
+        </button>
+        <button class="timeline-btn" onclick="setModel('rutherford')">
+            <span class="year">1911</span>
+            拉塞福 Rutherford
+        </button>
+        <button class="timeline-btn" onclick="setModel('chadwick')">
+            <span class="year">1932</span>
+            查兌克 Chadwick
+        </button>
+    </section>
+
+    <section class="viz-panel" id="canvas-container">
+        <canvas id="atomCanvas"></canvas>
+    </section>
+
+    <section class="info-panel" id="info-content">
+        </section>
+</main>
+
+<script>
+    // --- Data Source ---
+    const modelsData = {
+        dalton: {
+            name: "道爾頓實心球模型",
+            year: "1803",
+            desc: "道爾頓認為原子是物質的最小單位，像是一個堅硬、不可分割的實心球體。不同元素的原子質量不同，但同一元素的原子完全相同。",
+            pros: ["首次提出具體的科學原子論", "解釋了質量守恆與定比定律"],
+            cons: ["無法解釋電的現象", "未發現原子內部結構（如電子、質子）"]
+        },
+        thomson: {
+            name: "湯木生葡萄乾布丁模型",
+            year: "1897",
+            desc: "發現電子後，湯木生認為原子是一個帶正電的球體（布丁），而帶負電的電子（葡萄乾）均勻鑲嵌在其中，整體呈電中性。",
+            pros: ["發現了第一個亞原子粒子：電子", "確認原子不是不可分割的"],
+            cons: ["無法解釋拉塞福的α粒子散射實驗", "正電荷分佈理論後來被推翻"]
+        },
+        rutherford: {
+            name: "拉塞福行星模型",
+            year: "1911",
+            desc: "透過α粒子散射實驗，發現原子大部分是中空的。中心有一個體積極小但質量極大的正電核心（原子核），電子像行星繞太陽一樣繞核旋轉。",
+            pros: ["發現了原子核的存在", "建立了現代原子結構的雛形"],
+            cons: ["無法解釋電子為何不會因輻射能量而墜入原子核", "無法解釋原子光譜的線狀特徵"]
+        },
+        chadwick: {
+            name: "查兌克中子模型",
+            year: "1932",
+            desc: "查兌克透過實驗證實原子核內除了帶正電的質子外，還有不帶電的「中子」。解決了原子核質量與電荷不匹配的謎題。",
+            pros: ["解釋了同位素的存在", "完善了原子核的組成結構"],
+            cons: ["（此模型主要補充核結構，未解決電子軌域量子化問題，需波耳模型補充）"]
+        }
+    };
+
+    // --- State & Canvas Setup ---
+    let currentModel = 'dalton';
+    const canvas = document.getElementById('atomCanvas');
+    const ctx = canvas.getContext('2d');
+    let width, height, centerX, centerY;
+    let animationId;
+    let time = 0;
+
+    // --- Resize Handler ---
+    function resize() {
+        const container = document.getElementById('canvas-container');
+        width = container.clientWidth;
+        height = container.clientHeight;
+        
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.scale(dpr, dpr);
+        
+        centerX = width / 2;
+        centerY = height / 2;
+    }
+    
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- Interaction Logic ---
+    function setModel(modelKey) {
+        currentModel = modelKey;
+        
+        document.querySelectorAll('.timeline-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if(btn.textContent.toLowerCase().includes(modelKey)) {
+                btn.classList.add('active');
+            }
+        });
+
+        updateInfoPanel(modelKey);
+    }
+
+    function updateInfoPanel(key) {
+        const data = modelsData[key];
+        const html = `
+            <div class="model-header">
+                <div class="tag" style="background:#334155; color:#fff;">${data.year}</div>
+                <h2 class="model-name">${data.name}</h2>
+            </div>
+            <p class="model-desc">${data.desc}</p>
+            
+            <div class="pros-cons">
+                <span class="tag pro">優點 / 貢獻</span>
+                <ul>${data.pros.map(p => `<li>${p}</li>`).join('')}</ul>
+                
+                <span class="tag con">缺點 / 限制</span>
+                <ul>${data.cons.map(c => `<li>${c}</li>`).join('')}</ul>
+            </div>
+        `;
+        document.getElementById('info-content').innerHTML = html;
+    }
+
+    updateInfoPanel('dalton');
+
+    // --- Drawing Functions ---
+
+    function drawDalton() {
+        const radius = Math.min(width, height) * 0.25;
+        const gradient = ctx.createRadialGradient(
+            centerX - radius/3, centerY - radius/3, radius * 0.1,
+            centerX, centerY, radius
+        );
+        gradient.addColorStop(0, '#60a5fa');
+        gradient.addColorStop(1, '#1e3a8a');
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        const breath = Math.sin(time * 0.02) * 2;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = `rgba(96, 165, 250, ${0.3 + breath/20})`;
+        ctx.stroke();
+    }
+
+    function drawThomson() {
+        const radius = Math.min(width, height) * 0.25;
+
+        // Background Sphere
+        const gradient = ctx.createRadialGradient(
+            centerX, centerY, radius * 0.2,
+            centerX, centerY, radius
+        );
+        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.4)');
+        gradient.addColorStop(1, 'rgba(239, 68, 68, 0.1)');
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Positive Charge Cloud', centerX, centerY - radius - 10);
+
+        // Electrons (Jittering)
+        const electronCount = 8;
+        for(let i=0; i<electronCount; i++) {
+            const angle = (i / electronCount) * Math.PI * 2;
+            const dist = radius * 0.6;
+            
+            const jx = Math.sin(time * 0.05 + i) * 3;
+            const jy = Math.cos(time * 0.05 + i) * 3;
+
+            const x = centerX + Math.cos(angle) * dist + jx;
+            const y = centerY + Math.sin(angle) * dist + jy;
+
+            ctx.beginPath();
+            ctx.arc(x, y, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#22d3ee';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#22d3ee';
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.fillText('-', x, y+3);
+        }
+    }
+
+    function drawRutherford() {
+        // 1. Nucleus
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#facc15';
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#facc15';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 2. Electron Orbits
+        const orbitScale = Math.min(width, height) * 0.35;
+        const electrons = 4;
+
+        for (let i = 0; i < electrons; i++) {
+            const rotation = (Math.PI / electrons) * i;
+            
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(rotation);
+            
+            // Orbit path
+            ctx.beginPath();
+            ctx.ellipse(0, 0, orbitScale, orbitScale * 0.3, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Electron
+            const speed = 0.05;
+            const angle = time * speed + (i * 1.5);
+            const ex = Math.cos(angle) * orbitScale;
+            const ey = Math.sin(angle) * orbitScale * 0.3;
+
+            ctx.beginPath();
+            ctx.arc(ex, ey, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#22d3ee';
+            ctx.shadowColor = '#22d3ee';
+            ctx.shadowBlur = 5;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            ctx.restore();
+        }
+    }
+
+    function drawChadwick() {
+        // 1. Complex Nucleus
+        const particles = [
+            {x: -4, y: -4, type: 'p'}, {x: 4, y: 4, type: 'n'},
+            {x: -5, y: 5, type: 'n'}, {x: 5, y: -5, type: 'p'},
+            {x: 0, y: 0, type: 'p'}, {x: 0, y: -7, type: 'n'},
+            {x: 7, y: 0, type: 'n'}, {x: -7, y: 0, type: 'p'}
+        ];
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(time * 0.01);
+
+        particles.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+            if(p.type === 'p') {
+                ctx.fillStyle = '#ef4444';
+            } else {
+                ctx.fillStyle = '#94a3b8';
+            }
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            ctx.fill();
+            ctx.stroke();
+        });
+        ctx.restore();
+
+        ctx.textAlign = 'left';
+        ctx.font = '12px sans-serif';
+        ctx.fillStyle = '#ef4444';
+        ctx.fillText('● 質子 Proton (+)', 20, height - 40);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('● 中子 Neutron (0)', 20, height - 20);
+
+        // 2. Electron Cloud Shells
+        [0.2, 0.35].forEach((scale, idx) => {
+            const r = Math.min(width, height) * scale;
+            
+            // Shell line
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, r, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Electron
+            const angle = time * (0.04 - idx*0.01) + idx;
+            const ex = centerX + Math.cos(angle) * r;
+            const ey = centerY + Math.sin(angle) * r;
+            
+            ctx.beginPath();
+            ctx.arc(ex, ey, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#22d3ee';
+            ctx.fill();
+        });
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, width, height);
+        ctx.globalCompositeOperation = 'source-over';
+
+        switch (currentModel) {
+            case 'dalton':
+                drawDalton();
+                break;
+            case 'thomson':
+                drawThomson();
+                break;
+            case 'rutherford':
+                drawRutherford();
+                break;
+            case 'chadwick':
+                drawChadwick();
+                break;
+        }
+
+        time += 1;
+        animationId = requestAnimationFrame(animate);
+    }
+
+    animate();
+
+</script>
+</body>
+</html>
