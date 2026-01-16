@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>理化實驗室：簡單機械 V18 (槓桿平衡計算版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        .canvas-box {
+            background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+            border-radius: 1rem;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            height: 100%; 
+            min-height: 400px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        input[type=range] {
+            height: 6px;
+            background: #cbd5e1;
+            border-radius: 5px;
+            outline: none;
+            appearance: none;
+            width: 100%;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        .nav-btn { transition: all 0.2s; border-bottom: 3px solid transparent; opacity: 0.7; }
+        .nav-btn.active { color: #0284c7; border-bottom-color: #0284c7; background-color: #e0f2fe; opacity: 1; }
+        .nav-btn:hover { opacity: 1; background-color: #f0f9ff; }
+
+        .module-panel { display: none; height: 100%; }
+        .module-panel.active { display: flex; flex-direction: column; }
+
+        .mode-btn { border: 2px solid #e2e8f0; color: #64748b; transition: all 0.2s; }
+        .mode-btn.active { border-color: #0ea5e9; color: #0ea5e9; background-color: #f0f9ff; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <header class="bg-white shadow-md z-20 flex-none">
+        <div class="max-w-[1600px] mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-sky-600 rounded-lg flex items-center justify-center text-white text-lg shadow-sm">⚙️</div>
+                <div class="flex items-baseline gap-3">
+                    <h1 class="font-bold text-xl text-slate-800 tracking-tight">簡單機械實驗室 <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded ml-1">v18.0</span></h1>
+                    <span class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs px-3 py-1 rounded-full font-bold shadow-md tracking-wide cursor-default transform hover:scale-105 transition-transform">
+                        ✨ 小粘製作
+                    </span>
+                </div>
+            </div>
+            <nav class="flex gap-1 h-full items-end overflow-x-auto no-scrollbar">
+                <button onclick="switchTab('lever')" class="nav-btn active px-3 py-3 text-sm font-bold whitespace-nowrap" id="tab-lever">1. 槓桿</button>
+                <button onclick="switchTab('plane')" class="nav-btn px-3 py-3 text-sm font-bold whitespace-nowrap" id="tab-plane">2. 斜面</button>
+                <button onclick="switchTab('pulley')" class="nav-btn px-3 py-3 text-sm font-bold whitespace-nowrap" id="tab-pulley">3. 滑輪</button>
+                <button onclick="switchTab('gear')" class="nav-btn px-3 py-3 text-sm font-bold whitespace-nowrap" id="tab-gear">4. 齒輪</button>
+                <button onclick="switchTab('wheel')" class="nav-btn px-3 py-3 text-sm font-bold whitespace-nowrap" id="tab-wheel">5. 輪軸</button>
+                <button onclick="switchTab('arm')" class="nav-btn px-3 py-3 text-sm font-bold whitespace-nowrap" id="tab-arm">6. 力臂</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="flex-grow relative max-w-[1600px] mx-auto w-full p-2 md:p-6 overflow-hidden">
+        
+        <div id="mod-lever" class="module-panel active">
+            <div class="flex flex-col lg:flex-row h-full gap-4">
+                <div class="lg:w-80 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col gap-6 flex-none overflow-y-auto">
+                    <h3 class="font-bold text-slate-800 text-lg border-b pb-3">⚖️ 槓桿實驗</h3>
+                    
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <button onclick="setLeverMode('center')" id="btn-lv-center" class="mode-btn active py-2 rounded-lg text-xs">第一類 (支點中)</button>
+                        <button onclick="setLeverMode('side')" id="btn-lv-side" class="mode-btn py-2 rounded-lg text-xs">第二/三類 (支點旁)</button>
+                    </div>
+
+                    <div id="lv-controls-center" class="space-y-6">
+                        <div class="bg-rose-50 p-3 rounded-lg border border-rose-100">
+                            <div class="text-xs font-bold text-rose-700 mb-2">📦 左側：抗力 (Load)</div>
+                            <div class="mb-3"><label class="text-xs font-bold text-slate-500 flex justify-between">物重 <span id="lv-w-val">20</span>kg</label><input type="range" id="inp-lv-w" min="5" max="100" value="20" class="accent-rose-500"></div>
+                            <div><label class="text-xs font-bold text-slate-500 flex justify-between">力臂 <span id="lv-d1-val">4</span>m</label><input type="range" id="inp-lv-d1" min="1" max="8" value="4" step="0.5" class="accent-rose-500"></div>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded-lg border border-green-100">
+                            <div class="text-xs font-bold text-green-700 mb-2">💪 右側：施力 (Effort)</div>
+                            <div class="mb-3"><label class="text-xs font-bold text-slate-500 flex justify-between">施力 <span id="lv-f-val">20</span>kgw</label><input type="range" id="inp-lv-f" min="0" max="100" value="20" class="accent-green-500"></div>
+                            <div><label class="text-xs font-bold text-slate-500 flex justify-between">力臂 <span id="lv-d2-val">4</span>m</label><input type="range" id="inp-lv-d2" min="1" max="8" value="4" step="0.5" class="accent-green-500"></div>
+                        </div>
+                    </div>
+
+                    <div id="lv-controls-side" class="space-y-6 hidden">
+                        <div class="bg-rose-50 p-3 rounded-lg border border-rose-100">
+                            <div class="text-xs font-bold text-rose-700 mb-2">📦 抗力設定 (Load)</div>
+                            <div class="mb-3"><label class="text-xs font-bold text-slate-500 flex justify-between">物重 (W) <span id="lv2-w-val">30</span>kg</label><input type="range" id="inp-lv2-w" min="5" max="100" value="30" class="accent-rose-500"></div>
+                            <div><label class="text-xs font-bold text-slate-500 flex justify-between">抗力臂 (d_w) <span id="lv2-dw-val">4</span>m</label><input type="range" id="inp-lv2-dw" min="1" max="10" value="4" step="0.5" class="accent-rose-500"></div>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded-lg border border-green-100">
+                            <div class="text-xs font-bold text-green-700 mb-2">💪 施力設定 (Effort)</div>
+                            <div><label class="text-xs font-bold text-slate-500 flex justify-between">施力臂 (d_f) <span id="lv2-df-val">8</span>m</label><input type="range" id="inp-lv2-df" min="1" max="10" value="8" step="0.5" class="accent-green-500"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+                        <div id="lv-status" class="font-bold text-slate-600">計算中...</div>
+                        <div class="text-xs text-slate-400 mt-1" id="lv-formula"></div>
+                    </div>
+                </div>
+                <div class="flex-grow canvas-box">
+                    <canvas id="cvs-lever"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="mod-plane" class="module-panel">
+            <div class="grid grid-cols-1 lg:grid-cols-12 h-full gap-4">
+                <div class="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col gap-6 overflow-y-auto">
+                    <h3 class="font-bold text-emerald-600 text-lg border-b pb-3">📐 參數設定</h3>
+                    <div><label class="flex justify-between text-sm font-bold mb-2">物體重量 (W) <span id="pl-w-val">50</span>kg</label><input type="range" id="inp-pl-w" min="10" max="100" value="50" class="accent-emerald-500"></div>
+                    <div><label class="flex justify-between text-sm font-bold mb-2">斜面高度 (H) <span id="pl-h-val">3</span>m</label><input type="range" id="inp-pl-h" min="1" max="8" value="3" step="0.5" class="accent-emerald-500"></div>
+                    <div><label class="flex justify-between text-sm font-bold mb-2">斜面長度 (L) <span id="pl-l-val">10</span>m</label><input type="range" id="inp-pl-l" min="5" max="15" value="10" step="0.5" class="accent-emerald-500"></div>
+                </div>
+                <div class="lg:col-span-6 canvas-box bg-white"><canvas id="cvs-plane"></canvas></div>
+                <div class="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col gap-6 overflow-y-auto">
+                    <h3 class="font-bold text-blue-600 text-lg border-b pb-3">📊 實驗數據</h3>
+                    <div class="space-y-4">
+                        <div class="bg-slate-50 p-3 rounded-lg"><div class="text-xs text-slate-500 font-bold mb-1">幾何邊長</div><div class="flex justify-between text-sm text-slate-700"><span>高度 (H)</span> <span class="font-mono" id="pl-res-h">3.0 m</span></div><div class="flex justify-between text-sm text-slate-700"><span>斜邊 (L)</span> <span class="font-mono" id="pl-res-l">10.0 m</span></div><div class="flex justify-between text-sm text-slate-700 border-t border-slate-200 mt-1 pt-1"><span>底邊 (B)</span> <span class="font-mono font-bold" id="pl-res-base">9.54 m</span></div></div>
+                        <div class="bg-emerald-50 p-3 rounded-lg border border-emerald-100"><div class="text-xs text-emerald-700 font-bold mb-1">推力 (理想省力)</div><div class="flex justify-between items-end"><span class="text-sm">F = </span><span class="text-2xl font-bold font-mono text-emerald-600" id="pl-res-force">15.0</span></div><div class="text-xs text-emerald-500 text-right">kgw</div></div>
+                        <div class="bg-rose-50 p-3 rounded-lg border border-rose-100"><div class="text-xs text-rose-700 font-bold mb-1">下滑力 (F<sub>slide</sub>)</div><div class="flex justify-between items-end"><span class="text-sm">F<sub>s</sub> = </span><span class="text-2xl font-bold font-mono text-rose-600" id="pl-res-slide">15.0</span></div><div class="text-[10px] text-rose-400 mt-2 border-t border-rose-200 pt-1">公式：F<sub>slide</sub> = W × (H / L)</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="mod-pulley" class="module-panel">
+            <div class="flex flex-col lg:flex-row h-full gap-4">
+                <div class="lg:w-80 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col gap-6 flex-none">
+                    <h3 class="font-bold text-orange-600 text-lg border-b pb-3">🏗️ 滑輪組</h3>
+                    <div class="grid grid-cols-2 gap-2"><button onclick="setPulleyMode('fixed')" id="btn-p-fixed" class="mode-btn active py-2 rounded-lg text-sm">定滑輪</button><button onclick="setPulleyMode('movable')" id="btn-p-movable" class="mode-btn py-2 rounded-lg text-sm">動滑輪</button></div>
+                    <div class="space-y-4 pt-2">
+                        <div class="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-200"><span class="text-sm font-bold text-slate-600">顯示力臂圖解</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="chk-pu-arms" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div></label></div>
+                        <div><label class="flex justify-between text-sm font-bold mb-1">滑輪半徑 (r) <span id="pu-r-val">30</span>cm</label><input type="range" id="inp-pu-r" min="20" max="60" value="30" class="accent-orange-500"></div>
+                        <div><label class="flex justify-between text-sm font-bold mb-1">物體重量 (W) <span id="pu-w-val">40</span>kg</label><input type="range" id="inp-pu-w" min="10" max="100" value="40" class="accent-orange-500"></div>
+                        <div class="border-t pt-4"><label class="flex justify-between text-sm font-bold mb-1 text-slate-700">右側施力角度 <span id="pu-angle-val">0</span>°</label><input type="range" id="inp-pu-angle" min="0" max="60" value="0" step="1" class="accent-slate-500"></div>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-xl mt-auto border border-orange-100"><h4 class="font-bold text-orange-800 mb-2 text-sm" id="pu-info-title">定滑輪</h4><div class="flex justify-between text-lg text-orange-700 font-bold border-t border-orange-200 pt-2 mt-2"><span>施力 F：</span><span id="pu-res-force">--</span></div><div class="text-xs text-orange-600 mt-2 space-y-1"><p id="pu-note"></p></div></div>
+                </div>
+                <div class="flex-grow canvas-box bg-white"><canvas id="cvs-pulley"></canvas></div>
+            </div>
+        </div>
+
+        <div id="mod-gear" class="module-panel">
+            <div class="flex flex-col lg:flex-row h-full gap-4">
+                <div class="lg:w-80 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col gap-6 flex-none overflow-y-auto">
+                    <h3 class="font-bold text-purple-600 text-lg border-b pb-3">⚙️ 齒輪與鏈條</h3>
+                    <div class="space-y-2"><label class="text-xs font-bold text-slate-500">傳動方式</label><div class="grid grid-cols-2 gap-2"><button onclick="setGearMode('mesh')" id="btn-gr-mesh" class="mode-btn active py-2 rounded-lg text-sm">齒輪咬合</button><button onclick="setGearMode('chain')" id="btn-gr-chain" class="mode-btn py-2 rounded-lg text-sm">鏈條傳動</button></div></div>
+                    <div id="chain-options" class="hidden space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-100"><label class="text-xs font-bold text-slate-500">鏈條連接</label><div class="flex gap-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="chainType" value="parallel" checked onchange="updateGear()"> 平行 (同向)</label><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="chainType" value="crossed" onchange="updateGear()"> 交叉 (反向)</label></div></div>
+                    <div><label class="flex justify-between text-sm font-bold mb-2 text-purple-700">主動輪齒數 (N1) <span id="gr-n1-val">20</span></label><input type="range" id="inp-gr-n1" min="10" max="40" value="20" step="2" class="accent-purple-500"></div>
+                    <div><label class="flex justify-between text-sm font-bold mb-2 text-slate-600">被動輪齒數 (N2) <span id="gr-n2-val">40</span></label><input type="range" id="inp-gr-n2" min="10" max="40" value="40" step="2" class="accent-slate-500"></div>
+                    <div><label class="flex justify-between text-sm font-bold mb-2 text-green-600">輸入轉速 (RPM) <span id="gr-speed-val">60</span></label><input type="range" id="inp-gr-speed" min="0" max="200" value="60" class="accent-green-500"></div>
+                    <div class="bg-purple-50 p-4 rounded-xl mt-auto border border-purple-100"><div class="flex justify-between text-sm text-purple-900 mb-2"><span>轉速比 (S1 : S2)</span><span class="font-bold" id="gr-speed-ratio">--</span></div><div class="flex justify-between text-lg font-bold text-purple-700 border-t border-purple-200 pt-2"><span>輸出轉速：</span><span id="gr-out-speed">-- RPM</span></div></div>
+                </div>
+                <div class="flex-grow canvas-box bg-white flex items-center justify-center bg-slate-50"><canvas id="cvs-gear"></canvas></div>
+            </div>
+        </div>
+
+        <div id="mod-wheel" class="module-panel">
+            <div class="flex flex-col lg:flex-row h-full gap-4">
+                <div class="lg:w-80 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col gap-6 flex-none">
+                    <h3 class="font-bold text-indigo-600 text-lg border-b pb-3">☸️ 輪軸原理</h3>
+                    <div class="flex bg-slate-100 p-1 rounded-lg"><button onclick="setWheelMode('normal')" id="btn-wh-normal" class="flex-1 py-1.5 rounded-md text-xs font-bold shadow bg-white text-indigo-600">省力 (施力在輪)</button><button onclick="setWheelMode('reverse')" id="btn-wh-reverse" class="flex-1 py-1.5 rounded-md text-xs font-bold text-slate-500">省時 (施力在軸)</button></div>
+                    <div><label class="flex justify-between text-sm font-bold mb-2 text-indigo-700">輪半徑 (R) <span id="wh-R-val">20</span>cm</label><input type="range" id="inp-wh-R" min="10" max="30" value="20" class="accent-indigo-500"></div>
+                    <div><label class="flex justify-between text-sm font-bold mb-2 text-slate-600">軸半徑 (r) <span id="wh-r-val">5</span>cm</label><input type="range" id="inp-wh-r" min="2" max="15" value="5" class="accent-slate-500"></div>
+                    <div><label class="flex justify-between text-sm font-bold mb-2 text-slate-600">物重 (W) <span id="wh-w-val">50</span>kg</label><input type="range" id="inp-wh-w" min="10" max="100" value="50" class="accent-slate-500"></div>
+                    <div class="bg-indigo-50 p-4 rounded-xl mt-auto border border-indigo-100"><div class="flex justify-between text-lg font-bold text-indigo-700"><span>所需施力 F：</span><span id="wh-res-force">--</span></div></div>
+                </div>
+                <div class="flex-grow canvas-box bg-white"><canvas id="cvs-wheel"></canvas></div>
+            </div>
+        </div>
+
+        <div id="mod-arm" class="module-panel">
+            <div class="flex flex-col lg:flex-row h-full gap-4">
+                <div class="lg:w-80 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col gap-6 flex-none">
+                    <h3 class="font-bold text-teal-600 text-lg border-b pb-3">📐 力臂原理</h3>
+                    <div class="bg-teal-50 p-3 rounded-lg text-xs text-teal-800 leading-relaxed mb-2">**力臂 (d)**：從支點到「力的作用線」的垂直距離。<br> 力矩(L) = 施力(F) × 力臂(d) </div>
+                    <div><label class="flex justify-between text-sm font-bold mb-2 text-slate-700">施力位置 (r) <span id="arm-r-val">10</span>m</label><input type="range" id="inp-arm-r" min="0" max="14" value="10" class="accent-teal-500"></div>
+                    <div><label class="flex justify-between text-sm font-bold mb-2 text-slate-700">施力角度 (θ) <span id="arm-deg-val">90</span>°</label><input type="range" id="inp-arm-deg" min="0" max="180" value="90" step="1" class="accent-teal-500"></div>
+                    <div class="flex justify-between items-center bg-white p-2 rounded border border-slate-200"><span class="text-sm font-bold text-slate-600">顯示力臂輔助線</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="chk-arm-show" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500"></div></label></div>
+                    <div class="bg-teal-50 p-4 rounded-xl mt-auto border border-teal-100"><div class="flex justify-between text-sm text-teal-800 mb-1"><span>有效力臂長度 (d)：</span><span class="font-mono font-bold text-lg" id="arm-len-val">10.0</span> m</div><div class="text-xs text-teal-600 text-right">d = r × sin(θ)</div></div>
+                </div>
+                <div class="flex-grow canvas-box bg-white"><canvas id="cvs-arm"></canvas></div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // === 全域變數 ===
+        let activeTab = 'lever';
+        const visuals = {};
+        ['lever', 'plane', 'pulley', 'gear', 'wheel', 'arm'].forEach(id => {
+            const cvs = document.getElementById(`cvs-${id}`);
+            const parent = cvs.parentElement;
+            visuals[id] = { cvs, ctx: cvs.getContext('2d'), parent };
+        });
+
+        function resizeAll() {
+            Object.keys(visuals).forEach(k => {
+                const { cvs, parent } = visuals[k];
+                cvs.width = parent.clientWidth;
+                cvs.height = parent.clientHeight;
+            });
+        }
+        window.addEventListener('resize', resizeAll);
+        resizeAll();
+
+        function switchTab(id) {
+            activeTab = id;
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`tab-${id}`).classList.add('active');
+            document.querySelectorAll('.module-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(`mod-${id}`).classList.add('active');
+            requestAnimationFrame(resizeAll);
+        }
+
+        function drawArrow(ctx, x1, y1, x2, y2, color, text, lineWidth = 2) {
+            const head = 10 + lineWidth * 0.5;
+            const angle = Math.atan2(y2-y1, x2-x1);
+            ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lineWidth;
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2-head*Math.cos(angle-Math.PI/6), y2-head*Math.sin(angle-Math.PI/6));
+            ctx.lineTo(x2-head*Math.cos(angle+Math.PI/6), y2-head*Math.sin(angle+Math.PI/6));
+            ctx.fill();
+            if(text) {
+                ctx.font = "bold 14px Arial";
+                const txtX = x2 + (x2>x1 ? 10 : -30);
+                const txtY = y2 + (y2>y1 ? 15 : -10);
+                ctx.fillText(text, txtX, txtY);
+            }
+        }
+
+        // ==========================================
+        // 1. 槓桿 (Lever) V18
+        // ==========================================
+        let leverMode = 'center';
+        const lvInp = {
+            // Mode 1
+            w: document.getElementById('inp-lv-w'), d1: document.getElementById('inp-lv-d1'),
+            f: document.getElementById('inp-lv-f'), d2: document.getElementById('inp-lv-d2'),
+            // Mode 2
+            w2: document.getElementById('inp-lv2-w'), dw: document.getElementById('inp-lv2-dw'),
+            df: document.getElementById('inp-lv2-df') // f2 移除，改為顯示結果
+        };
+        let lvAnim = { angle: 0, target: 0 };
+
+        function setLeverMode(m) {
+            leverMode = m;
+            const c1 = document.getElementById('lv-controls-center');
+            const c2 = document.getElementById('lv-controls-side');
+            const b1 = document.getElementById('btn-lv-center');
+            const b2 = document.getElementById('btn-lv-side');
+            
+            if(m === 'center') {
+                c1.classList.remove('hidden'); c2.classList.add('hidden');
+                b1.className = "mode-btn active py-2 rounded-lg text-xs"; b2.className = "mode-btn py-2 rounded-lg text-xs";
+            } else {
+                c1.classList.add('hidden'); c2.classList.remove('hidden');
+                b1.className = "mode-btn py-2 rounded-lg text-xs"; b2.className = "mode-btn active py-2 rounded-lg text-xs";
+            }
+            updateLever();
+        }
+
+        function updateLever() {
+            const status = document.getElementById('lv-status');
+            const formula = document.getElementById('lv-formula');
+
+            if(leverMode === 'center') {
+                const W = parseFloat(lvInp.w.value), d1 = parseFloat(lvInp.d1.value);
+                const F = parseFloat(lvInp.f.value), d2 = parseFloat(lvInp.d2.value);
+                document.getElementById('lv-w-val').innerText = W; document.getElementById('lv-d1-val').innerText = d1;
+                document.getElementById('lv-f-val').innerText = F; document.getElementById('lv-d2-val').innerText = d2;
+                
+                const net = (W * d1) - (F * d2);
+                formula.innerText = "平衡公式: W × d1 = F × d2";
+                if (Math.abs(net) < 1) { status.innerText = "🎉 平衡 (Balanced)"; status.className = "font-bold text-green-600"; lvAnim.target = 0; } 
+                else if (net > 0) { status.innerText = "↺ 左側較重"; status.className = "font-bold text-rose-600"; lvAnim.target = -0.2; } 
+                else { status.innerText = "↻ 施力過大"; status.className = "font-bold text-green-600"; lvAnim.target = 0.2; }
+            } else {
+                // V18: Class 2/3 - Calculate F
+                const W = parseFloat(lvInp.w2.value), dw = parseFloat(lvInp.dw.value);
+                const df = parseFloat(lvInp.df.value);
+                document.getElementById('lv2-w-val').innerText = W; document.getElementById('lv2-dw-val').innerText = dw;
+                document.getElementById('lv2-df-val').innerText = df;
+
+                // F = W * dw / df
+                const F_req = (W * dw) / df;
+                
+                // 類型判斷
+                let typeText = "";
+                if(df > dw) typeText = "(省力 - 第二類)";
+                else if(df < dw) typeText = "(費力 - 第三類)";
+                else typeText = "(等臂)";
+
+                status.innerText = `所需施力 F = ${F_req.toFixed(1)} kgw`;
+                status.className = "font-bold text-blue-600";
+                formula.innerText = `${typeText} 公式: F = W × (dw / df)`;
+                
+                lvAnim.target = 0; // 始終平衡
+            }
+        }
+        Object.values(lvInp).forEach(e => { if(e) e.addEventListener('input', updateLever); });
+
+        function drawLever() {
+            if(activeTab!=='lever') { requestAnimationFrame(drawLever); return; }
+            const { ctx, cvs } = visuals.lever;
+            const w = cvs.width, h = cvs.height;
+            const cx = w/2, cy = h/2 + 20;
+            const scale = Math.min(w,h)/24;
+            ctx.clearRect(0,0,w,h);
+            lvAnim.angle += (lvAnim.target - lvAnim.angle) * 0.1;
+
+            if(leverMode === 'center') {
+                // Class 1
+                ctx.fillStyle="#64748b"; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx-15, cy+40); ctx.lineTo(cx+15, cy+40); ctx.fill();
+                ctx.save(); ctx.translate(cx, cy); ctx.rotate(lvAnim.angle);
+                ctx.fillStyle="#cbd5e1"; ctx.roundRect(-9*scale, -6, 18*scale, 12, 5); ctx.fill();
+                for(let i=-8; i<=8; i++) { ctx.beginPath(); ctx.moveTo(i*scale, -6); ctx.lineTo(i*scale, 6); ctx.strokeStyle="#94a3b8"; ctx.stroke(); }
+                const d1 = parseFloat(lvInp.d1.value), W = parseFloat(lvInp.w.value);
+                const d2 = parseFloat(lvInp.d2.value), F = parseFloat(lvInp.f.value);
+                const lx = -d1 * scale, rx = d2 * scale;
+                ctx.restore();
+                const cos = Math.cos(lvAnim.angle), sin = Math.sin(lvAnim.angle);
+                const lx_w = cx + lx * cos, ly_w = cy + lx * sin;
+                const rx_w = cx + rx * cos, ry_w = cy + rx * sin;
+                ctx.fillStyle="#e11d48"; ctx.fillRect(lx_w - 15, ly_w-30, 30, 30);
+                ctx.fillStyle="white"; ctx.font="10px Arial"; ctx.textAlign="center"; ctx.fillText(W, lx_w, ly_w - 12);
+                drawArrow(ctx, lx_w, ly_w, lx_w, ly_w + 60, "#e11d48", "W"); 
+                ctx.fillStyle="#16a34a"; ctx.beginPath(); ctx.arc(rx_w, ry_w, 4, 0, Math.PI*2); ctx.fill();
+                drawArrow(ctx, rx_w, ry_w, rx_w, ry_w + 30 + F*0.5, "#16a34a", `F=${F}`);
+            } else {
+                // V18: Class 2/3 - Static Balance
+                const leftX = 50; 
+                // Fulcrum
+                ctx.fillStyle="#64748b"; ctx.beginPath(); ctx.moveTo(leftX, cy); ctx.lineTo(leftX-15, cy+40); ctx.lineTo(leftX+15, cy+40); ctx.fill();
+                
+                // Bar (Horizontal)
+                const barLen = 12 * scale;
+                ctx.fillStyle="#cbd5e1"; ctx.roundRect(leftX, cy-6, barLen, 12, 5); ctx.fill();
+                for(let i=1; i<=12; i++) { ctx.beginPath(); ctx.moveTo(leftX + i*scale, cy-6); ctx.lineTo(leftX + i*scale, cy+6); ctx.strokeStyle="#94a3b8"; ctx.stroke(); }
+
+                const dw = parseFloat(lvInp.dw.value), W = parseFloat(lvInp.w2.value);
+                const df = parseFloat(lvInp.df.value);
+                // Calculate F for viz
+                const F = (W * dw) / df;
+
+                const wx = leftX + dw * scale;
+                const fx = leftX + df * scale;
+
+                // Object W (On Top, Red, Down Arrow)
+                // V18 Fix: Box sitting on bar
+                ctx.fillStyle="#e11d48"; ctx.fillRect(wx - 15, cy - 36, 30, 30); 
+                ctx.fillStyle="white"; ctx.font="10px Arial"; ctx.textAlign="center"; ctx.fillText(W, wx, cy - 18);
+                // Gravity Arrow from center of box
+                const wArrowLen = 30 + W * 0.5;
+                drawArrow(ctx, wx, cy-21, wx, cy-21 + wArrowLen, "#e11d48", "W");
+
+                // Effort F (Green, Up Arrow)
+                const fArrowLen = 30 + F * 0.5;
+                // Limit visual length to avoid overflow
+                const visFLen = Math.min(200, fArrowLen);
+                
+                ctx.fillStyle="#16a34a"; ctx.beginPath(); ctx.arc(fx, cy, 4, 0, Math.PI*2); ctx.fill();
+                drawArrow(ctx, fx, cy+10, fx, cy+10 - visFLen, "#16a34a", `F=${F.toFixed(1)}`);
+            }
+
+            requestAnimationFrame(drawLever);
+        }
+        requestAnimationFrame(drawLever);
+
+        // ==========================================
+        // 2. 斜面 (Plane)
+        // ==========================================
+        const plInp = { w: document.getElementById('inp-pl-w'), h: document.getElementById('inp-pl-h'), l: document.getElementById('inp-pl-l') };
+        function updatePlane() {
+            let h = parseFloat(plInp.h.value), l = parseFloat(plInp.l.value);
+            if(l <= h) { l = h + 0.1; plInp.l.value = l; }
+            const w = parseFloat(plInp.w.value);
+            document.getElementById('pl-res-h').innerText = h.toFixed(1) + " m";
+            document.getElementById('pl-res-l').innerText = l.toFixed(1) + " m";
+            document.getElementById('pl-res-base').innerText = Math.sqrt(l*l - h*h).toFixed(2) + " m";
+            const f = w * (h/l); 
+            document.getElementById('pl-res-force').innerText = f.toFixed(1);
+            document.getElementById('pl-res-slide').innerText = f.toFixed(1);
+        }
+        Object.values(plInp).forEach(e => e.addEventListener('input', updatePlane));
+        function drawPlane() {
+            if(activeTab!=='plane') { requestAnimationFrame(drawPlane); return; }
+            const { ctx, cvs } = visuals.plane;
+            const w = cvs.width, h = cvs.height;
+            ctx.clearRect(0,0,w,h);
+            const H = parseFloat(plInp.h.value), L = parseFloat(plInp.l.value), W = parseFloat(plInp.w.value);
+            const scale = Math.min(w/18, h/10);
+            const startX = 60, groundY = h - 60;
+            const baseW = Math.sqrt(L*L - H*H) * scale, pixelH = H * scale;
+            ctx.beginPath(); ctx.moveTo(startX, groundY); ctx.lineTo(startX+baseW, groundY); ctx.lineTo(startX, groundY-pixelH); ctx.closePath();
+            ctx.fillStyle="#ecfccb"; ctx.fill(); ctx.strokeStyle="#65a30d"; ctx.lineWidth=3; ctx.stroke();
+            
+            ctx.fillStyle="#166534"; ctx.font="14px Arial"; ctx.textAlign="right";
+            ctx.fillText(`H=${H}m`, startX-10, groundY - pixelH/2);
+            ctx.textAlign="center"; ctx.fillText(`Base`, startX + baseW/2, groundY + 20);
+
+            const midX = (startX + (startX + baseW))/2, midY = ((groundY - pixelH) + groundY)/2;
+            const angle = Math.atan2(pixelH, baseW);
+
+            ctx.save(); ctx.translate(midX, midY-15); ctx.rotate(-angle);
+            ctx.translate(0, -25); 
+            ctx.fillText(`L=${L}m`, 0, 0); ctx.restore();
+
+            ctx.save(); ctx.translate(midX, midY); ctx.rotate(angle);
+            const size = 40; ctx.fillStyle="#f59e0b"; ctx.fillRect(-size/2, -size, size, size);
+            const F = W * (H/L);
+            const lenF = 20 + F * 1.5; 
+            drawArrow(ctx, size/2, -size/2, size/2 + lenF, -size/2, "#dc2626", `F`);
+            ctx.restore();
+            const lenW = 20 + W * 1.5;
+            drawArrow(ctx, midX, midY, midX, midY + lenW, "#2563eb", `W`);
+            requestAnimationFrame(drawPlane);
+        }
+        requestAnimationFrame(drawPlane);
+
+        // ==========================================
+        // 3. 滑輪 (Pulley)
+        // ==========================================
+        let pulleyMode = 'fixed';
+        const puInp = { w: document.getElementById('inp-pu-w'), deg: document.getElementById('inp-pu-angle'), r: document.getElementById('inp-pu-r'), arms: document.getElementById('chk-pu-arms') };
+        function setPulleyMode(m) {
+            pulleyMode = m;
+            document.getElementById('btn-p-fixed').className = `mode-btn ${m==='fixed'?'active':''} py-2 rounded-lg text-sm`;
+            document.getElementById('btn-p-movable').className = `mode-btn ${m==='movable'?'active':''} py-2 rounded-lg text-sm`;
+            updatePulley();
+        }
+        function updatePulley() {
+            const w = parseFloat(puInp.w.value), deg = parseFloat(puInp.deg.value), r = parseFloat(puInp.r.value);
+            const rad = deg * Math.PI / 180;
+            if(pulleyMode === 'fixed') {
+                document.getElementById('pu-info-title').innerText = "定滑輪";
+                document.getElementById('pu-res-force').innerText = w + " kgw";
+                document.getElementById('pu-note').innerText = "改變方向，不省力";
+            } else {
+                document.getElementById('pu-info-title').innerText = "動滑輪";
+                const f = w / (1 + Math.cos(rad));
+                document.getElementById('pu-res-force').innerText = f.toFixed(1) + " kgw";
+                document.getElementById('pu-note').innerText = deg===0 ? "繩索平行，省力一半" : "力臂變短，施力變大";
+            }
+        }
+        Object.values(puInp).forEach(e => e.addEventListener('input', updatePulley));
+
+        function drawPulley() {
+            if(activeTab!=='pulley') { requestAnimationFrame(drawPulley); return; }
+            const { ctx, cvs } = visuals.pulley;
+            const w = cvs.width, h = cvs.height;
+            const cx = w/2, cy = 100, r = parseFloat(puInp.r.value), W = parseFloat(puInp.w.value);
+            const deg = parseFloat(puInp.deg.value), rad = deg * Math.PI / 180;
+            const showArms = puInp.arms.checked;
+            ctx.clearRect(0,0,w,h);
+
+            if(pulleyMode === 'fixed') {
+                const tanX = cx + r*Math.cos(-rad);
+                const tanY = cy + r*Math.sin(-rad);
+                ctx.fillStyle="#94a3b8"; ctx.fillRect(cx-50, 20, 100, 10);
+                ctx.beginPath(); ctx.moveTo(cx,30); ctx.lineTo(cx,cy); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(cx-r, cy); ctx.lineTo(cx-r, cy+150); ctx.strokeStyle="#475569"; ctx.lineWidth=3; ctx.stroke();
+                ctx.fillStyle="#3b82f6"; ctx.fillRect(cx-r-20, cy+150, 40, 40);
+                drawArrow(ctx, cx-r, cy+190, cx-r, cy+230, "#3b82f6", `W=${W}`);
+                ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, -rad, false); ctx.stroke(); 
+                const ex = tanX + 100*Math.sin(rad), ey = tanY + 100*Math.cos(rad);
+                ctx.beginPath(); ctx.moveTo(tanX, tanY); ctx.lineTo(ex, ey); ctx.stroke();
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fillStyle="#fb923c"; ctx.fill(); ctx.stroke();
+                drawArrow(ctx, ex, ey, ex + 30*Math.sin(rad), ey + 30*Math.cos(rad), "#dc2626", "F=" + W);
+                if(showArms) {
+                    ctx.strokeStyle="#e11d48"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx-r, cy); ctx.stroke();
+                    ctx.strokeStyle="#16a34a"; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(tanX, tanY); ctx.stroke();
+                    ctx.fillStyle="black"; ctx.fillText("支點", cx-10, cy-5);
+                }
+            } else {
+                const py = cy + 100;
+                ctx.fillStyle="#94a3b8"; ctx.fillRect(cx-100, 20, 200, 10);
+                ctx.strokeStyle="#475569"; ctx.lineWidth=3;
+                ctx.beginPath(); ctx.moveTo(cx-r, 30); ctx.lineTo(cx-r, py); ctx.stroke();
+
+                const tanX = cx + r * Math.cos(rad);
+                const tanY = py + r * Math.sin(rad); 
+                
+                ctx.beginPath(); ctx.arc(cx, py, r, Math.PI, rad, false); ctx.stroke();
+
+                const ropeLen = 140; 
+                const endX = tanX + ropeLen * Math.sin(rad);
+                const endY = tanY - ropeLen * Math.cos(rad);
+                ctx.beginPath(); ctx.moveTo(tanX, tanY); ctx.lineTo(endX, endY); ctx.stroke();
+
+                ctx.beginPath(); ctx.arc(cx, py, r, 0, Math.PI*2); ctx.fillStyle="#fb923c"; ctx.fill(); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(cx, py+r); ctx.lineTo(cx, py+r+40); ctx.stroke();
+                ctx.fillStyle="#3b82f6"; ctx.fillRect(cx-20, py+r+40, 40, 40);
+                drawArrow(ctx, cx, py+r+80, cx, py+r+120, "#3b82f6", `W=${W}`);
+
+                const fVal = W / (1 + Math.cos(rad));
+                const arrowScale = 30 + fVal * 1.5;
+                const arrowEndX = tanX + arrowScale * Math.sin(rad);
+                const arrowEndY = tanY - arrowScale * Math.cos(rad);
+                drawArrow(ctx, tanX, tanY, arrowEndX, arrowEndY, "#dc2626", `F=${fVal.toFixed(1)}`);
+                
+                if(showArms) {
+                    const fulcrumX = cx - r, fulcrumY = py;
+                    const lineStart = {x: tanX - 200*Math.sin(rad), y: tanY + 200*Math.cos(rad)};
+                    const lineEnd   = {x: tanX + 200*Math.sin(rad), y: tanY - 200*Math.cos(rad)};
+                    ctx.setLineDash([5, 5]); ctx.lineWidth = 1; ctx.strokeStyle = "#94a3b8";
+                    ctx.beginPath(); ctx.moveTo(lineStart.x, lineStart.y); ctx.lineTo(lineEnd.x, lineEnd.y); ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.strokeStyle = "#e11d48"; ctx.lineWidth=3;
+                    ctx.beginPath(); ctx.moveTo(fulcrumX, fulcrumY); ctx.lineTo(cx, py); ctx.stroke();
+                    const APx = tanX - fulcrumX, APy = tanY - fulcrumY;
+                    const ux = Math.sin(rad), uy = -Math.cos(rad);
+                    const t = APx * ux + APy * uy; 
+                    const Qx = tanX - t * ux, Qy = tanY - t * uy;
+                    ctx.strokeStyle = "#16a34a"; 
+                    ctx.beginPath(); ctx.moveTo(fulcrumX, fulcrumY); ctx.lineTo(Qx, Qy); ctx.stroke();
+                    ctx.fillStyle="black"; ctx.beginPath(); ctx.arc(fulcrumX, fulcrumY, 4, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle="#16a34a"; ctx.beginPath(); ctx.arc(Qx, Qy, 4, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle="black"; ctx.fillText("支點", fulcrumX-30, fulcrumY);
+                }
+            }
+            requestAnimationFrame(drawPulley);
+        }
+        requestAnimationFrame(drawPulley);
+
+        // ==========================================
+        // 4. 齒輪 (Gear)
+        // ==========================================
+        let gearMode = 'mesh'; 
+        const grInp = { n1: document.getElementById('inp-gr-n1'), n2: document.getElementById('inp-gr-n2'), rpm: document.getElementById('inp-gr-speed') };
+        let grAngle = 0;
+        function setGearMode(m) {
+            gearMode = m;
+            document.getElementById('btn-gr-mesh').className = `mode-btn ${m==='mesh'?'active':''} py-2 rounded-lg text-sm`;
+            document.getElementById('btn-gr-chain').className = `mode-btn ${m==='chain'?'active':''} py-2 rounded-lg text-sm`;
+            if(m === 'chain') document.getElementById('chain-options').classList.remove('hidden');
+            else document.getElementById('chain-options').classList.add('hidden');
+            updateGear();
+        }
+        function updateGear() {
+            const n1 = parseInt(grInp.n1.value), n2 = parseInt(grInp.n2.value), rpm = parseInt(grInp.rpm.value);
+            document.getElementById('gr-n1-val').innerText = n1; document.getElementById('gr-n2-val').innerText = n2;
+            document.getElementById('gr-speed-val').innerText = rpm;
+            const ratio = n2 / n1; 
+            document.getElementById('gr-speed-ratio').innerText = `1 : ${ratio.toFixed(2)}`;
+            document.getElementById('gr-out-speed').innerText = `${(rpm/ratio).toFixed(0)} RPM`;
+        }
+        Object.values(grInp).forEach(e => e.addEventListener('input', updateGear));
+        function drawToothedGear(ctx, x, y, radius, teeth, angle, color) {
+            ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+            ctx.fillStyle = color; ctx.beginPath();
+            const outerR = radius + 5, innerR = radius - 5;
+            for (let i = 0; i < teeth; i++) {
+                const theta = (Math.PI * 2 * i) / teeth, toothWidth = (Math.PI * 2) / teeth * 0.5;
+                ctx.arc(0, 0, innerR, theta, theta + toothWidth * 0.2);
+                ctx.arc(0, 0, outerR, theta + toothWidth * 0.4, theta + toothWidth * 0.6);
+                ctx.arc(0, 0, innerR, theta + toothWidth * 0.8, theta + toothWidth);
+            }
+            ctx.closePath(); ctx.fill();
+            ctx.beginPath(); ctx.arc(0, 0, innerR - 8, 0, Math.PI*2); ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth=2; ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI*2); ctx.fillStyle="white"; ctx.fill(); ctx.restore();
+        }
+        function drawGear() {
+            if(activeTab!=='gear') { requestAnimationFrame(drawGear); return; }
+            const { ctx, cvs } = visuals.gear;
+            const w = cvs.width, h = cvs.height; const cx = w/2, cy = h/2;
+            ctx.clearRect(0,0,w,h);
+            const N1 = parseInt(grInp.n1.value), N2 = parseInt(grInp.n2.value), RPM = parseInt(grInp.rpm.value);
+            const module = 5, r1 = N1 * module, r2 = N2 * module; 
+            const baseSpeed = RPM * 0.002; grAngle += baseSpeed; 
+            const isChain = gearMode === 'chain';
+            const isCrossed = isChain && document.querySelector('input[name="chainType"]:checked').value === 'crossed';
+            const theta1 = grAngle; 
+            let theta2 = (!isChain || isCrossed) ? -theta1 * (N1/N2) + (isChain ? 0 : 0.2) : theta1 * (N1/N2);
+            let cx1, cx2;
+            if (isChain) {
+                const gap = 80; cx1 = cx - (r1+r2+gap)/2 + r1; cx2 = cx1 + r1 + r2 + gap;
+                ctx.strokeStyle = "#475569"; ctx.lineWidth = 4; ctx.setLineDash([5, 3]);
+                ctx.beginPath();
+                if(isCrossed) { ctx.moveTo(cx1, cy - r1); ctx.lineTo(cx2, cy + r2); } else { ctx.moveTo(cx1, cy - r1); ctx.lineTo(cx2, cy - r2); }
+                ctx.lineDashOffset = -grAngle * r1; ctx.stroke();
+                ctx.beginPath();
+                if(isCrossed) { ctx.moveTo(cx1, cy + r1); ctx.lineTo(cx2, cy - r2); } else { ctx.moveTo(cx1, cy + r1); ctx.lineTo(cx2, cy + r2); }
+                ctx.lineDashOffset = grAngle * r1; ctx.stroke();
+                ctx.setLineDash([]);
+            } else { cx1 = cx - (r1+r2)/2 + r1 - 8; cx2 = cx1 + r1 + r2; }
+            drawToothedGear(ctx, cx1, cy, r1, N1, theta1, "#9333ea");
+            drawToothedGear(ctx, cx2, cy, r2, N2, theta2, "#64748b");
+            ctx.font = "bold 12px Arial"; ctx.fillStyle = "#9333ea"; ctx.fillText("Input", cx1-20, cy - r1 - 20);
+            ctx.fillStyle = "#64748b"; ctx.fillText("Output", cx2-20, cy - r2 - 20);
+            requestAnimationFrame(drawGear);
+        }
+        requestAnimationFrame(drawGear);
+
+        // ==========================================
+        // 5. 輪軸 (Wheel)
+        // ==========================================
+        let wheelMode = 'normal';
+        const whInp = { R: document.getElementById('inp-wh-R'), r: document.getElementById('inp-wh-r'), w: document.getElementById('inp-wh-w') };
+        function setWheelMode(m) {
+            wheelMode = m;
+            document.getElementById('btn-wh-normal').className = `flex-1 py-1.5 rounded-md text-xs font-bold ${m==='normal'?'shadow bg-white text-indigo-600':'text-slate-500'}`;
+            document.getElementById('btn-wh-reverse').className = `flex-1 py-1.5 rounded-md text-xs font-bold ${m==='reverse'?'shadow bg-white text-indigo-600':'text-slate-500'}`;
+            updateWheel();
+        }
+        function updateWheel() {
+            const R = parseFloat(whInp.R.value); let r = parseFloat(whInp.r.value);
+            if(r >= R) { r = R-1; whInp.r.value = r; }
+            document.getElementById('wh-R-val').innerText = R; document.getElementById('wh-r-val').innerText = r;
+            document.getElementById('wh-w-val').innerText = whInp.w.value;
+            const W = parseFloat(whInp.w.value);
+            const F = wheelMode === 'normal' ? W*(r/R) : W*(R/r);
+            document.getElementById('wh-res-force').innerText = F.toFixed(1) + " kgw";
+        }
+        Object.values(whInp).forEach(e => e.addEventListener('input', updateWheel));
+        function drawWheel() {
+            if(activeTab!=='wheel') { requestAnimationFrame(drawWheel); return; }
+            const { ctx, cvs } = visuals.wheel;
+            const w = cvs.width, h = cvs.height; const cx = w/2, cy = h/2 - 50; const scale = 5;
+            const R = parseFloat(whInp.R.value), r = parseFloat(whInp.r.value), W = parseFloat(whInp.w.value);
+            ctx.clearRect(0,0,w,h);
+            
+            ctx.beginPath(); ctx.arc(cx,cy, R*scale, 0, Math.PI*2); ctx.fillStyle="#e0e7ff"; ctx.strokeStyle="#4338ca"; ctx.lineWidth=4; ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(cx,cy, r*scale, 0, Math.PI*2); ctx.fillStyle="#cbd5e1"; ctx.strokeStyle="#334155"; ctx.fill(); ctx.stroke();
+            const F = wheelMode === 'normal' ? W*(r/R) : W*(R/r);
+            let fx, wx, fColor;
+            if(wheelMode === 'normal') { 
+                fx = cx + R*scale; wx = cx - r*scale; fColor="#dc2626"; 
+                const arrowLen = Math.min(250, 40 + F * 2);
+                drawArrow(ctx, fx, cy, fx, cy + arrowLen, fColor, `F=${F.toFixed(1)}`, Math.min(10, 2 + F * 0.1));
+            } else { 
+                fx = cx - r*scale; wx = cx + R*scale; fColor="#be123c"; 
+                const arrowLen = Math.min(280, 40 + F * 0.1);
+                const arrowWidth = Math.min(10, 3 + F * 0.005);
+                drawArrow(ctx, fx, cy, fx, cy + arrowLen, fColor, `F=${F.toFixed(1)}`, arrowWidth);
+            }
+            ctx.fillStyle="#3b82f6"; ctx.fillRect(wx-15, cy+80, 30, 30);
+            ctx.beginPath(); ctx.moveTo(wx, cy); ctx.lineTo(wx, cy+80); ctx.strokeStyle="#333"; ctx.lineWidth=2; ctx.stroke();
+            ctx.fillStyle="#fff"; ctx.font="10px Arial"; ctx.fillText("W", wx-5, cy+100);
+            requestAnimationFrame(drawWheel);
+        }
+        requestAnimationFrame(drawWheel);
+
+        // ==========================================
+        // 6. 力臂 (Moment Arm)
+        // ==========================================
+        const armInp = { r: document.getElementById('inp-arm-r'), deg: document.getElementById('inp-arm-deg'), show: document.getElementById('chk-arm-show') };
+        function updateArm() {
+            const r = parseFloat(armInp.r.value), deg = parseFloat(armInp.deg.value);
+            document.getElementById('arm-r-val').innerText = r; document.getElementById('arm-deg-val').innerText = deg;
+            const rad = deg * Math.PI / 180;
+            const len = r * Math.sin(rad);
+            document.getElementById('arm-len-val').innerText = len.toFixed(2);
+        }
+        Object.values(armInp).forEach(e => e.addEventListener('input', updateArm));
+        function drawArm() {
+            if(activeTab!=='arm') { requestAnimationFrame(drawArm); return; }
+            const { ctx, cvs } = visuals.arm;
+            const w = cvs.width, h = cvs.height;
+            const cx = 50, cy = 300; const scale = 25;
+            const r = parseFloat(armInp.r.value), deg = parseFloat(armInp.deg.value), show = armInp.show.checked;
+            const rad = deg * Math.PI / 180;
+            
+            ctx.clearRect(0,0,w,h);
+            
+            ctx.fillStyle="#64748b"; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx-15, cy+30); ctx.lineTo(cx+15, cy+30); ctx.fill();
+            ctx.fillStyle="#cbd5e1"; ctx.fillRect(cx, cy-5, 350, 10);
+            
+            const px = cx + r * scale; const py = cy;
+            ctx.fillStyle="#3b82f6"; ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI*2); ctx.fill();
+            
+            const fLen = 80;
+            const dx = Math.cos(rad); const dy = -Math.sin(rad);
+            
+            drawArrow(ctx, px, py, px + fLen*dx, py + fLen*dy, "#3b82f6", "F");
+
+            if (show) {
+                const lineLen = 500;
+                ctx.strokeStyle="#94a3b8"; ctx.setLineDash([5,5]); ctx.lineWidth=1;
+                ctx.beginPath();
+                ctx.moveTo(px - lineLen*dx, py - lineLen*dy);
+                ctx.lineTo(px + lineLen*dx, py + lineLen*dy);
+                ctx.stroke(); ctx.setLineDash([]);
+
+                const TFx = cx - px; const TFy = cy - py;
+                const dot = TFx * dx + TFy * dy;
+                const Qx = px + dot * dx;
+                const Qy = py + dot * dy;
+
+                ctx.strokeStyle="#e11d48"; ctx.lineWidth=3;
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(Qx, Qy); ctx.stroke();
+                ctx.fillStyle="#e11d48"; ctx.beginPath(); ctx.arc(Qx, Qy, 4, 0, Math.PI*2); ctx.fill();
+                
+                const midQx = (cx + Qx)/2; const midQy = (cy + Qy)/2;
+                ctx.fillStyle="#e11d48"; ctx.font="bold 14px Arial"; 
+                ctx.fillText("d", midQx + 5, midQy - 5);
+            }
+            requestAnimationFrame(drawArm);
+        }
+        requestAnimationFrame(drawArm);
+
+        // Init
+        updateLever(); updatePlane(); updatePulley(); updateGear(); updateWheel(); updateArm();
+
+    </script>
+</body>
+</html>
