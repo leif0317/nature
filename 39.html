@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>氣體溶解度噴泉實驗 (NH3 / HCl)</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --bg-color: #f0f4f8;
+            --panel-bg: #ffffff;
+            --tag-color: #f1c40f; /* 屬名標籤顏色 */
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h1 { margin: 0; font-size: 1.3rem; letter-spacing: 1px; }
+
+        /* 作者屬名樣式 */
+        .author-badge {
+            background-color: var(--tag-color);
+            color: var(--primary-color);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 800;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            border: 1px solid #d4ac0d;
+            transform: rotate(-2deg); /* 微微傾斜增加設計感 */
+        }
+        
+        .controls-top {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        select {
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: none;
+            font-size: 0.95rem;
+            cursor: pointer;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            font-weight: bold;
+        }
+
+        .monitor { 
+            font-family: monospace; 
+            background: rgba(0,0,0,0.3); 
+            padding: 5px 15px; 
+            border-radius: 15px; 
+            font-size: 0.9rem;
+            border: 1px solid rgba(255,255,255,0.3);
+            min-width: 140px;
+            text-align: center;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 60px);
+        }
+
+        .canvas-area {
+            flex: 7;
+            background: linear-gradient(to bottom, #eef2f3 0%, #ffffff 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.6);
+        }
+
+        .control-panel {
+            flex: 3;
+            max-width: 320px;
+            background: var(--panel-bg);
+            padding: 20px;
+            border-left: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .step-box {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 12px;
+            background: #fafafa;
+            transition: all 0.3s;
+        }
+
+        .step-box.active {
+            border-color: #3498db;
+            background: #f0f9ff;
+            border-left: 4px solid #3498db;
+        }
+
+        .step-box.disabled { opacity: 0.5; pointer-events: none; }
+
+        h3 { margin: 0 0 5px 0; font-size: 1rem; color: #333; }
+        p { margin: 0 0 10px 0; font-size: 0.85rem; color: #666; }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: #3498db;
+            color: white;
+            transition: background 0.2s;
+        }
+
+        button:hover { background: #2980b9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+        .btn-reset { background: #95a5a6; margin-top: auto; }
+        .btn-reset:hover { background: #7f8c8d; }
+
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+            .canvas-area { height: 60%; }
+            .control-panel { height: 40%; max-width: none; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="title-group">
+        <h1>噴泉現象實驗室</h1>
+        <span class="author-badge">小粘製作</span>
+    </div>
+    
+    <div class="controls-top">
+        <select id="gasSelect">
+            <option value="NH3">氨氣 (NH₃) + 酚酞</option>
+            <option value="HCL">氯化氫 (HCl) + 石蕊</option>
+        </select>
+        <div class="monitor" id="pressureUI">壓力: 1.00 atm</div>
+    </div>
+</header>
+
+<div class="container">
+    <div class="canvas-area">
+        <canvas id="simCanvas" width="500" height="550"></canvas>
+    </div>
+
+    <div class="control-panel">
+        <div id="step1" class="step-box active">
+            <h3>步驟 1：啟動 (Priming)</h3>
+            <p>擠壓滴管。觀察氣體分子(灰點)如何被下方水滴吸引並溶解。</p>
+            <button id="btnStep1">擠壓滴管</button>
+        </div>
+
+        <div id="step2" class="step-box disabled">
+            <h3>步驟 2：噴泉 (Fountain)</h3>
+            <p>打開止水閥。噴泉水流接觸到燒瓶積水後才會變色，且水位約在45%處停止。</p>
+            <button id="btnStep2">打開止水閥</button>
+        </div>
+
+        <div class="step-box" style="border:none; background:none; padding:0;">
+            <h3>實驗資訊</h3>
+            <ul style="padding-left: 20px; font-size: 0.85rem; color: #555;">
+                <li id="infoGas">氣體：NH₃ (極易溶)</li>
+                <li id="infoInd">指示劑：酚酞 (鹼性變紅)</li>
+            </ul>
+        </div>
+
+        <button id="btnReset" class="btn-reset">重置實驗</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const pressureUI = document.getElementById('pressureUI');
+const gasSelect = document.getElementById('gasSelect');
+const btnStep1 = document.getElementById('btnStep1');
+const btnStep2 = document.getElementById('btnStep2');
+const btnReset = document.getElementById('btnReset');
+const step1Box = document.getElementById('step1');
+const step2Box = document.getElementById('step2');
+
+// 實驗參數配置
+const EXPERIMENTS = {
+    NH3: {
+        gasColor: 'rgba(100, 100, 100, 0.5)',   // 灰色氣體
+        liqColor: 'rgba(200, 230, 255, 0.8)',   // 燒杯水：透明/淺藍
+        reactColor: 'rgba(255, 60, 140, 0.95)', // 反應後：粉紅 (鹼性)
+        label: "含酚酞的水 (無色)",
+        infoInd: "指示劑：酚酞 (鹼性變紅)",
+        infoGas: "氣體：NH₃ (極易溶)"
+    },
+    HCL: {
+        gasColor: 'rgba(100, 120, 100, 0.4)',   // 淡綠灰色氣體
+        liqColor: 'rgba(100, 100, 255, 0.8)',   // 燒杯水：藍色 (石蕊)
+        reactColor: 'rgba(255, 50, 50, 0.95)',  // 反應後：紅色 (酸性)
+        label: "含藍色石蕊的水",
+        infoInd: "指示劑：石蕊 (酸性變紅)",
+        infoGas: "氣體：HCl (極易溶)"
+    }
+};
+
+let currentExp = EXPERIMENTS.NH3;
+
+// 幾何參數
+const CONFIG = {
+    flask: { x: 250, y: 150, r: 100 },
+    stopper: { y: 250, w: 40, h: 25 },
+    tube: { tipY: 150, bottomY: 480, width: 6 },
+    beaker: { x: 250, y: 440, w: 120, h: 90 },
+    dropper: { x: 280, tipY: 240 }
+};
+
+// 狀態管理
+let state = {
+    step: 0, 
+    pressure: 1.0,
+    tubeHeight: 0,
+    poolLevel: 0, 
+    isSqueezing: false,
+    maxPoolLevel: 0.45 
+};
+
+// 粒子
+let particles = {
+    gas: [],
+    drops: [],
+    fountain: []
+};
+
+// 顏色常數
+const C = {
+    glass: 'rgba(240, 248, 255, 0.4)',
+    glassStroke: '#7f8c8d',
+    stopper: '#5d4037'
+};
+
+// 初始化
+function init() {
+    updateExperimentSettings();
+    reset();
+    animate();
+}
+
+function updateExperimentSettings() {
+    const type = gasSelect.value;
+    currentExp = EXPERIMENTS[type];
+    
+    document.getElementById('infoInd').textContent = currentExp.infoInd;
+    document.getElementById('infoGas').textContent = currentExp.infoGas;
+}
+
+function reset() {
+    state = { 
+        step: 0, 
+        pressure: 1.0, 
+        tubeHeight: 0, 
+        poolLevel: 0, 
+        isSqueezing: false,
+        maxPoolLevel: 0.45 
+    };
+    particles = { gas: [], drops: [], fountain: [] };
+    
+    // 生成氣體
+    for(let i=0; i<300; i++) {
+        let a = Math.random() * Math.PI * 2;
+        let r = Math.sqrt(Math.random()) * (CONFIG.flask.r - 5);
+        particles.gas.push({
+            x: CONFIG.flask.x + r * Math.cos(a),
+            y: CONFIG.flask.y + r * Math.sin(a),
+            vx: (Math.random()-0.5),
+            vy: (Math.random()-0.5)
+        });
+    }
+
+    // UI Reset
+    step1Box.classList.remove('disabled');
+    step1Box.classList.add('active');
+    step2Box.classList.add('disabled');
+    step2Box.classList.remove('active');
+    btnStep1.disabled = false;
+    btnStep2.disabled = true;
+    updatePressure();
+}
+
+// 物理核心
+function update() {
+    // 1. 滴管水滴
+    for (let i = particles.drops.length - 1; i >= 0; i--) {
+        let p = particles.drops[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.3; 
+
+        if (p.y > CONFIG.flask.y + CONFIG.flask.r - 10) { 
+            particles.drops.splice(i, 1);
+            state.poolLevel = Math.min(state.poolLevel + 0.01, 0.05); 
+        }
+    }
+
+    // 2. 氣體溶解
+    let poolSurfaceY = CONFIG.flask.y + CONFIG.flask.r - (state.poolLevel * CONFIG.flask.r * 2);
+    let bottomCenterY = CONFIG.flask.y + CONFIG.flask.r;
+
+    for (let i = particles.gas.length - 1; i >= 0; i--) {
+        let p = particles.gas[i];
+        
+        if (state.poolLevel > 0) {
+            let dx = CONFIG.flask.x - p.x;
+            let dy = bottomCenterY - p.y;
+            
+            // 溶解速度調整：有明顯吸力但不瞬間消失
+            p.vx += dx * 0.015; 
+            p.vy += dy * 0.02; 
+            
+            p.vx *= 0.92;
+            p.vy *= 0.92;
+
+            p.x += p.vx;
+            p.y += p.vy;
+
+            if (p.y > poolSurfaceY) {
+                particles.gas.splice(i, 1);
+                state.pressure = particles.gas.length / 300; 
+                continue;
+            }
+        } else {
+            p.x += p.vx; p.y += p.vy;
+            let dx = p.x - CONFIG.flask.x;
+            let dy = p.y - CONFIG.flask.y;
+            if (Math.hypot(dx, dy) > CONFIG.flask.r - 2) {
+                 p.vx *= -1; p.vy *= -1;
+            }
+        }
+    }
+    updatePressure();
+
+    // 3. 噴泉上升
+    if (state.step === 2) {
+        let targetTubeH = (1.0 - state.pressure);
+        if (state.tubeHeight < targetTubeH) state.tubeHeight += 0.02;
+
+        let emissionRate = (state.poolLevel >= state.maxPoolLevel) ? 0 : 8;
+
+        if ((state.tubeHeight > 0.6 || state.pressure < 0.5) && emissionRate > 0) { 
+            state.tubeHeight = 1.0; 
+            
+            for(let k=0; k<emissionRate; k++) {
+                particles.fountain.push({
+                    x: CONFIG.flask.x,
+                    y: CONFIG.tube.tipY,
+                    vx: (Math.random()-0.5) * 7,
+                    vy: - (5 + Math.random() * 7), 
+                    life: 1.0,
+                    color: currentExp.liqColor // 噴出時保持原色
+                });
+            }
+        }
+    }
+
+    // 4. 噴泉粒子物理
+    for (let i = particles.fountain.length - 1; i >= 0; i--) {
+        let p = particles.fountain[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.25; 
+
+        let d = Math.hypot(p.x - CONFIG.flask.x, p.y - CONFIG.flask.y);
+        if (d > CONFIG.flask.r - 2) {
+            p.vx *= -0.6; p.vy *= -0.6;
+            let angle = Math.atan2(p.y - CONFIG.flask.y, p.x - CONFIG.flask.x);
+            p.x = CONFIG.flask.x + Math.cos(angle) * (CONFIG.flask.r - 3);
+            p.y = CONFIG.flask.y + Math.sin(angle) * (CONFIG.flask.r - 3);
+        }
+
+        if (p.y > poolSurfaceY) {
+            particles.fountain.splice(i, 1);
+            if (state.poolLevel < state.maxPoolLevel) {
+                state.poolLevel += 0.0003; // 緩慢上升
+            }
+        }
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawBeakerAndTubeBack();
+    drawParticles();
+    drawFlaskAndDropper();
+}
+
+function drawBeakerAndTubeBack() {
+    let b = CONFIG.beaker;
+    // 燒杯
+    ctx.beginPath();
+    ctx.rect(b.x - b.w/2, b.y, b.w, b.h);
+    ctx.strokeStyle = "#999";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // 燒杯水
+    ctx.fillStyle = currentExp.liqColor;
+    ctx.fillRect(b.x - b.w/2 + 2, b.y + 30, b.w - 4, b.h - 30);
+    
+    // 標籤
+    ctx.fillStyle = "#555";
+    ctx.font = "12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(currentExp.label, b.x, b.y + b.h + 20);
+
+    // 長管
+    ctx.beginPath();
+    ctx.moveTo(CONFIG.flask.x, CONFIG.tube.tipY);
+    ctx.lineTo(CONFIG.flask.x - 3, CONFIG.tube.tipY + 15);
+    ctx.lineTo(CONFIG.flask.x - 3, b.y + b.h - 10);
+    ctx.lineTo(CONFIG.flask.x + 3, b.y + b.h - 10);
+    ctx.lineTo(CONFIG.flask.x + 3, CONFIG.tube.tipY + 15);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.strokeStyle = "#aaa";
+    ctx.lineWidth = 1;
+    ctx.fill(); ctx.stroke();
+
+    if (state.tubeHeight > 0) {
+        let fullLen = (b.y + b.h - 10) - CONFIG.tube.tipY;
+        let h = state.tubeHeight * fullLen;
+        let topY = (b.y + b.h - 10) - h;
+        ctx.fillStyle = currentExp.liqColor;
+        ctx.fillRect(CONFIG.flask.x - 2, topY, 4, h);
+    }
+}
+
+function drawParticles() {
+    // 氣體
+    ctx.fillStyle = currentExp.gasColor;
+    particles.gas.forEach(p => {
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill();
+    });
+
+    // 滴管水滴
+    ctx.fillStyle = currentExp.liqColor;
+    particles.drops.forEach(p => {
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+    });
+
+    // 噴泉粒子
+    particles.fountain.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); 
+        ctx.arc(p.x, p.y, 1.5, 0, Math.PI*2); 
+        ctx.fill();
+    });
+
+    // 底部積水
+    if (state.poolLevel > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(CONFIG.flask.x, CONFIG.flask.y, CONFIG.flask.r - 2, 0, Math.PI*2);
+        ctx.clip();
+
+        let h = state.poolLevel * CONFIG.flask.r * 2;
+        let y = CONFIG.flask.y + CONFIG.flask.r - h;
+        
+        // 變色判定：步驟2啟動後積水變色
+        let color = (state.step === 2) ? currentExp.reactColor : currentExp.liqColor;
+        // 剛開始的幾滴還沒變色
+        if(state.step === 0 || (state.step === 1 && state.poolLevel < 0.06)) {
+             color = currentExp.liqColor;
+        }
+
+        ctx.fillStyle = color;
+        ctx.fillRect(CONFIG.flask.x - CONFIG.flask.r, y, CONFIG.flask.r*2, h);
+        
+        ctx.fillStyle = "rgba(255,255,255,0.3)";
+        ctx.fillRect(CONFIG.flask.x - CONFIG.flask.r, y, CONFIG.flask.r*2, 2);
+        ctx.restore();
+    }
+}
+
+function drawFlaskAndDropper() {
+    let sy = CONFIG.stopper.y;
+    ctx.fillStyle = C.stopper;
+    ctx.beginPath();
+    ctx.moveTo(CONFIG.flask.x - 25, sy);
+    ctx.lineTo(CONFIG.flask.x + 25, sy);
+    ctx.lineTo(CONFIG.flask.x + 20, sy + 25);
+    ctx.lineTo(CONFIG.flask.x - 20, sy + 25);
+    ctx.fill();
+
+    let dx = CONFIG.dropper.x;
+    ctx.fillStyle = C.glass;
+    ctx.strokeStyle = "#888";
+    ctx.lineWidth = 1;
+    
+    ctx.beginPath();
+    ctx.moveTo(dx - 3, CONFIG.dropper.tipY);
+    ctx.lineTo(dx + 3, CONFIG.dropper.tipY);
+    ctx.lineTo(dx + 3, sy + 35);
+    ctx.lineTo(dx - 3, sy + 35);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = "#e67e22";
+    ctx.beginPath();
+    let bulbW = state.isSqueezing ? 8 : 10;
+    ctx.ellipse(dx, sy + 45, bulbW, 12, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(CONFIG.flask.x, CONFIG.flask.y, CONFIG.flask.r, 0, Math.PI*2);
+    ctx.strokeStyle = C.glassStroke;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.arc(CONFIG.flask.x - 30, CONFIG.flask.y - 30, 20, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.fill();
+}
+
+// 事件綁定
+gasSelect.addEventListener('change', () => {
+    updateExperimentSettings();
+    reset();
+});
+
+btnStep1.addEventListener('click', () => {
+    state.isSqueezing = true;
+    setTimeout(() => state.isSqueezing = false, 200);
+
+    let dx = CONFIG.dropper.x;
+    let dy = CONFIG.dropper.tipY;
+    
+    let count = 0;
+    let dropInt = setInterval(() => {
+        if(count > 10) clearInterval(dropInt);
+        particles.drops.push({
+            x: dx,
+            y: dy,
+            vx: (Math.random()-0.5)*0.5,
+            vy: 2
+        });
+        count++;
+    }, 50);
+
+    setTimeout(() => {
+        if(state.poolLevel === 0) state.poolLevel = 0.04;
+        state.step = 1; 
+        
+        btnStep2.disabled = false;
+        step2Box.classList.remove('disabled');
+        step2Box.classList.add('active');
+        step1Box.classList.remove('active');
+        step1Box.classList.add('disabled');
+    }, 1500);
+    
+    btnStep1.disabled = true;
+});
+
+btnStep2.addEventListener('click', () => {
+    state.step = 2;
+    if (state.pressure > 0.3) state.pressure = 0.1;
+    btnStep2.disabled = true;
+    step2Box.classList.remove('active');
+    step2Box.classList.add('disabled');
+});
+
+btnReset.addEventListener('click', reset);
+
+function updatePressure() {
+    pressureUI.innerText = `壓力: ${state.pressure.toFixed(2)} atm`;
+    let redness = Math.floor((1 - state.pressure) * 150);
+    pressureUI.style.backgroundColor = `rgba(${redness}, 50, 50, 0.5)`;
+}
+
+function animate() {
+    update();
+    draw();
+    requestAnimationFrame(animate);
+}
+
+init();
+
+</script>
+</body>
+</html>
