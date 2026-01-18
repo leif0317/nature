@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式酸鹼滴定 - 測驗版 (小粘製作)</title>
+    <style>
+        :root {
+            --primary: #4A90E2;
+            --success: #2ECC71;
+            --warning: #F5A623;
+            --danger: #E74C3C;
+            --flask-liquid: #E0F7FA;
+            --flask-pink: #F48FB1;
+            --burette-border: #95a5a6;
+            --stopcock-color: #E74C3C;
+            --zoom-liquid-color: #4A90E2; 
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; padding: 0; background-color: #f0f2f5;
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none;
+        }
+
+        /* --- 頂部 --- */
+        .progress-header {
+            background: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #ddd; height: 60px; z-index: 100; position: relative;
+        }
+        .step-indicators { display: flex; gap: 6px; }
+        .step-dot { width: 10px; height: 10px; border-radius: 50%; background: #e9ecef; transition: 0.3s; }
+        .step-dot.active { background: var(--primary); transform: scale(1.3); }
+        .step-dot.completed { background: var(--success); }
+
+        .author-badge {
+            margin-left: 15px; background: #2c3e50; color: white; padding: 5px 12px;
+            border-radius: 20px; font-size: 0.9rem; font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: inline-block;
+            vertical-align: middle; border: 2px solid white;
+        }
+
+        /* --- UI 面板通用樣式 --- */
+        .ui-panel {
+            position: absolute; 
+            background: white; padding: 15px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            z-index: 50; 
+            transition: all 0.3s;
+        }
+
+        /* 左上參數設定 */
+        #setup-panel {
+            top: 80px; left: 20px; width: 240px;
+            max-height: calc(100vh - 100px); overflow-y: auto;
+        }
+
+        /* 右側控制面板 */
+        #control-panel {
+            top: 80px; right: 20px; width: 240px;
+        }
+
+        /* 計算機面板 (置中) */
+        .modal-overlay-container {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 8000;
+            display: none; justify-content: center; align-items: center;
+            backdrop-filter: blur(3px);
+        }
+        .modal-overlay-container.active { display: flex; }
+
+        #calc-panel {
+            background: white; padding: 25px; border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            width: 380px; max-width: 90%;
+            transform: scale(0.9); opacity: 0; transition: all 0.3s;
+        }
+        .modal-overlay-container.active #calc-panel { transform: scale(1); opacity: 1; }
+
+        /* 元件樣式 */
+        .section-title {
+            font-size: 0.9rem; font-weight: bold; color: var(--primary); 
+            border-bottom: 2px solid #eee; margin-bottom: 10px; padding-bottom: 5px; margin-top: 15px;
+        }
+        .section-title:first-child { margin-top: 0; }
+
+        label { display: block; margin-bottom: 4px; font-weight: 600; color: #555; font-size: 0.85rem; }
+        
+        select, input { 
+            width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; 
+            margin-bottom: 10px; box-sizing: border-box; font-size: 0.9rem; background: white;
+        }
+        
+        button { 
+            width: 100%; padding: 10px; border: none; border-radius: 6px; 
+            background: var(--primary); color: white; cursor: pointer; font-weight: bold; transition: 0.2s; margin-bottom: 5px;
+        }
+        button:hover { filter: brightness(1.1); }
+        button:disabled { background: #e0e0e0; color: #999; cursor: not-allowed; transform: none; }
+        
+        /* --- 修正：參數設定後的狀態 --- */
+        /* 1. 尚未解鎖的區域：保持半透明，不可點擊 */
+        .locked-section { 
+            opacity: 0.4; 
+            pointer-events: none; 
+            filter: grayscale(1); 
+            transition: opacity 0.5s;
+        }
+        
+        /* 2. 已完成設定的區域：文字清晰，但不可更改 */
+        .completed-section {
+            opacity: 1 !important; /* 強制不透明 */
+            filter: none !important;
+        }
+        .completed-section select:disabled {
+            background-color: #fcfcfc; /* 極淡的灰 */
+            color: #222 !important;    /* 深色文字，確保可讀 */
+            border-color: #ccc;
+            opacity: 1; /* 修正 iOS/Safari 預設透明度 */
+            -webkit-text-fill-color: #222; /* 修正 Chrome/Safari 預設顏色 */
+            cursor: default;
+        }
+        .completed-section button:disabled {
+            background: #ccc; /* 只有按鈕變暗 */
+            color: #fff;
+        }
+
+        /* 3. 當前操作區域 */
+        .active-section {
+            opacity: 1; pointer-events: auto;
+            border: 2px solid var(--primary); border-radius: 8px;
+            padding: 10px; margin: -10px; margin-bottom: 10px;
+            background-color: rgba(74, 144, 226, 0.05);
+        }
+
+        /* pH 顯示器 */
+        .ph-container {
+            background:#2c3e50; color:#ecf0f1; padding:15px; border-radius:8px; 
+            text-align:center; margin-bottom:15px; position: relative;
+        }
+        .ph-value { font-size:2.2rem; font-weight:bold; color:var(--success); transition: opacity 0.3s; min-height: 42px;}
+        .ph-hidden { opacity: 0; }
+        .ph-mask-text { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -40%);
+            font-size: 1.5rem; color: #7f8c8d; font-weight: bold; letter-spacing: 2px;
+            pointer-events: none; display: none;
+        }
+        .ph-hidden + .ph-mask-text { display: block; }
+        .ph-toggle {
+            position: absolute; top: 8px; right: 8px;
+            background: rgba(255,255,255,0.15); border: none; color: white;
+            width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 12px;
+        }
+
+        /* --- 計算機樣式 (新增輸入框) --- */
+        .calc-step { margin-bottom: 15px; padding: 12px; background: #f8f9fa; border-left: 4px solid var(--primary); border-radius: 4px; text-align: left; }
+        .calc-formula { font-family: 'Times New Roman', serif; font-style: italic; font-size: 1.2rem; text-align: center; margin: 10px 0; color: #2c3e50; background: #fff; padding: 5px; border-radius: 4px; border: 1px dashed #ccc;}
+        .calc-result-area { text-align: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; }
+        
+        #student-answer { 
+            font-size: 1.2rem; text-align: center; border: 2px solid var(--primary); color: #2c3e50; font-weight: bold; 
+            width: 70%; display: block; margin: 10px auto;
+        }
+        
+        .feedback-msg { font-weight: bold; margin-top: 10px; min-height: 24px; }
+        .feedback-correct { color: var(--success); }
+        .feedback-wrong { color: var(--danger); }
+
+        .close-calc { float: right; cursor: pointer; color: #999; font-size: 1.5rem; line-height: 20px; }
+        .close-calc:hover { color: #333; }
+
+        /* --- 實驗場景 --- */
+        .lab-container {
+            flex: 1; display: flex; justify-content: center; align-items: flex-end;
+            gap: 50px; padding-bottom: 140px; position: relative; z-index: 1;
+        }
+        .lab-bench {
+            position: absolute; bottom: 138px; left: 0; width: 100%; height: 12px;
+            background: #bdc3c7; border-top: 1px solid #95a5a6; z-index: 0;
+        }
+
+        .apparatus { display: flex; flex-direction: column; align-items: center; width: 260px; position: relative; }
+
+        .burette-container { position: relative; display: flex; flex-direction: column; align-items: center; z-index: 5; }
+        .burette-body {
+            width: 28px; height: 260px;
+            border: 2px solid var(--burette-border); border-bottom: none; border-top: none;
+            background: rgba(255,255,255,0.6); position: relative; overflow: hidden;
+            background-image: repeating-linear-gradient(to bottom, #7f8c8d 0, #7f8c8d 1px, transparent 1px, transparent 10px);
+            background-size: 10px 100%; background-repeat: no-repeat; background-position: right top;
+        }
+        .burette-liquid {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; 
+            background: rgba(74, 144, 226, 0.4); z-index: -1; transition: height 0.5s linear;
+        }
+        .scale-number { position: absolute; right: 2px; font-size: 9px; color: #555; font-family: monospace; }
+
+        .stopcock-assembly {
+            width: 44px; height: 34px; position: relative; display: flex; justify-content: center; align-items: center;
+            z-index: 10; margin-top: -2px;
+        }
+        .valve-housing { width: 12px; height: 24px; background: #ecf0f1; border: 2px solid var(--burette-border); border-radius: 2px; position: absolute; }
+        .valve-handle {
+            width: 40px; height: 10px; background: var(--stopcock-color); border-radius: 5px;
+            position: relative; z-index: 2; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); border: 1px solid rgba(0,0,0,0.1);
+        }
+        .valve-handle::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: white; border-radius: 50%; border: 1px solid #ccc; }
+        .stopcock-assembly.open .valve-handle { transform: rotate(90deg); }
+
+        .burette-tip {
+            width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent;
+            border-top: 30px solid var(--burette-border); z-index: 4; margin-top: -2px; position: relative;
+        }
+        .burette-tip::after {
+            content: ''; position: absolute; top: -30px; left: -6px; width: 0; height: 0;
+            border-left: 6px solid transparent; border-right: 6px solid transparent;
+            border-top: 26px solid white; z-index: 5;
+        }
+        .burette-tip.filled::after {
+            border-top-color: rgba(74, 144, 226, 0.6); transition: border-top-color 0.5s;
+        }
+
+        .beaker {
+            position: absolute; bottom: 0; width: 60px; height: 70px;
+            cursor: pointer; z-index: 60; transition: transform 0.5s; opacity: 0; pointer-events: none;
+        }
+        .beaker.visible { opacity: 1; pointer-events: auto; }
+        #acid-beaker { left: -80px; } 
+        #base-beaker { left: -80px; }
+
+        .flask-wrapper { position: relative; transition: transform 1s cubic-bezier(0.68, -0.55, 0.27, 1.55); }
+        .flask-wrapper.moved-away { transform: translateX(150px); }
+
+        .flask {
+            width: 120px; height: 160px; position: relative; z-index: 4; 
+            clip-path: polygon(35% 0%, 65% 0%, 70% 40%, 100% 100%, 0% 100%, 30% 40%);
+            background: rgba(255,255,255,0.7);
+            border-left: 2px solid rgba(150,150,150,0.5); border-right: 2px solid rgba(150,150,150,0.5);
+            background-image: linear-gradient(110deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.8) 20%, rgba(255,255,255,0.1) 40%);
+        }
+        .flask::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 5px; border-bottom: 3px solid #999; }
+
+        .flask-liquid {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 0px; 
+            background-color: var(--flask-liquid); transition: background-color 0.3s ease, height 1.5s ease-out;
+        }
+        .badge {
+            position: absolute; bottom: 10px; width: 100%; text-align: center;
+            font-size: 11px; font-weight: bold; color: var(--success); display: none;
+        }
+
+        #indicator-bottle {
+            position: absolute; bottom: 0; right: -90px; width: 50px; height: 70px; cursor: pointer; z-index: 20; transition: transform 0.3s;
+        }
+        #indicator-bottle:hover { transform: scale(1.05); }
+
+        .stream {
+            position: absolute; top: 320px; left: 50%; transform: translateX(-50%); width: 3px; height: 0;
+            background: var(--primary); opacity: 0.6; z-index: 3; display: none;
+        }
+        .drop {
+            position: absolute; left: 50%; width: 7px; height: 7px; background: var(--primary);
+            border-radius: 50%; transform: translateX(-50%); z-index: 3; opacity: 0;
+        }
+
+        /* --- 放大鏡 --- */
+        #zoom-container {
+            position: absolute; top: 200px; left: 50%; transform: translate(-180px, 0) scale(0);
+            width: 180px; height: 180px; background: white; border-radius: 50%; border: 5px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 5000; overflow: hidden;
+            display: flex; justify-content: center; align-items: flex-start;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: none;
+        }
+        #zoom-container.active { transform: translate(-220px, 0) scale(1); }
+        .zoom-label {
+            position: absolute; bottom: 15px; width: 100%; text-align: center; font-weight: bold; color: #555;
+            background: rgba(255,255,255,0.8); font-size: 12px; z-index: 20;
+        }
+        .zoom-svg { width: 100%; height: 100%; margin-top: -20px; }
+        #zoom-liquid-svg { transition: transform 1.5s linear; transform: translateY(0); }
+        @keyframes svg-bubble-fall { 0% { cy: 60; opacity: 1; } 100% { cy: 250; opacity: 0; } }
+
+        /* 引導列 */
+        .guide-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%; background: white; padding: 15px 20px;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.1); z-index: 3000; display: flex; align-items: center; justify-content: center; gap: 20px;
+            border-top: 4px solid var(--warning); transform: translateY(100%); transition: transform 0.3s;
+        }
+        .guide-bar.visible { transform: translateY(0); }
+        .guide-content h4 { margin: 0 0 5px 0; color: var(--warning); font-size: 1rem; }
+        .guide-content p { margin: 0; color: #555; font-size: 0.9rem; }
+
+        .pulse-obj { animation: pulse-anim 1.5s infinite; }
+        @keyframes pulse-anim {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(74, 144, 226, 0.7); }
+            50% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(74, 144, 226, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(74, 144, 226, 0); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="zoom-container">
+        <svg class="zoom-svg" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
+            <defs><clipPath id="tip-clip"><polygon points="20,10 180,10 100,210" /></clipPath></defs>
+            <polygon points="20,10 180,10 100,210" fill="white" />
+            <g clip-path="url(#tip-clip)">
+                <rect id="zoom-liquid-svg" x="0" y="-220" width="200" height="230" fill="#4A90E2" />
+                <circle id="zoom-bubble-svg" cx="100" cy="60" r="12" fill="white" stroke="#aaa" stroke-width="1" />
+            </g>
+            <polygon points="20,10 180,10 100,210" fill="none" stroke="rgba(150,150,150,0.6)" stroke-width="6" stroke-linejoin="round" />
+        </svg>
+        <div class="zoom-label">🔍 尖嘴放大視圖</div>
+    </div>
+
+    <div id="calc-modal-wrapper" class="modal-overlay-container">
+        <div id="calc-panel">
+            <span class="close-calc" onclick="closeCalc()">×</span>
+            <h3 style="margin-top:0; color:#2c3e50;">🧮 濃度計算機</h3>
+            <p style="font-size:0.9rem; color:#666;">公式：酸的當量數 = 鹼的當量數</p>
+            
+            <div class="calc-step">
+                <strong>1. 公式：</strong>
+                <div class="calc-formula">Ma × Va × na = Mb × Vb × nb</div>
+            </div>
+
+            <div class="calc-step">
+                <strong>2. 實驗數據：</strong>
+                <div style="font-size:0.9rem; margin-top:5px; line-height: 1.6;">
+                    鹼濃度 (Mb) = <span id="calc-mb"></span> M<br>
+                    鹼消耗 (Vb) = <span id="calc-vb" style="color:var(--primary); font-weight:bold;"></span> mL<br>
+                    鹼價數 (nb) = <span id="calc-nb"></span><br>
+                    酸體積 (Va) = <span id="calc-va"></span> mL<br>
+                    酸價數 (na) = <span id="calc-na"></span>
+                </div>
+            </div>
+
+            <div class="calc-result-area">
+                <strong>3. 請計算未知酸濃度 (Ma)：</strong>
+                <input type="number" id="student-answer" placeholder="輸入答案 (例如: 0.5)" step="0.01">
+                <button onclick="checkAnswer()" style="width:100%; margin-top:10px;">檢查答案</button>
+                <div id="calc-feedback" class="feedback-msg"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="setup-panel" class="ui-panel">
+        <div id="acid-section" class="active-section">
+            <div class="section-title">1. 酸性溶液 (錐形瓶)</div>
+            <label>酸液種類</label>
+            <select id="acid-type">
+                <option value="H2SO4">硫酸 (H₂SO₄)</option>
+                <option value="HCl">鹽酸 (HCl)</option>
+                <option value="HNO3">硝酸 (HNO₃)</option>
+                <option value="CH3COOH">醋酸 (CH₃COOH)</option>
+                <option value="H2CO3">碳酸 (H₂CO₃)</option>
+            </select>
+            <label>取用體積 (mL)</label>
+            <select id="acid-vol">
+                <option value="10">10 mL</option>
+                <option value="20">20 mL</option>
+                <option value="30">30 mL</option>
+                <option value="40">40 mL</option>
+                <option value="50">50 mL</option>
+            </select>
+            <button onclick="confirmAcid()" id="btn-acid" class="pulse-obj">確認加入酸液</button>
+        </div>
+
+        <div id="base-section" class="locked-section">
+            <div class="section-title">2. 鹼性溶液 (滴定管)</div>
+            <label>鹼液種類</label>
+            <select id="base-type" disabled>
+                <option value="NaOH">氫氧化鈉 (NaOH)</option>
+                <option value="Ca(OH)2">氫氧化鈣 (Ca(OH)₂)</option>
+                <option value="NH4OH">氫氧化銨 (NH₄OH)</option>
+            </select>
+            <label>標準濃度 (M)</label>
+            <select id="base-conc" disabled>
+                <option value="1">1.0 M</option>
+                <option value="2">2.0 M</option>
+                <option value="3">3.0 M</option>
+                <option value="4">4.0 M</option>
+                <option value="5">5.0 M</option>
+            </select>
+            <button onclick="confirmBase()" id="btn-base" disabled>確認填充鹼液</button>
+        </div>
+    </div>
+
+    <div id="control-panel" class="ui-panel">
+        <div class="ph-container">
+            <button class="ph-toggle" onclick="togglePH()" title="顯示/隱藏 pH 值">👁️</button>
+            <div style="font-size:0.8rem; opacity:0.8;">pH 值</div>
+            <div id="ph-display" class="ph-value ph-hidden">--</div>
+            <div class="ph-mask-text">???</div>
+            <div style="font-size:0.8rem; margin-top:5px; border-top:1px solid #465a6e; padding-top:5px;">
+                已加入鹼液: <span id="base-added">0.00</span> mL
+            </div>
+        </div>
+
+        <button id="btn-open-calc" onclick="openCalc()" style="background:#8e44ad; display:none; margin-bottom:15px; width:100%; border:none; border-radius:6px; color:white; padding:10px; cursor:pointer;">🧮 開啟計算機</button>
+
+        <label>流速控制 (mL/s)</label>
+        <input type="range" id="flow-rate" min="0.5" max="3" step="0.5" value="1">
+        
+        <button id="btn-continuous" onclick="toggleFlow()" disabled>▶ 開始滴定</button>
+        <button id="btn-single" onclick="addDrop()" style="background:#95a5a6; margin-top:5px;" disabled>💧 單滴 (0.05mL)</button>
+    </div>
+
+    <div class="progress-header">
+        <div style="font-weight: bold; color: #2c3e50; font-size: 1.2rem; display: flex; align-items: center;">
+            🧪 模擬酸鹼滴定
+            <span class="author-badge">小粘製作</span>
+        </div>
+        <div class="step-indicators">
+            <div class="step-dot active"></div>
+            <div class="step-dot"></div>
+            <div class="step-dot"></div>
+            <div class="step-dot"></div>
+            <div class="step-dot"></div>
+            <div class="step-dot"></div>
+            <div class="step-dot"></div>
+        </div>
+    </div>
+
+    <div class="lab-container">
+        <div class="lab-bench"></div>
+
+        <div class="apparatus" id="apparatus-area">
+            <div class="burette-container">
+                <div class="burette-body">
+                    <div class="burette-liquid" id="burette-liquid"></div>
+                    <span class="scale-number" style="top:5px">0</span>
+                    <span class="scale-number" style="top:20%">10</span>
+                    <span class="scale-number" style="top:40%">20</span>
+                    <span class="scale-number" style="top:60%">30</span>
+                    <span class="scale-number" style="top:80%">40</span>
+                    <span class="scale-number" style="top:96%">50</span>
+                </div>
+                <div class="stopcock-assembly" id="stopcock">
+                    <div class="valve-housing"></div>
+                    <div class="valve-handle"></div>
+                </div>
+                <div class="burette-tip" id="main-tip"></div>
+            </div>
+
+            <div class="stream" id="stream"></div>
+
+            <div class="flask-wrapper" id="flask-wrapper">
+                <div class="flask">
+                    <div class="flask-liquid" id="flask-liquid">
+                        <div class="badge" id="indicator-badge">已加酚酞</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="acid-beaker" class="beaker visible">
+                <svg viewBox="0 0 60 70" width="60" height="70">
+                    <path d="M5,5 L5,60 Q5,68 15,68 L45,68 Q55,68 55,60 L55,5" fill="rgba(255,255,255,0.8)" stroke="#888" stroke-width="2"/>
+                    <path d="M5,30 L55,30 L55,60 Q55,68 45,68 L15,68 Q5,68 5,60 Z" fill="#E0F7FA" stroke="none"/>
+                    <text x="30" y="50" font-family="Arial" font-size="10" fill="#333" text-anchor="middle" font-weight="bold">Acid</text>
+                </svg>
+            </div>
+
+            <div id="base-beaker" class="beaker">
+                <svg viewBox="0 0 60 70" width="60" height="70">
+                    <path d="M5,5 L5,60 Q5,68 15,68 L45,68 Q55,68 55,60 L55,5" fill="rgba(255,255,255,0.8)" stroke="#888" stroke-width="2"/>
+                    <path d="M5,20 L55,20 L55,60 Q55,68 45,68 L15,68 Q5,68 5,60 Z" fill="rgba(74, 144, 226, 0.4)" stroke="none"/>
+                    <text x="30" y="45" font-family="Arial" font-size="10" fill="#333" text-anchor="middle" font-weight="bold">Base</text>
+                </svg>
+            </div>
+
+            <div id="indicator-bottle" onclick="addIndicator()">
+                 <svg viewBox="0 0 40 60" width="50" height="70" style="overflow:visible;">
+                    <defs>
+                        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#f5f5f5;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#cfcfcf;stop-opacity:1" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M5,60 L35,60 L38,25 L2,25 Z" fill="url(#grad1)" stroke="#888" stroke-width="1"/>
+                    <rect x="14" y="5" width="12" height="20" fill="#ddd" stroke="#888"/>
+                    <rect x="12" y="2" width="16" height="8" fill="#333" rx="2"/>
+                    <rect x="10" y="35" width="20" height="15" fill="white" stroke="#ccc"/>
+                    <text x="20" y="46" font-family="Arial" font-size="10" fill="#E91E63" text-anchor="middle" font-weight="bold">PP</text>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <div class="guide-bar visible" id="guide-bar">
+        <div style="font-size: 2rem;">💡</div>
+        <div class="guide-content">
+            <h4 id="guide-title">步驟 1</h4>
+            <p id="guide-desc">...</p>
+        </div>
+    </div>
+
+    <script>
+        const ACIDS = {
+            'H2SO4': { name: '硫酸', valence: 2 },
+            'HCl': { name: '鹽酸', valence: 1 },
+            'HNO3': { name: '硝酸', valence: 1 },
+            'CH3COOH': { name: '醋酸', valence: 1 },
+            'H2CO3': { name: '碳酸', valence: 2 }
+        };
+        const BASES = {
+            'NaOH': { name: '氫氧化鈉', valence: 1 },
+            'Ca(OH)2': { name: '氫氧化鈣', valence: 2 },
+            'NH4OH': { name: '氫氧化銨', valence: 1 }
+        };
+
+        let state = {
+            step: 0, 
+            acidType: 'H2SO4', acidVol: 10, acidValence: 2, acidConcReal: 0,
+            baseType: 'NaOH', baseConc: 1, baseValence: 1,
+            addedBase: 0.0, ph: 1.0, 
+            isFlowing: false, hasIndicator: false, maxBuretteVol: 50, isBuretteFilled: false,
+            isPhHidden: true
+        };
+        let flowInterval = null;
+
+        // 隨機酸濃度 (0.5, 1.0, 1.5, 2.0)
+        const possibleConcs = [0.5, 1.0, 1.5, 2.0];
+        state.acidConcReal = possibleConcs[Math.floor(Math.random() * possibleConcs.length)];
+        console.log("Cheat Info: Real Acid Conc =", state.acidConcReal, "M");
+
+        const guideSteps = [
+            { title: "步驟 1：加入酸性溶液", desc: "請在左上角選擇酸液種類與體積，然後點擊「確認加入」。" },
+            { title: "步驟 2：填充鹼性溶液", desc: "酸液已加入。接著請設定鹼液的標準濃度，點擊「確認填充」。" },
+            { title: "步驟 3：加入指示劑", desc: "⚠️ 關鍵步驟：點擊右側的「酚酞指示劑」，否則無法觀察變色。" },
+            { title: "步驟 4：排除尖端氣泡", desc: "滴定管尖嘴現在充滿空氣。請點擊「開啟旋塞」排出氣泡，避免體積誤差。" },
+            { title: "步驟 5：粗略滴定", desc: "氣泡已排除。點擊「開始滴定」快速加入鹼液，系統會在接近 pH 7.0 時自動暫停。" },
+            { title: "步驟 6：精確滴定", desc: "接近終點！請改用「單滴」功能，一滴一滴加入，一旦變色系統將強制停止。" },
+            { title: "實驗結束", desc: "請點擊紫色按鈕開啟計算機，計算未知酸的濃度。" }
+        ];
+
+        window.onload = function() {
+            renderGuide(0);
+        };
+
+        // --- 核心邏輯 ---
+
+        function confirmAcid() {
+            state.acidType = document.getElementById('acid-type').value;
+            state.acidVol = parseFloat(document.getElementById('acid-vol').value);
+            state.acidValence = ACIDS[state.acidType].valence;
+
+            // 鎖定酸 (變為 completed-section)
+            document.getElementById('acid-section').classList.remove('active-section');
+            document.getElementById('acid-section').classList.add('completed-section'); // 新樣式: 不透明但不可點
+            document.getElementById('btn-acid').classList.remove('pulse-obj');
+            
+            document.getElementById('acid-type').disabled = true;
+            document.getElementById('acid-vol').disabled = true;
+            document.getElementById('btn-acid').disabled = true;
+
+            const beaker = document.getElementById('acid-beaker');
+            beaker.style.zIndex = 3000;
+            beaker.style.transform = "translate(160px, -150px) rotate(45deg)";
+            
+            setTimeout(() => {
+                document.getElementById('flask-liquid').style.height = "50px"; 
+                state.ph = (state.acidValence > 1) ? 1.0 : 2.0; 
+                document.getElementById('ph-display').innerText = state.ph.toFixed(2);
+            }, 500);
+
+            setTimeout(() => {
+                beaker.style.opacity = 0;
+                
+                // 解鎖鹼
+                document.getElementById('base-section').classList.remove('locked-section');
+                document.getElementById('base-section').classList.add('active-section');
+                document.getElementById('base-type').disabled = false;
+                document.getElementById('base-conc').disabled = false;
+                document.getElementById('btn-base').disabled = false;
+                document.getElementById('btn-base').classList.add('pulse-obj');
+
+                state.step++;
+                renderGuide(state.step);
+            }, 1500);
+        }
+
+        function confirmBase() {
+            state.baseType = document.getElementById('base-type').value;
+            state.baseConc = parseFloat(document.getElementById('base-conc').value);
+            state.baseValence = BASES[state.baseType].valence;
+
+            // 鎖定鹼
+            document.getElementById('base-section').classList.remove('active-section');
+            document.getElementById('base-section').classList.add('completed-section'); // 新樣式
+            document.getElementById('btn-base').classList.remove('pulse-obj');
+
+            document.getElementById('base-type').disabled = true;
+            document.getElementById('base-conc').disabled = true;
+            document.getElementById('btn-base').disabled = true;
+
+            document.getElementById('base-beaker').classList.add('visible');
+            const beaker = document.getElementById('base-beaker');
+            setTimeout(() => {
+                beaker.style.zIndex = 3000;
+                beaker.style.transform = "translate(120px, -300px) rotate(45deg)";
+            }, 100);
+
+            setTimeout(() => {
+                document.getElementById('burette-liquid').style.height = "100%";
+                state.isBuretteFilled = true;
+            }, 600);
+
+            setTimeout(() => {
+                beaker.style.opacity = 0;
+                state.step++;
+                renderGuide(state.step);
+                document.getElementById('indicator-bottle').classList.add('pulse-obj');
+            }, 1600);
+        }
+
+        function addIndicator() {
+            if (state.step !== 2) return;
+            state.hasIndicator = true;
+            document.getElementById('indicator-bottle').classList.remove('pulse-obj');
+            const bottle = document.getElementById('indicator-bottle');
+            bottle.style.zIndex = 3000; 
+            bottle.style.transition = "all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+            bottle.style.transform = "translate(-120px, -110px) rotate(-60deg)";
+            setTimeout(() => {
+                document.getElementById('indicator-badge').style.display = 'block';
+                bottle.style.transform = "none";
+                setTimeout(() => { 
+                    bottle.style.zIndex = ""; 
+                    state.step++; 
+                    renderGuide(state.step);
+                    setupPurgeStep();
+                }, 500);
+            }, 800);
+        }
+
+        function setupPurgeStep() {
+            document.getElementById('flask-wrapper').classList.add('moved-away');
+            document.getElementById('zoom-container').classList.add('active');
+            document.getElementById('btn-continuous').innerText = "開啟旋塞排除氣泡";
+            document.getElementById('btn-continuous').disabled = false;
+            document.getElementById('btn-continuous').classList.add('pulse-obj');
+        }
+
+        function toggleFlow() {
+            if (state.isFlowing) stopFlow(); else startFlow();
+        }
+
+        function startFlow() {
+            state.isFlowing = true;
+            
+            // 排氣邏輯
+            if (state.step === 3) {
+                document.getElementById('btn-continuous').innerText = "排除中...";
+                document.getElementById('stopcock').classList.add('open');
+                const stream = document.getElementById('stream');
+                stream.style.display = 'block'; stream.style.height = "130px";
+                
+                document.getElementById('zoom-liquid-svg').style.transform = "translateY(220px)";
+                document.getElementById('zoom-bubble-svg').style.animation = "svg-bubble-fall 1.5s forwards"; 
+                setTimeout(() => { document.getElementById('main-tip').classList.add('filled'); }, 800);
+
+                setTimeout(() => {
+                    stream.style.display = 'none';
+                    document.getElementById('stopcock').classList.remove('open');
+                    state.isFlowing = false;
+                    document.getElementById('zoom-container').classList.remove('active');
+                    document.getElementById('flask-wrapper').classList.remove('moved-away');
+                    
+                    state.step++;
+                    renderGuide(state.step);
+                    document.getElementById('btn-continuous').innerText = "▶ 開始滴定";
+                    document.getElementById('btn-continuous').classList.add('pulse-obj');
+                }, 2000);
+                return;
+            }
+
+            if (state.step !== 4) return;
+            document.getElementById('btn-continuous').innerText = "⏸ 暫停";
+            document.getElementById('btn-continuous').style.background = "#E67E22";
+            document.getElementById('stopcock').classList.add('open'); 
+            const stream = document.getElementById('stream');
+            stream.style.display = 'block'; stream.style.height = "130px";
+            
+            flowInterval = setInterval(() => {
+                const rate = parseFloat(document.getElementById('flow-rate').value);
+                state.addedBase += (rate * 0.1);
+                updateSystem();
+            }, 100);
+        }
+
+        function stopFlow() {
+            state.isFlowing = false;
+            document.getElementById('btn-continuous').innerText = "▶ 開始滴定";
+            document.getElementById('btn-continuous').style.background = "var(--primary)";
+            document.getElementById('stopcock').classList.remove('open');
+            document.getElementById('stream').style.display = 'none';
+            clearInterval(flowInterval);
+        }
+
+        function addDrop() {
+            if (state.step !== 5) return;
+            state.addedBase += 0.05;
+            document.getElementById('btn-single').classList.remove('pulse-obj');
+            const drop = document.createElement('div');
+            drop.className = 'drop'; drop.style.animation = 'drop-fall 0.4s linear forwards';
+            document.getElementById('apparatus-area').appendChild(drop);
+            setTimeout(() => { updateSystem(); drop.remove(); }, 350);
+        }
+
+        function updateSystem() {
+            const molAcid = state.acidVol * state.acidConcReal * state.acidValence;
+            const molBase = state.addedBase * state.baseConc * state.baseValence;
+            const totalVol = state.acidVol + state.addedBase;
+            
+            let currentPh = 7.0;
+            if (molAcid > molBase) {
+                currentPh = 2.0 + (molBase/molAcid) * 4.0; 
+            } else if (molBase > molAcid) {
+                currentPh = 8.3 + ((molBase - molAcid) / totalVol) * 20; 
+                if(currentPh > 13) currentPh = 13;
+            }
+            // 變色判定：當鹼當量 >= 酸當量
+            if (molBase >= molAcid - 0.001) { 
+                currentPh = 8.2; 
+                // 確保消耗體積正好對應當量點，以便學生計算 (Math trick for simulation)
+                // state.addedBase = (state.acidVol * state.acidConcReal * state.acidValence) / (state.baseConc * state.baseValence);
+            }
+
+            state.ph = currentPh;
+            document.getElementById('ph-display').innerText = state.ph.toFixed(2);
+            document.getElementById('base-added').innerText = state.addedBase.toFixed(2);
+            
+            if(state.isBuretteFilled) {
+                const percentLeft = ((state.maxBuretteVol - state.addedBase) / state.maxBuretteVol) * 100;
+                document.getElementById('burette-liquid').style.height = `${Math.max(0, percentLeft)}%`;
+            }
+
+            const flaskLiquid = document.getElementById('flask-liquid');
+            flaskLiquid.style.height = Math.min(50 + state.addedBase * 1.5, 140) + 'px';
+            
+            if (state.hasIndicator && state.ph >= 8.2) {
+                flaskLiquid.style.backgroundColor = 'var(--flask-pink)';
+                finishExperiment();
+            }
+
+            if (state.step === 4 && state.ph >= 6.5) {
+                stopFlow();
+                state.step++;
+                renderGuide(state.step);
+                document.getElementById('btn-continuous').classList.remove('pulse-obj');
+                document.getElementById('btn-continuous').disabled = true; 
+                document.getElementById('btn-single').disabled = false; 
+                document.getElementById('btn-single').style.background = "var(--primary)";
+                document.getElementById('btn-single').classList.add('pulse-obj');
+            }
+        }
+
+        function finishExperiment() {
+            stopFlow();
+            document.getElementById('btn-single').disabled = true;
+            document.getElementById('btn-single').classList.remove('pulse-obj');
+            state.step = 6;
+            renderGuide(state.step);
+            document.getElementById('btn-open-calc').style.display = 'block';
+            document.getElementById('btn-open-calc').classList.add('pulse-obj');
+            // 移除自動彈窗
+        }
+
+        function renderGuide(step) {
+            document.getElementById('guide-title').innerText = guideSteps[step].title;
+            document.getElementById('guide-desc').innerText = guideSteps[step].desc;
+            
+            document.querySelectorAll('.step-dot').forEach((dot, i) => {
+                dot.classList.remove('active');
+                if(i === step) dot.classList.add('active');
+                if(i < step) dot.classList.add('completed');
+            });
+        }
+
+        function togglePH() {
+            state.isPhHidden = !state.isPhHidden;
+            const display = document.getElementById('ph-display');
+            if(state.isPhHidden) display.classList.add('ph-hidden');
+            else display.classList.remove('ph-hidden');
+        }
+
+        function openCalc() {
+            document.getElementById('calc-mb').innerText = state.baseConc;
+            document.getElementById('calc-vb').innerText = state.addedBase.toFixed(2);
+            document.getElementById('calc-nb').innerText = state.baseValence;
+            document.getElementById('calc-va').innerText = state.acidVol;
+            document.getElementById('calc-na').innerText = state.acidValence;
+            
+            // 清空舊狀態
+            document.getElementById('student-answer').value = "";
+            document.getElementById('calc-feedback').innerHTML = "";
+            document.getElementById('btn-open-calc').classList.remove('pulse-obj');
+            document.getElementById('calc-modal-wrapper').classList.add('active');
+        }
+
+        function checkAnswer() {
+            const inputVal = parseFloat(document.getElementById('student-answer').value);
+            const feedback = document.getElementById('calc-feedback');
+            
+            if (isNaN(inputVal)) {
+                feedback.innerHTML = "<span class='feedback-wrong'>請輸入數字！</span>";
+                return;
+            }
+
+            const actualMa = state.acidConcReal;
+            const diff = Math.abs(inputVal - actualMa);
+
+            if (diff < 0.05) {
+                feedback.innerHTML = `<span class='feedback-correct'>🎉 正確！真實濃度為 ${actualMa} M</span>`;
+            } else {
+                feedback.innerHTML = `<span class='feedback-wrong'>❌ 錯誤。請檢查計算 (公式：Ma = Mb×Vb×nb / (Va×na))</span>`;
+            }
+        }
+
+        function closeCalc() {
+            document.getElementById('calc-modal-wrapper').classList.remove('active');
+        }
+
+    </script>
+</body>
+</html>
