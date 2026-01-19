@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>氣體溶解度噴泉實驗 (NH3 / HCl)</title>
+    <title>氣體溶解度噴泉實驗 (雙變因探究)</title>
     <style>
         :root {
             --primary-color: #2c3e50;
             --bg-color: #f0f4f8;
             --panel-bg: #ffffff;
-            --tag-color: #f1c40f; /* 屬名標籤顏色 */
+            --tag-color: #f1c40f;
         }
 
         body {
@@ -43,7 +43,6 @@
 
         h1 { margin: 0; font-size: 1.3rem; letter-spacing: 1px; }
 
-        /* 作者屬名樣式 */
         .author-badge {
             background-color: var(--tag-color);
             color: var(--primary-color);
@@ -53,22 +52,22 @@
             font-weight: 800;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             border: 1px solid #d4ac0d;
-            transform: rotate(-2deg); /* 微微傾斜增加設計感 */
+            transform: rotate(-2deg);
         }
         
         .controls-top {
             display: flex;
-            gap: 15px;
+            gap: 10px;
             align-items: center;
         }
 
         select {
-            padding: 5px 10px;
+            padding: 5px 8px;
             border-radius: 4px;
             border: none;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             cursor: pointer;
-            background: rgba(255,255,255,0.9);
+            background: rgba(255,255,255,0.95);
             color: #333;
             font-weight: bold;
         }
@@ -76,11 +75,11 @@
         .monitor { 
             font-family: monospace; 
             background: rgba(0,0,0,0.3); 
-            padding: 5px 15px; 
+            padding: 5px 12px; 
             border-radius: 15px; 
             font-size: 0.9rem;
             border: 1px solid rgba(255,255,255,0.3);
-            min-width: 140px;
+            min-width: 120px;
             text-align: center;
         }
 
@@ -156,10 +155,21 @@
         .btn-reset { background: #95a5a6; margin-top: auto; }
         .btn-reset:hover { background: #7f8c8d; }
 
-        @media (max-width: 768px) {
+        .info-tag {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: white;
+            margin-left: 5px;
+        }
+
+        @media (max-width: 900px) {
+            .controls-top { display: none; }
+            .control-panel { max-width: none; }
             .container { flex-direction: column; }
             .canvas-area { height: 60%; }
-            .control-panel { height: 40%; max-width: none; }
+            .control-panel { height: 40%; }
         }
     </style>
 </head>
@@ -167,14 +177,18 @@
 
 <header>
     <div class="title-group">
-        <h1>噴泉現象實驗室</h1>
+        <h1>STEM 實驗室：噴泉實驗</h1>
         <span class="author-badge">小粘製作</span>
     </div>
     
     <div class="controls-top">
         <select id="gasSelect">
-            <option value="NH3">氨氣 (NH₃) + 酚酞</option>
-            <option value="HCL">氯化氫 (HCl) + 石蕊</option>
+            <option value="NH3">氨氣 (鹼性)</option>
+            <option value="HCL">氯化氫 (酸性)</option>
+        </select>
+        <select id="indSelect">
+            <option value="PHEN">酚酞指示劑</option>
+            <option value="LITMUS">石蕊試劑</option>
         </select>
         <div class="monitor" id="pressureUI">壓力: 1.00 atm</div>
     </div>
@@ -186,23 +200,35 @@
     </div>
 
     <div class="control-panel">
+        <div style="display: flex; gap:10px; margin-bottom: 10px;" class="mobile-only">
+             <select id="gasSelectMobile" style="flex:1; border:1px solid #ccc;">
+                <option value="NH3">氨氣 (NH₃)</option>
+                <option value="HCL">氯化氫 (HCl)</option>
+            </select>
+             <select id="indSelectMobile" style="flex:1; border:1px solid #ccc;">
+                <option value="PHEN">酚酞</option>
+                <option value="LITMUS">石蕊</option>
+            </select>
+        </div>
+
         <div id="step1" class="step-box active">
             <h3>步驟 1：啟動 (Priming)</h3>
-            <p>擠壓滴管。觀察氣體分子(灰點)如何被下方水滴吸引並溶解。</p>
+            <p>擠壓滴管 (純水)。觀察氣體溶解於水中，但此時尚未發生指示劑反應。</p>
             <button id="btnStep1">擠壓滴管</button>
         </div>
 
         <div id="step2" class="step-box disabled">
             <h3>步驟 2：噴泉 (Fountain)</h3>
-            <p>打開止水閥。噴泉水流接觸到燒瓶積水後才會變色，且水位約在45%處停止。</p>
+            <p>打開止水閥。指示劑溶液噴入後與氣體混合，觀察顏色變化。</p>
             <button id="btnStep2">打開止水閥</button>
         </div>
 
         <div class="step-box" style="border:none; background:none; padding:0;">
-            <h3>實驗資訊</h3>
+            <h3>實驗預測</h3>
             <ul style="padding-left: 20px; font-size: 0.85rem; color: #555;">
-                <li id="infoGas">氣體：NH₃ (極易溶)</li>
-                <li id="infoInd">指示劑：酚酞 (鹼性變紅)</li>
+                <li id="predGas">氣體：氨氣 (鹼性)</li>
+                <li id="predInd">指示劑：酚酞</li>
+                <li id="predResult">預期結果：<span id="resultTag" style="background:#e91e63; color:white; padding:2px 5px; border-radius:3px;">變粉紅色</span></li>
             </ul>
         </div>
 
@@ -214,34 +240,56 @@
 const canvas = document.getElementById('simCanvas');
 const ctx = canvas.getContext('2d');
 const pressureUI = document.getElementById('pressureUI');
+
+// Controls
 const gasSelect = document.getElementById('gasSelect');
+const indSelect = document.getElementById('indSelect');
+const gasSelectMobile = document.getElementById('gasSelectMobile');
+const indSelectMobile = document.getElementById('indSelectMobile');
+
 const btnStep1 = document.getElementById('btnStep1');
 const btnStep2 = document.getElementById('btnStep2');
 const btnReset = document.getElementById('btnReset');
 const step1Box = document.getElementById('step1');
 const step2Box = document.getElementById('step2');
 
-// 實驗參數配置
-const EXPERIMENTS = {
-    NH3: {
-        gasColor: 'rgba(100, 100, 100, 0.5)',   // 灰色氣體
-        liqColor: 'rgba(200, 230, 255, 0.8)',   // 燒杯水：透明/淺藍
-        reactColor: 'rgba(255, 60, 140, 0.95)', // 反應後：粉紅 (鹼性)
-        label: "含酚酞的水 (無色)",
-        infoInd: "指示劑：酚酞 (鹼性變紅)",
-        infoGas: "氣體：NH₃ (極易溶)"
+// --- 化學資料庫 ---
+const GAS_DATA = {
+    NH3: { name: "氨氣 (NH₃)", type: 'base', color: 'rgba(100, 100, 100, 0.5)' },
+    HCL: { name: "氯化氫 (HCl)", type: 'acid', color: 'rgba(100, 120, 100, 0.4)' }
+};
+
+const IND_DATA = {
+    PHEN: { 
+        name: "酚酞", 
+        // 酚酞起始顏色：淺藍 (代表無色透明液體在視覺上的呈現)
+        baseColor: 'rgba(135, 205, 255, 0.85)', 
+        startColor: 'rgba(135, 205, 255, 0.85)', 
+        getColor: (type) => type === 'base' ? 'rgba(255, 60, 140, 0.95)' : 'rgba(135, 205, 255, 0.85)' 
     },
-    HCL: {
-        gasColor: 'rgba(100, 120, 100, 0.4)',   // 淡綠灰色氣體
-        liqColor: 'rgba(100, 100, 255, 0.8)',   // 燒杯水：藍色 (石蕊)
-        reactColor: 'rgba(255, 50, 50, 0.95)',  // 反應後：紅色 (酸性)
-        label: "含藍色石蕊的水",
-        infoInd: "指示劑：石蕊 (酸性變紅)",
-        infoGas: "氣體：HCl (極易溶)"
+    LITMUS: { 
+        name: "石蕊", 
+        // 石蕊起始顏色：紫色
+        baseColor: 'rgba(140, 120, 200, 0.8)', 
+        startColor: 'rgba(140, 120, 200, 0.8)',
+        getColor: (type) => type === 'base' ? 'rgba(50, 50, 255, 0.9)' : 'rgba(255, 50, 50, 0.9)'
     }
 };
 
-let currentExp = EXPERIMENTS.NH3;
+// 顏色常數
+const C = {
+    glass: 'rgba(240, 248, 255, 0.4)',
+    glassStroke: '#7f8c8d',
+    stopper: '#5d4037',
+    waterBlue: 'rgba(100, 180, 255, 0.6)' // 純水顏色 (滴管用)
+};
+
+// 當前設定
+let currentSettings = {
+    gas: GAS_DATA.NH3,
+    ind: IND_DATA.PHEN,
+    resultColor: 'rgba(255, 60, 140, 0.95)'
+};
 
 // 幾何參數
 const CONFIG = {
@@ -269,26 +317,44 @@ let particles = {
     fountain: []
 };
 
-// 顏色常數
-const C = {
-    glass: 'rgba(240, 248, 255, 0.4)',
-    glassStroke: '#7f8c8d',
-    stopper: '#5d4037'
-};
-
 // 初始化
 function init() {
+    syncSelectors();
     updateExperimentSettings();
     reset();
     animate();
 }
 
+function syncSelectors() {
+    gasSelectMobile.value = gasSelect.value;
+    indSelectMobile.value = indSelect.value;
+}
+
 function updateExperimentSettings() {
-    const type = gasSelect.value;
-    currentExp = EXPERIMENTS[type];
+    const gasType = gasSelect.value;
+    const indType = indSelect.value;
     
-    document.getElementById('infoInd').textContent = currentExp.infoInd;
-    document.getElementById('infoGas').textContent = currentExp.infoGas;
+    currentSettings.gas = GAS_DATA[gasType];
+    currentSettings.ind = IND_DATA[indType];
+    currentSettings.resultColor = currentSettings.ind.getColor(currentSettings.gas.type);
+
+    document.getElementById('predGas').textContent = `氣體：${currentSettings.gas.name} (${currentSettings.gas.type === 'base' ? '鹼性' : '酸性'})`;
+    document.getElementById('predInd').textContent = `指示劑：${currentSettings.ind.name}`;
+    
+    const resTag = document.getElementById('resultTag');
+    if (currentSettings.resultColor === currentSettings.ind.baseColor) {
+        resTag.textContent = "無明顯變色";
+        resTag.style.background = "#95a5a6";
+    } else if (currentSettings.gas.type === 'base' && indType === 'PHEN') {
+        resTag.textContent = "變粉紅色";
+        resTag.style.background = "#e91e63";
+    } else if (currentSettings.gas.type === 'base' && indType === 'LITMUS') {
+        resTag.textContent = "變藍色";
+        resTag.style.background = "#2980b9";
+    } else if (currentSettings.gas.type === 'acid' && indType === 'LITMUS') {
+        resTag.textContent = "變紅色";
+        resTag.style.background = "#c0392b";
+    }
 }
 
 function reset() {
@@ -302,7 +368,6 @@ function reset() {
     };
     particles = { gas: [], drops: [], fountain: [] };
     
-    // 生成氣體
     for(let i=0; i<300; i++) {
         let a = Math.random() * Math.PI * 2;
         let r = Math.sqrt(Math.random()) * (CONFIG.flask.r - 5);
@@ -314,7 +379,6 @@ function reset() {
         });
     }
 
-    // UI Reset
     step1Box.classList.remove('disabled');
     step1Box.classList.add('active');
     step2Box.classList.add('disabled');
@@ -324,9 +388,8 @@ function reset() {
     updatePressure();
 }
 
-// 物理核心
 function update() {
-    // 1. 滴管水滴
+    // 1. 滴管水滴 (永遠是純水色)
     for (let i = particles.drops.length - 1; i >= 0; i--) {
         let p = particles.drops[i];
         p.x += p.vx;
@@ -350,10 +413,8 @@ function update() {
             let dx = CONFIG.flask.x - p.x;
             let dy = bottomCenterY - p.y;
             
-            // 溶解速度調整：有明顯吸力但不瞬間消失
             p.vx += dx * 0.015; 
             p.vy += dy * 0.02; 
-            
             p.vx *= 0.92;
             p.vy *= 0.92;
 
@@ -393,7 +454,8 @@ function update() {
                     vx: (Math.random()-0.5) * 7,
                     vy: - (5 + Math.random() * 7), 
                     life: 1.0,
-                    color: currentExp.liqColor // 噴出時保持原色
+                    // 噴出的水：保持燒杯內試劑的「原始顏色」
+                    color: currentSettings.ind.startColor 
                 });
             }
         }
@@ -417,7 +479,7 @@ function update() {
         if (p.y > poolSurfaceY) {
             particles.fountain.splice(i, 1);
             if (state.poolLevel < state.maxPoolLevel) {
-                state.poolLevel += 0.0003; // 緩慢上升
+                state.poolLevel += 0.0003; 
             }
         }
     }
@@ -432,24 +494,21 @@ function draw() {
 
 function drawBeakerAndTubeBack() {
     let b = CONFIG.beaker;
-    // 燒杯
     ctx.beginPath();
     ctx.rect(b.x - b.w/2, b.y, b.w, b.h);
     ctx.strokeStyle = "#999";
     ctx.lineWidth = 2;
     ctx.stroke();
     
-    // 燒杯水
-    ctx.fillStyle = currentExp.liqColor;
+    // 燒杯水 (試劑起始色)
+    ctx.fillStyle = currentSettings.ind.startColor;
     ctx.fillRect(b.x - b.w/2 + 2, b.y + 30, b.w - 4, b.h - 30);
     
-    // 標籤
     ctx.fillStyle = "#555";
     ctx.font = "12px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(currentExp.label, b.x, b.y + b.h + 20);
+    ctx.fillText("指示劑溶液", b.x, b.y + b.h + 20);
 
-    // 長管
     ctx.beginPath();
     ctx.moveTo(CONFIG.flask.x, CONFIG.tube.tipY);
     ctx.lineTo(CONFIG.flask.x - 3, CONFIG.tube.tipY + 15);
@@ -466,25 +525,25 @@ function drawBeakerAndTubeBack() {
         let fullLen = (b.y + b.h - 10) - CONFIG.tube.tipY;
         let h = state.tubeHeight * fullLen;
         let topY = (b.y + b.h - 10) - h;
-        ctx.fillStyle = currentExp.liqColor;
+        ctx.fillStyle = currentSettings.ind.startColor;
         ctx.fillRect(CONFIG.flask.x - 2, topY, 4, h);
     }
 }
 
 function drawParticles() {
     // 氣體
-    ctx.fillStyle = currentExp.gasColor;
+    ctx.fillStyle = currentSettings.gas.color;
     particles.gas.forEach(p => {
         ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill();
     });
 
-    // 滴管水滴
-    ctx.fillStyle = currentExp.liqColor;
+    // 滴管水滴 (固定為純水藍色)
+    ctx.fillStyle = C.waterBlue;
     particles.drops.forEach(p => {
         ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
     });
 
-    // 噴泉粒子
+    // 噴泉 (顏色由粒子帶有的屬性決定)
     particles.fountain.forEach(p => {
         ctx.fillStyle = p.color;
         ctx.beginPath(); 
@@ -502,14 +561,16 @@ function drawParticles() {
         let h = state.poolLevel * CONFIG.flask.r * 2;
         let y = CONFIG.flask.y + CONFIG.flask.r - h;
         
-        // 變色判定：步驟2啟動後積水變色
-        let color = (state.step === 2) ? currentExp.reactColor : currentExp.liqColor;
-        // 剛開始的幾滴還沒變色
-        if(state.step === 0 || (state.step === 1 && state.poolLevel < 0.06)) {
-             color = currentExp.liqColor;
+        // 顏色邏輯：
+        // 步驟 0 或 1：積水是滴管滴下去的純水 (C.waterBlue)
+        // 步驟 2：開始噴入試劑並反應，轉為反應色 (currentSettings.resultColor)
+        let poolColor = C.waterBlue;
+        
+        if (state.step === 2) {
+            poolColor = currentSettings.resultColor;
         }
 
-        ctx.fillStyle = color;
+        ctx.fillStyle = poolColor;
         ctx.fillRect(CONFIG.flask.x - CONFIG.flask.r, y, CONFIG.flask.r*2, h);
         
         ctx.fillStyle = "rgba(255,255,255,0.3)";
@@ -559,11 +620,14 @@ function drawFlaskAndDropper() {
     ctx.fill();
 }
 
-// 事件綁定
-gasSelect.addEventListener('change', () => {
+function onSettingChange() {
     updateExperimentSettings();
     reset();
-});
+}
+gasSelect.addEventListener('change', () => { gasSelectMobile.value = gasSelect.value; onSettingChange(); });
+indSelect.addEventListener('change', () => { indSelectMobile.value = indSelect.value; onSettingChange(); });
+gasSelectMobile.addEventListener('change', () => { gasSelect.value = gasSelectMobile.value; onSettingChange(); });
+indSelectMobile.addEventListener('change', () => { indSelect.value = indSelectMobile.value; onSettingChange(); });
 
 btnStep1.addEventListener('click', () => {
     state.isSqueezing = true;
