@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>氧氣製備：完美水位與燃燒細節版</title>
+    <style>
+        :root {
+            --glass-bg: linear-gradient(115deg, rgba(255,255,255,0.2) 0%, rgba(230,245,255,0.1) 40%, rgba(255,255,255,0.05) 100%);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.6);
+            --glass-shadow: inset 2px 2px 5px rgba(255,255,255,0.3), inset -2px -2px 5px rgba(0,0,0,0.1);
+            --water-color: rgba(135, 206, 250, 0.6);
+            --tube-color: #d35400; 
+            --stopper-color: #e67e22;
+            --bg-color: #2c3e50;
+            --table-line: 50px;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background: var(--bg-color); color: white;
+            margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+        }
+        
+        header { 
+            padding: 5px; background: rgba(0,0,0,0.4); text-align: center; 
+            z-index: 200; height: 40px;
+            display: flex; flex-direction: row; justify-content: center; align-items: center; gap: 20px;
+        }
+        h2 { margin: 0; font-size: 1.1rem; color: #fff; }
+        #status-bar { font-size: 0.9rem; color: #f1c40f; font-weight: bold; }
+        
+        #lab-bench {
+            position: relative; flex-grow: 1;
+            background: linear-gradient(to bottom, #455a64 0%, #37474f 100%);
+            border-bottom: 5px solid #263238; 
+            overflow: hidden; 
+        }
+        #lab-bench::after {
+            content: ''; position: absolute; bottom: var(--table-line);
+            left: 0; width: 100%; height: 2px; background: rgba(255,255,255,0.1); z-index: 0;
+        }
+
+        #action-bar {
+            padding: 8px; background: #1a252f; display: flex; flex-wrap: wrap;
+            gap: 6px; justify-content: center; height: 100px; overflow-y: auto; border-top: 1px solid #34495e;
+        }
+        .step-btn {
+            padding: 5px 10px; background: #455a64; border: 1px solid #546e7a; border-radius: 4px;
+            color: #b0bec5; cursor: not-allowed; font-size: 0.85rem; transition: all 0.3s; text-align: left;
+        }
+        .step-btn.active { background: #2e7d32; color: white; cursor: pointer; border-color: #388e3c; box-shadow: 0 2px 0 #1b5e20; }
+        .step-btn.completed { background: #0277bd; color: white; opacity: 0.7; cursor: default; border-color: #0288d1; }
+        .step-btn.pulse { background: #e67e22; animation: btnPulse 1s infinite; }
+        @keyframes btnPulse { 0% { box-shadow: 0 0 0 0 rgba(230, 126, 34, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(0,0,0,0); } 100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); } }
+
+        /* --- 器材 --- */
+        #flask-group { position: absolute; left: 60px; bottom: var(--table-line); width: 140px; height: 230px; opacity: 0; transition: opacity 1s; z-index: 30; }
+        .flask-rim { position: absolute; top: 30px; left: 45px; width: 50px; height: 8px; background: var(--glass-bg); border: var(--glass-border); border-radius: 4px; z-index: 4; box-shadow: var(--glass-shadow); }
+        .flask-neck { position: absolute; top: 36px; left: 50px; width: 40px; height: 70px; background: var(--glass-bg); border-left: var(--glass-border); border-right: var(--glass-border); z-index: 3; }
+        .flask-side-arm { position: absolute; top: 55px; left: 88px; width: 35px; height: 10px; background: var(--glass-bg); border: var(--glass-border); border-left: none; transform: rotate(15deg); transform-origin: left center; border-radius: 0 5px 5px 0; z-index: 2; }
+        #side-arm-tip { position: absolute; right: -5px; top: 50%; width: 1px; height: 1px; }
+        .flask-body { position: absolute; top: 100px; left: 10px; width: 120px; height: 130px; background: var(--glass-bg); border: var(--glass-border); border-radius: 40% 40% 50% 50% / 10% 10% 25% 25%; clip-path: polygon(30% 0, 70% 0, 100% 100%, 0% 100%); box-shadow: var(--glass-shadow); z-index: 2; overflow: hidden; }
+        #flask-content { position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; background: rgba(255,255,255,0.15); transition: height 1s; display: flex; justify-content: center; align-items: flex-end; z-index: 1; }
+        #mno2-container { position: absolute; bottom: 5px; width: 100%; text-align: center; display: flex; justify-content: center; z-index: 2; }
+        #mno2 { width: 50px; height: 8px; background: #2c2c2c; border-radius: 50%; filter: blur(1px); opacity: 0; transition: opacity 1s; }
+
+        #funnel-group { position: absolute; left: 107px; top: -600px; z-index: 35; transition: top 1s cubic-bezier(0.25, 1, 0.5, 1); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+        .funnel-cup { width: 46px; height: 42px; background: var(--glass-bg); border: var(--glass-border); border-radius: 50% 50% 45% 45% / 30% 30% 70% 70%; box-shadow: var(--glass-shadow); position: relative; z-index: 2; }
+        .funnel-tube { width: 7px; height: 240px; margin-top: -2px; background: var(--glass-bg); border-left: var(--glass-border); border-right: var(--glass-border); z-index: 1; }
+        .stopper { position: absolute; top: 100px; width: 38px; height: 25px; background: var(--stopper-color); border-top: 2px solid rgba(255,255,255,0.2); clip-path: polygon(0 0, 100% 0, 85% 100%, 15% 100%); z-index: 3; box-shadow: inset 0 5px 5px rgba(0,0,0,0.2); }
+        .stopper::before { content: ''; position: absolute; top: 0; left: -5px; width: 48px; height: 6px; background: var(--stopper-color); border-radius: 3px; box-shadow: 0 2px 2px rgba(0,0,0,0.3); }
+
+        #trough { position: absolute; left: 350px; bottom: var(--table-line); width: 300px; height: 120px; border: 3px solid rgba(255,255,255,0.3); border-top: none; border-radius: 0 0 20px 20px; background: rgba(255,255,255,0.05); opacity: 0; transition: opacity 1s; z-index: 10; }
+        #trough-water { position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; background: var(--water-color); border-radius: 0 0 17px 17px; transition: height 1.5s; }
+
+        .bottle { position: absolute; width: 70px; height: 110px; bottom: var(--table-line); opacity: 0; transition: all 1.5s ease-in-out; z-index: 40; display: flex; flex-direction: column; align-items: center; }
+        .bottle-rim { width: 56px; height: 10px; position: relative; overflow: hidden; background: var(--glass-bg); border: var(--glass-border); border-radius: 5px; margin-bottom: -2px; z-index: 2; }
+        .bottle-neck { width: 46px; height: 15px; position: relative; overflow: hidden; background: var(--glass-bg); border-left: var(--glass-border); border-right: var(--glass-border); z-index: 1; }
+        .bottle-body { position: relative; width: 70px; height: 85px; background: var(--glass-bg); border: var(--glass-border); border-radius: 15px 15px 5px 5px; overflow: hidden; }
+        
+        /* 水位控制 */
+        .water-fill { 
+            position: absolute; 
+            left: 0; width: 100%; height: 0%; 
+            background: var(--water-color); 
+            /* 預設 transition */
+            transition: height 0.5s linear; 
+        }
+        
+        #bottle-1 { left: 700px; }
+        #bottle-2 { left: 800px; opacity: 0; }
+
+        .glass-plate { position: absolute; width: 80px; height: 3px; background: rgba(220,255,220, 0.4); border: 1px solid rgba(255,255,255,0.6); top: -4px; opacity: 0; transition: opacity 0.5s; z-index: 22; }
+
+        /* 視覺化工具 */
+        #pouring-beaker { position: absolute; width: 40px; height: 50px; border: 2px solid rgba(255,255,255,0.7); border-top: none; background: rgba(255,255,255,0.2); border-radius: 0 0 5px 5px; opacity: 0; z-index: 60; transition: all 0.5s; transform-origin: top left; }
+        #pouring-beaker::after { content:''; position: absolute; bottom:0; left:0; width:100%; height:40%; background: var(--water-color); }
+        .liquid-stream { position: absolute; width: 4px; height: 0; background: var(--water-color); opacity: 0; transition: height 0.2s; z-index: 50; transform-origin: top; }
+        #chemical-dropper { position: absolute; width: 10px; height: 60px; background: linear-gradient(to bottom, #333 20%, rgba(255,255,255,0.5) 20%); border-radius: 5px 5px 2px 2px; opacity: 0; z-index: 60; transition: all 0.5s; }
+        .liquid-drop { position: absolute; width: 6px; height: 8px; background: white; border-radius: 50%; left: 50%; top: 100%; opacity: 0; z-index: 50; }
+        
+        /* 檢驗工具 */
+        #splint { position: absolute; width: 4px; height: 120px; background: #a0522d; border-radius: 2px; opacity: 0; z-index: 100; transition: all 1s; }
+        #splint-tip { position: absolute; bottom: 0; left: -1px; width: 6px; height: 6px; border-radius: 50%; background: #555; box-shadow: 0 0 2px #f00; transition: all 0.2s; }
+        
+        #magnesium { position: absolute; width: 6px; height: 100px; background: #bdc3c7; border-radius: 2px; opacity: 0; z-index: 100; transition: all 1s; box-shadow: 1px 1px 2px #7f8c8d; }
+        /* 鎂帶尖端 */
+        #mg-tip { position: absolute; bottom: 0; left: 0; width: 100%; height: 5px; background: transparent; transition: all 0.2s; }
+
+        .ember { background: #ff5722 !important; box-shadow: 0 0 4px 1px #ff4500; }
+        .burning { background: #fff !important; animation: burn-intense 0.2s infinite alternate; }
+        
+        /* 鎂帶燃燒狀態 */
+        /* 1. 點燃 (Lit): 小白光 */
+        .mg-lit { background: #fff !important; box-shadow: 0 0 10px 5px #fff; }
+        /* 2. 劇烈 (Intense): 大白光 + 閃爍 */
+        .mg-intense { 
+            background: #fff !important; 
+            box-shadow: 0 0 30px 15px #fff, 0 0 60px 30px rgba(255,255,255,0.9);
+            animation: mg-flicker 0.1s infinite alternate;
+        }
+
+        @keyframes burn-intense { 0% { box-shadow: 0 0 10px 4px #ffeb3b, 0 0 20px 8px #ff9800; transform: scale(1.1); } 100% { box-shadow: 0 0 15px 6px #ffff00, 0 0 25px 12px #ff5722; transform: scale(1.3); } }
+        @keyframes mg-flicker { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(1.2); opacity: 1; } }
+
+        #tube-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 40; opacity: 0; transition: opacity 1s; }
+        path { fill: none; stroke: var(--tube-color); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; transition: d 1.5s ease-in-out; filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.4)); }
+        
+        .bubble { position: absolute; background: rgba(255,255,255,0.8); border-radius: 50%; animation: rise linear forwards; }
+        @keyframes rise { to { transform: translateY(-180px) scale(1.1); opacity: 0; } }
+        @keyframes bubble-collect { from { top: 0; opacity: 1; } to { top: 80px; opacity: 0; } }
+
+        #timer-display { position: absolute; top: 150px; left: 50%; transform: translateX(-50%); font-size: 3rem; color: #ff5252; font-weight: bold; display: none; z-index: 200; }
+        .bubble-source { position: absolute; width: 1px; height: 1px; }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>氧氣製備實驗</h2>
+        <div id="status-bar">準備開始實驗，請依照下方步驟操作。</div>
+    </header>
+
+    <div id="lab-bench">
+        <svg id="tube-svg">
+            <path id="rubber-tube" d="" />
+        </svg>
+
+        <div id="flask-group">
+            <div class="flask-rim"></div>
+            <div class="flask-neck"></div>
+            <div class="flask-side-arm"><div id="side-arm-tip"></div></div>
+            <div class="flask-body">
+                <div id="flask-content"></div>
+                <div id="mno2-container"><div id="mno2"></div></div>
+            </div>
+        </div>
+
+        <div id="funnel-group">
+            <div id="pouring-beaker"></div>
+            <div class="liquid-stream" id="water-stream"></div>
+            <div id="chemical-dropper"></div>
+            <div class="funnel-cup"></div>
+            <div class="funnel-tube"></div>
+            <div class="stopper"></div>
+        </div>
+
+        <div id="trough">
+            <div id="trough-water"></div>
+        </div>
+
+        <div id="bottle-1" class="bottle">
+            <div class="bottle-rim"><div class="water-fill" id="b1-w-rim"></div></div>
+            <div class="bottle-neck"><div class="water-fill" id="b1-w-neck"></div></div>
+            <div class="bottle-body"><div class="water-fill" id="b1-w-body"></div></div>
+            <div class="glass-plate" id="plate-1"></div>
+        </div>
+
+        <div id="bottle-2" class="bottle">
+            <div class="bottle-rim"><div class="water-fill" id="b2-w-rim"></div></div>
+            <div class="bottle-neck"><div class="water-fill" id="b2-w-neck"></div></div>
+            <div class="bottle-body"><div class="water-fill" id="b2-w-body"></div></div>
+            <div class="glass-plate" id="plate-2"></div>
+        </div>
+        
+        <div id="splint"><div id="splint-tip"></div></div>
+        <div id="magnesium"><div id="mg-tip"></div></div>
+
+        <div id="bubble-source-flask" class="bubble-source" style="left:130px; bottom:60px;"></div>
+        <div id="bubble-source-tube" class="bubble-source"></div> 
+        <div id="timer-display">30</div>
+    </div>
+
+    <div id="action-bar"></div>
+
+    <script>
+        const steps = [
+            { id: 's1', text: '1. 放置器材', action: setupLab },
+            { id: 's2', text: '2. 水槽加水', action: fillTrough },
+            { id: 's3', text: '3. 廣口瓶1號 裝滿水倒置', action: () => prepareBottle(1) },
+            { id: 's4', text: '4. 加入二氧化錳', action: addMnO2 },
+            { id: 's5', text: '5. 裝上薊頭漏斗', action: addFunnel },
+            { id: 's6', text: '6. 連接橡皮管', action: connectTube },
+            { id: 's7', text: '7. 橡皮管入水槽', action: tubeToTrough },
+            { id: 's8', text: '8. 薊頭漏斗加水', action: addSealWater },
+            { id: 's9', text: '9. 加入雙氧水', action: addH2O2 },
+            { id: 's10', text: '10. 等待排氣 (30秒)', action: wait30Seconds },
+            { id: 's11', text: '11. 收集第1瓶', action: () => startCollection(1) },
+            { id: 's12', text: '12. 換瓶 (取瓶1, 備瓶2)', action: swapBottles },
+            { id: 's13', text: '13. 收集第2瓶', action: () => startCollection(2) },
+            { id: 's14', text: '14. 取出瓶2，實驗完成', action: finishExperiment },
+            { id: 's15', text: '15. 檢驗瓶1 (線香)', action: testSplint },
+            { id: 's16', text: '16. 檢驗瓶2 (鎂帶)', action: testMagnesium }
+        ];
+
+        let currentStepIndex = 0;
+        const msg = document.getElementById('status-bar');
+        const actionBar = document.getElementById('action-bar');
+        
+        function initButtons() {
+            steps.forEach((step, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'step-btn'; btn.id = `btn-${index}`; btn.innerText = step.text;
+                btn.onclick = () => {
+                    if (index === currentStepIndex && !btn.disabled) {
+                        step.action(); 
+                        if(index === 9) { 
+                            btn.disabled = true; // Wait step
+                        } else {
+                            markCompleted(index); 
+                            currentStepIndex++; 
+                            updateButtons();
+                        }
+                    }
+                };
+                actionBar.appendChild(btn);
+            });
+            updateButtons();
+        }
+
+        function updateButtons() {
+            const btns = document.querySelectorAll('.step-btn');
+            btns.forEach((btn, index) => {
+                btn.classList.remove('pulse');
+                if (index < currentStepIndex) { btn.className = 'step-btn completed'; btn.disabled = true; }
+                else if (index === currentStepIndex) { 
+                    btn.className = 'step-btn active'; 
+                    btn.disabled = false; 
+                    if (index === 10 || index === 11 || index === 12) btn.classList.add('pulse');
+                }
+                else { btn.className = 'step-btn'; btn.disabled = true; }
+            });
+        }
+        function markCompleted(index) { 
+            const btn = document.getElementById(`btn-${index}`);
+            if(btn && !btn.innerText.includes("(完成)")) btn.innerText += " (完成)"; 
+        }
+
+        function setupLab() {
+            document.getElementById('flask-group').style.opacity = '1';
+            document.getElementById('trough').style.opacity = '1';
+            document.getElementById('bottle-1').style.opacity = '1';
+            document.getElementById('bottle-2').style.opacity = '1';
+            msg.innerText = "器材已放置。廣口瓶位於右側桌面。";
+        }
+        function fillTrough() {
+            document.getElementById('trough-water').style.height = '85%';
+            msg.innerText = "水槽已加水。";
+        }
+        
+        // [修正] 由下而上填滿 - 無縫連接
+        function prepareBottle(num) {
+            const bottle = document.getElementById(`bottle-${num}`);
+            const wBody = document.getElementById(`b${num}-w-body`);
+            const wNeck = document.getElementById(`b${num}-w-neck`);
+            const wRim = document.getElementById(`b${num}-w-rim`);
+            
+            // 設置為填充模式 (anchor: bottom)
+            wBody.style.bottom = "0"; wBody.style.top = "auto";
+            wNeck.style.bottom = "0"; wNeck.style.top = "auto";
+            wRim.style.bottom = "0"; wRim.style.top = "auto";
+
+            // 計算高度比例 (Total ~110px. Body 85, Neck 15, Rim 10)
+            // 總時間 2.5s
+            // Body: 0s ~ 1.9s. Neck: 1.9s ~ 2.25s. Rim: 2.25s ~ 2.5s.
+            
+            wBody.style.transition = "height 1.9s linear";
+            wNeck.style.transition = "height 0.35s linear 1.9s"; // delay 1.9s
+            wRim.style.transition = "height 0.25s linear 2.25s"; // delay 2.25s
+            
+            // Trigger animation
+            wBody.style.height = '100%';
+            wNeck.style.height = '100%';
+            wRim.style.height = '100%';
+            
+            msg.innerText = `廣口瓶${num}號正在裝水 (由下而上)...`;
+            
+            setTimeout(() => {
+                bottle.style.left = "465px";
+                bottle.style.bottom = "80px"; 
+                bottle.style.transform = "rotate(180deg)"; 
+                msg.innerText = `廣口瓶${num}號已倒置沒入水槽中。`;
+                
+                // 倒置後，切換錨點到 top (為集氣做準備)
+                setTimeout(() => {
+                    wBody.style.transition = "none"; 
+                    wNeck.style.transition = "none";
+                    wRim.style.transition = "none";
+                    
+                    wBody.style.bottom = "auto"; wBody.style.top = "0";
+                    wNeck.style.bottom = "auto"; wNeck.style.top = "0";
+                    wRim.style.bottom = "auto"; wRim.style.top = "0";
+                }, 1500);
+            }, 3000); // Wait for fill (2.5s) + buffer
+        }
+
+        function addMnO2() { document.getElementById('mno2').style.opacity = '1'; msg.innerText = "已加入催化劑。"; }
+        function addFunnel() {
+            const flask = document.getElementById('flask-group').getBoundingClientRect();
+            const bench = document.getElementById('lab-bench').getBoundingClientRect();
+            const targetTop = (flask.top + 30) - 100 - bench.top;
+            document.getElementById('funnel-group').style.top = targetTop + 'px'; 
+            msg.innerText = "薊頭漏斗與塞子已緊密塞入瓶口。";
+        }
+        function connectTube() {
+            const tube = document.getElementById('tube-svg');
+            const bench = document.getElementById('lab-bench').getBoundingClientRect();
+            const tipRect = document.getElementById('side-arm-tip').getBoundingClientRect();
+            const tipX = tipRect.left - bench.left;
+            const tipY = tipRect.top - bench.top;
+            tube.style.opacity = '1';
+            const c1x = tipX + 40; const c1y = tipY - 20; 
+            const endY = bench.height - 120 - 20; 
+            const path = `M ${tipX} ${tipY} Q ${c1x} ${c1y} ${c1x + 20} ${endY + 50} T 320 ${bench.height - 100}`;
+            document.getElementById('rubber-tube').setAttribute('d', path);
+            msg.innerText = "橡皮管已正確套接至側管接口。";
+        }
+        function tubeToTrough() {
+            const bench = document.getElementById('lab-bench').getBoundingClientRect();
+            const tipRect = document.getElementById('side-arm-tip').getBoundingClientRect();
+            const tipX = tipRect.left - bench.left;
+            const tipY = tipRect.top - bench.top;
+            const wallTopY = bench.height - 170;
+            const troughLeftX = 350;
+            const insideX = 360;
+            const path = `M ${tipX} ${tipY} 
+                          C ${tipX+30} ${tipY-10}, ${troughLeftX-10} ${wallTopY-30}, ${troughLeftX+5} ${wallTopY+10} 
+                          L ${insideX} ${bench.height - 60} 
+                          L 400 ${bench.height - 60}`;
+            document.getElementById('rubber-tube').setAttribute('d', path);
+            document.getElementById('bubble-source-tube').style.left = '400px'; 
+            document.getElementById('bubble-source-tube').style.bottom = '60px';
+            msg.innerText = "橡皮管跨過水槽壁放入水中。";
+        }
+        
+        function addSealWater() {
+            const beaker = document.getElementById('pouring-beaker');
+            const stream = document.getElementById('water-stream');
+            const content = document.getElementById('flask-content');
+            beaker.style.left = "45px"; beaker.style.top = "-50px"; beaker.style.opacity = '1';
+            setTimeout(() => {
+                beaker.style.transform = "rotate(-45deg)";
+                stream.style.left = "21px"; stream.style.top = "0px";
+                stream.style.height = "120px"; stream.style.opacity = "1";
+                content.style.height = '20%'; content.style.background = 'rgba(200, 230, 255, 0.4)';
+            }, 500);
+            setTimeout(() => {
+                stream.style.opacity = "0"; beaker.style.opacity = "0";
+                msg.innerText = "加入少許水封住長管末端。";
+            }, 1500);
+        }
+        function addH2O2() {
+            const dropper = document.getElementById('chemical-dropper');
+            const content = document.getElementById('flask-content');
+            dropper.style.left = "18px"; dropper.style.top = "-50px"; dropper.style.opacity = '1';
+            let dropCount = 0;
+            const dropInt = setInterval(() => {
+                let d = document.createElement('div'); d.className = 'liquid-drop';
+                dropper.appendChild(d);
+                d.animate([{top: '100%', opacity: 1}, {top: '250px', opacity: 0}], {duration: 500, fill: 'forwards'});
+                setTimeout(()=>d.remove(), 500);
+                dropCount++;
+                if(dropCount > 5) {
+                    clearInterval(dropInt); dropper.style.opacity = '0';
+                    content.style.height = '50%';
+                    msg.innerText = "反應開始產生氣泡！";
+                    startReactionBubbles();
+                }
+            }, 300);
+        }
+        function startReactionBubbles() {
+            const source = document.getElementById('flask-content');
+            setInterval(() => { createBubble(source, 15, 60, 1.2); }, 300);
+        }
+        function wait30Seconds() {
+            const timerDisplay = document.getElementById('timer-display');
+            timerDisplay.style.display = 'block';
+            msg.innerText = "正在排空管內空氣...";
+            const tubeSource = document.getElementById('bubble-source-tube');
+            const wasteBubbles = setInterval(() => { 
+                let b = document.createElement('div'); b.className = 'bubble';
+                b.style.width = '6px'; b.style.height = '6px';
+                b.style.left = '0'; b.style.bottom = '0';
+                b.style.animation = 'rise 2s linear forwards';
+                tubeSource.appendChild(b);
+                setTimeout(()=>b.remove(), 2000);
+            }, 150);
+            
+            let timeLeft = 30;
+            let timer = setInterval(() => {
+                timeLeft--; timerDisplay.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timer); clearInterval(wasteBubbles);
+                    timerDisplay.style.display = 'none';
+                    msg.innerText = "空氣已排空，請手動點擊「11. 收集第1瓶」。";
+                    markCompleted(9); currentStepIndex++; updateButtons();
+                }
+            }, 100); 
+        }
+
+        function startCollection(bottleNum) {
+            const bench = document.getElementById('lab-bench').getBoundingClientRect();
+            const tipRect = document.getElementById('side-arm-tip').getBoundingClientRect();
+            const tipX = tipRect.left - bench.left;
+            const tipY = tipRect.top - bench.top;
+            const wallTopY = bench.height - 170;
+            const troughLeftX = 350;
+            const insideX = 360;
+            const bottleCenter = 500;
+            const bottleMouthY = bench.height - 85; 
+
+            const path = `M ${tipX} ${tipY} 
+                          C ${tipX+30} ${tipY-10}, ${troughLeftX-10} ${wallTopY-30}, ${troughLeftX+5} ${wallTopY+10} 
+                          L ${insideX} ${bench.height - 60} 
+                          L ${bottleCenter} ${bench.height - 60}
+                          L ${bottleCenter} ${bottleMouthY}`;
+            
+            document.getElementById('rubber-tube').setAttribute('d', path);
+            document.getElementById('bubble-source-tube').style.left = bottleCenter + 'px'; 
+            document.getElementById('bubble-source-tube').style.bottom = '85px';
+            
+            msg.innerText = `正在收集第${bottleNum}瓶氧氣 (過程15秒)...`;
+            
+            const wBody = document.getElementById(`b${bottleNum}-w-body`);
+            const wNeck = document.getElementById(`b${bottleNum}-w-neck`);
+            const wRim = document.getElementById(`b${bottleNum}-w-rim`);
+            const bottleBodyContainer = document.querySelector(`#bottle-${bottleNum} .bottle-body`);
+
+            // 15秒排水 (Anchor Top: 0)
+            // 無縫連接排水：Body -> Neck -> Rim
+            wBody.style.transition = "height 11.5s linear";
+            wNeck.style.transition = "height 2s linear 11.5s"; 
+            wRim.style.transition = "height 1.5s linear 13.5s";
+
+            let collectBubbles = setInterval(() => {
+                let b = document.createElement('div'); b.className = 'bubble';
+                b.style.width = '8px'; b.style.height = '8px';
+                b.style.left = '50%'; b.style.top = '0';
+                b.style.animation = 'bubble-collect 2s linear forwards';
+                bottleBodyContainer.appendChild(b);
+                setTimeout(()=>b.remove(), 2000);
+            }, 300);
+
+            wBody.style.height = '0%'; wNeck.style.height = '0%'; wRim.style.height = '0%';
+            
+            setTimeout(() => {
+                clearInterval(collectBubbles);
+                msg.innerText = `第${bottleNum}瓶收集完成！請手動點擊下一步。`;
+                
+                // [修正] 只解鎖，不跳轉
+                const currentBtn = document.querySelector('.step-btn.active');
+                if(currentBtn) {
+                    currentBtn.classList.remove('active');
+                    currentBtn.disabled = true;
+                    markCompleted(currentStepIndex);
+                }
+                
+                if(bottleNum === 1) {
+                    currentStepIndex = 11; // 12. 換瓶 (Unlock)
+                } else {
+                    currentStepIndex = 13; // 14. 取出 (Unlock)
+                }
+                updateButtons();
+            }, 15000);
+        }
+
+        // [修正] 步驟12：手動換瓶
+        function swapBottles() {
+            // 1. 移走管子
+            tubeToTrough(); 
+            
+            // 2. 移出瓶1
+            const b1 = document.getElementById('bottle-1');
+            const p1 = document.getElementById('plate-1');
+            p1.style.opacity = '1';
+            b1.style.zIndex = 100; b1.style.transition = "all 2s ease";
+            b1.style.bottom = "50px"; b1.style.left = "700px"; b1.style.transform = "rotate(0deg)";
+            
+            msg.innerText = "取出第1瓶，準備第2瓶...";
+            
+            // 3. 延遲後執行準備瓶2
+            setTimeout(() => {
+                prepareBottle(2);
+                
+                // 等待準備完成 (3s) 後才解鎖下一步
+                setTimeout(() => { 
+                    msg.innerText = "第2瓶準備就緒，請點擊「13. 收集第2瓶」。";
+                    
+                    const currentBtn = document.querySelector('.step-btn.active');
+                    if(currentBtn) {
+                        currentBtn.classList.remove('active');
+                        currentBtn.disabled = true;
+                        markCompleted(currentStepIndex); // Mark 12 done
+                    }
+                    currentStepIndex = 12; // Index 12 is Step 13
+                    updateButtons(); 
+                }, 4500); // 2s move out + 2.5s prepare
+            }, 2000);
+        }
+
+        function finishExperiment() {
+            tubeToTrough();
+            const b2 = document.getElementById('bottle-2');
+            const p2 = document.getElementById('plate-2');
+            p2.style.opacity = '1';
+            b2.style.zIndex = 100; b2.style.transition = "all 2s ease";
+            b2.style.bottom = "50px"; b2.style.left = "800px"; b2.style.transform = "rotate(0deg)";
+            
+            msg.innerText = "兩瓶氧氣收集完成，準備進行檢驗。";
+            
+            setTimeout(() => { 
+                const currentBtn = document.querySelector('.step-btn.active');
+                if(currentBtn) {
+                    currentBtn.classList.remove('active');
+                    currentBtn.disabled = true;
+                    markCompleted(currentStepIndex);
+                }
+                currentStepIndex = 14; 
+                updateButtons(); 
+            }, 2000);
+        }
+
+        function testSplint() {
+            const splint = document.getElementById('splint');
+            const tip = document.getElementById('splint-tip');
+            const plate = document.getElementById('plate-1');
+            const bottleBody = document.querySelector('#bottle-1 .bottle-body');
+            const bottleNeck = document.querySelector('#bottle-1 .bottle-neck');
+            
+            msg.innerText = "移開第1瓶玻璃片...";
+            plate.style.transform = "translateX(40px)";
+
+            setTimeout(() => {
+                tip.classList.add('ember'); 
+                splint.style.opacity = '1';
+                splint.style.left = "720px"; splint.style.bottom = "250px"; 
+                msg.innerText = "將帶有火星的線香伸入瓶中...";
+
+                setTimeout(() => {
+                    splint.style.bottom = "100px"; 
+                    setTimeout(() => {
+                        tip.classList.remove('ember'); tip.classList.add('burning');
+                        msg.innerText = "線香劇烈復燃！";
+                        const glow = "inset 0 0 30px rgba(255, 230, 100, 0.9)";
+                        bottleBody.style.boxShadow = glow; bottleNeck.style.boxShadow = glow;
+                        
+                        setTimeout(() => { 
+                            const currentBtn = document.querySelector('.step-btn.active');
+                            if(currentBtn) {
+                                currentBtn.classList.remove('active');
+                                currentBtn.disabled = true;
+                                markCompleted(currentStepIndex);
+                            }
+                            currentStepIndex = 15; updateButtons(); 
+                        }, 1000);
+                    }, 800);
+                }, 1000);
+            }, 800);
+        }
+
+        function testMagnesium() {
+            const mg = document.getElementById('magnesium');
+            const mgTip = document.getElementById('mg-tip');
+            const plate = document.getElementById('plate-2');
+            const bottleBody = document.querySelector('#bottle-2 .bottle-body');
+            const bottleNeck = document.querySelector('#bottle-2 .bottle-neck');
+            
+            msg.innerText = "移開第2瓶玻璃片...";
+            plate.style.transform = "translateX(40px)";
+            
+            setTimeout(() => {
+                mg.style.opacity = '1';
+                mg.style.left = "820px"; mg.style.bottom = "250px";
+                msg.innerText = "點燃鎂帶伸入瓶中...";
+                
+                setTimeout(() => {
+                    // 先點燃前端 (Lit)
+                    mgTip.classList.add('mg-lit');
+                    
+                    // 伸入瓶中
+                    setTimeout(() => {
+                        mg.style.bottom = "100px";
+                        setTimeout(() => {
+                            // [修正] 劇烈燃燒 (Flash) - 僅前端
+                            mgTip.classList.remove('mg-lit');
+                            mgTip.classList.add('mg-flash');
+                            
+                            msg.innerText = "鎂帶發出強烈白光！";
+                            const glow = "inset 0 0 50px rgba(255, 255, 255, 1)";
+                            bottleBody.style.boxShadow = glow; bottleNeck.style.boxShadow = glow;
+                        }, 500);
+                    }, 500);
+                }, 1000);
+            }, 800);
+        }
+
+        function createBubble(parent, sizeVar, rangeVar, speedScale) {
+            const b = document.createElement('div'); b.className = 'bubble';
+            const size = Math.random() * sizeVar + 4;
+            b.style.width = size + 'px'; b.style.height = size + 'px';
+            b.style.left = (Math.random() * rangeVar) + 'px'; b.style.bottom = '0';
+            b.style.animationDuration = (Math.random() * 1 + 1.5) / speedScale + 's';
+            parent.appendChild(b); setTimeout(() => b.remove(), 2000);
+        }
+        initButtons();
+    </script>
+</body>
+</html>
