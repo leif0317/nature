@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小粘自然 | 科學與數學互動網</title>
+    <title>小粘自然 | 章節導航版</title>
     <style>
         /* --- 1. 全域設定 --- */
         :root {
             --bg-color: #fdfbf7;
             --text-color: #333;
             /* 四大分類主題色 */
-            --color-bio: #658c65;      /* 生物-綠 */
-            --color-phy: #5b7c99;      /* 理化-藍 */
-            --color-earth: #a67c52;    /* 地科-褐 */
-            --color-math: #c45c5c;     /* 數學-紅 */
+            --color-bio: #658c65;      
+            --color-phy: #5b7c99;      
+            --color-earth: #a67c52;    
+            --color-math: #c45c5c;     
         }
 
         body {
@@ -36,7 +36,7 @@
         h1 { margin: 0; color: #444; letter-spacing: 2px; }
         p.subtitle { color: #888; margin-top: 5px; }
 
-        /* --- 3. 首頁：四大分類入口 (Home Screen) --- */
+        /* --- 3. 首頁：四大分類入口 --- */
         #home-screen {
             max-width: 1000px;
             margin: 40px auto;
@@ -55,34 +55,22 @@
             cursor: pointer;
             transition: transform 0.3s, box-shadow 0.3s;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            border-bottom: 5px solid #ccc; /* 預設底部線條 */
+            border-bottom: 5px solid #ccc;
         }
 
-        .category-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-        }
-
+        .category-card:hover { transform: translateY(-8px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
         .cat-icon { font-size: 3.5rem; display: block; margin-bottom: 15px; }
         .cat-title { font-size: 1.5rem; font-weight: bold; color: #555; }
 
-        /* 各分類的顏色設定 */
-        .card-bio { border-color: var(--color-bio); }
-        .card-bio .cat-icon { color: var(--color-bio); }
-        
-        .card-phy { border-color: var(--color-phy); }
-        .card-phy .cat-icon { color: var(--color-phy); }
+        /* 各分類顏色 */
+        .card-bio { border-color: var(--color-bio); } .card-bio .cat-icon { color: var(--color-bio); }
+        .card-phy { border-color: var(--color-phy); } .card-phy .cat-icon { color: var(--color-phy); }
+        .card-earth { border-color: var(--color-earth); } .card-earth .cat-icon { color: var(--color-earth); }
+        .card-math { border-color: var(--color-math); } .card-math .cat-icon { color: var(--color-math); }
 
-        .card-earth { border-color: var(--color-earth); }
-        .card-earth .cat-icon { color: var(--color-earth); }
-
-        .card-math { border-color: var(--color-math); }
-        .card-math .cat-icon { color: var(--color-math); }
-
-
-        /* --- 4. 內頁：資源列表 (Detail Screen) --- */
+        /* --- 4. 內頁：章節列表 --- */
         #detail-screen {
-            display: none; /* 預設隱藏 */
+            display: none;
             max-width: 1200px;
             margin: 20px auto;
             padding: 20px;
@@ -93,131 +81,106 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             border-bottom: 2px solid #eee;
             padding-bottom: 15px;
         }
 
         .back-btn {
-            background: #eee;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: 0.2s;
+            background: #eee; border: none; padding: 8px 20px; border-radius: 20px;
+            cursor: pointer; font-size: 1rem; display: flex; align-items: center; gap: 5px; transition: 0.2s;
         }
         .back-btn:hover { background: #ddd; }
 
-        .section-title {
-            font-size: 1.5rem;
+        .section-title { font-size: 1.5rem; font-weight: bold; color: #444; }
+
+        /* --- 章節區塊樣式 --- */
+        .chapter-group { margin-bottom: 40px; }
+        
+        .chapter-header {
+            font-size: 1.2rem;
             font-weight: bold;
-            color: #444;
+            color: #555;
+            margin-bottom: 15px;
+            padding-left: 10px;
+            border-left: 5px solid #ccc; /* 左邊的顏色條 */
+            background: rgba(255,255,255,0.5);
+            padding: 10px;
+            border-radius: 0 5px 5px 0;
         }
 
-        /* 資源卡片網格 */
         .gallery {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
+            gap: 20px;
         }
 
-        /* 資源小卡片樣式 */
         .item-card {
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            transition: 0.3s;
-            text-decoration: none;
-            color: inherit;
-            display: flex;
-            flex-direction: column;
-            border-left: 5px solid transparent; /* 左側顏色條 */
+            background: white; border-radius: 10px; overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: 0.3s;
+            text-decoration: none; color: inherit; display: flex; flex-direction: column;
         }
         .item-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
-        
         .item-content { padding: 20px; }
-        .item-title { font-weight: bold; font-size: 1.2rem; margin-bottom: 8px; }
+        .item-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; }
         .item-desc { font-size: 0.9rem; color: #666; }
 
         /* 動畫 */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 頁尾 */
-        footer {
-            text-align: center;
-            padding: 30px;
-            color: #999;
-            font-size: 0.85rem;
-            margin-top: 50px;
-        }
-
+        footer { text-align: center; padding: 30px; color: #999; font-size: 0.85rem; margin-top: 50px; }
     </style>
 </head>
 <body>
 
 <header>
     <h1>🌿 小粘自然</h1>
-    <p class="subtitle">互動式科學與數學探索中心</p>
+    <p class="subtitle">分類、章節、互動式資源導航</p>
 </header>
 
 <main id="home-screen">
     <div class="category-card card-bio" onclick="openCategory('bio', '生物 Biology', '#658c65')">
-        <span class="cat-icon">🧬</span>
-        <div class="cat-title">生物</div>
+        <span class="cat-icon">🧬</span><div class="cat-title">生物</div>
     </div>
-    
-    <div class="category-card card-phy" onclick="openCategory('phy', '理化 Physics & Chem', '#5b7c99')">
-        <span class="cat-icon">⚛️</span>
-        <div class="cat-title">理化</div>
+    <div class="category-card card-phy" onclick="openCategory('phy', '理化 Phy & Chem', '#5b7c99')">
+        <span class="cat-icon">⚛️</span><div class="cat-title">理化</div>
     </div>
-    
-    <div class="category-card card-earth" onclick="openCategory('earth', '地球科學 Earth Sci', '#a67c52')">
-        <span class="cat-icon">🌍</span>
-        <div class="cat-title">地球科學</div>
+    <div class="category-card card-earth" onclick="openCategory('earth', '地科 Earth Sci', '#a67c52')">
+        <span class="cat-icon">🌍</span><div class="cat-title">地球科學</div>
     </div>
-    
     <div class="category-card card-math" onclick="openCategory('math', '數學 Math', '#c45c5c')">
-        <span class="cat-icon">📐</span>
-        <div class="cat-title">數學</div>
+        <span class="cat-icon">📐</span><div class="cat-title">數學</div>
     </div>
 </main>
 
 <main id="detail-screen">
     <div class="nav-bar">
         <button class="back-btn" onclick="goHome()">⬅ 返回主選單</button>
-        <div class="section-title" id="page-title">分類標題</div>
+        <div class="section-title" id="page-title">標題</div>
     </div>
-    
-    <div class="gallery" id="gallery-container">
-        </div>
+    <div id="content-container"></div>
 </main>
 
-<footer>
-    &copy; 2025 小粘自然教學網 | 啟發探索的樂趣
-</footer>
+<footer>&copy; 2025 小粘自然教學網</footer>
 
 <script>
-    // --- 資料庫區 ---
-    // 請在這裡新增你的網頁
-    // category 代號： 'bio' (生物), 'phy' (理化), 'earth' (地科), 'math' (數學)
+    // --- 資料設定區 (這是您主要修改的地方) ---
+    // 請注意新增了 "chapter" 欄位
     const projects = [
-        {
+        // --- 生物 ---
+         {
             title: "互動式驗電器",
             category: "phy",
+            chapter: "電學",
             desc: "調整電棒，觀察靜電感應現象以及感應起電。",
-            tags: ["物理", "實驗", "國中"],
-            link: "2.html", // 連結到您的互動網頁檔案
+            link: "2.html",
             icon: "⚡︎"
         },
         {
             title: "全元素原子模擬器",
             category: "phy",
+            chapter: "元素",
             desc: "視覺畫質量數、原子序、電子數與同位數概念",
             tags: ["化學", "元素", "國中"],
             link: "3.html",
@@ -226,6 +189,7 @@
         {
             title: "太陽系運行軌道",
             category: "earth",
+            chapter: "日月地",
             desc: "視覺化呈現八大行星繞行太陽和彗星尾巴。",
             tags: ["地科", "天文"],
             link: "11.html",
@@ -234,6 +198,7 @@
         {
             title: "離子化合物配對練習表",
             category: "phy",
+            chapter: "化合物",
             desc: "練習將正負離子配對組合，寫出正確的化學式。",
             tags: ["化學", "離子"],
             link: "1.html",
@@ -242,6 +207,7 @@
         {
             title: "電路水路動畫",
             category: "phy",
+            chapter: "電學",
             desc: "動畫展示以水流類比電路情況。",
             tags: ["電流", "物理"],
             link: "4.html",
@@ -250,6 +216,7 @@
         {
             title: "互動式化學平衡",
             category: "phy",
+            chapter: "化合物",
             desc: "填入數字使化學式左右平衡",
             tags: ["化學", "平衡", "反應式"],
             link: "5.html",
@@ -258,6 +225,7 @@
         {
             title: "電解硫酸銅模擬器",
             category: "phy",
+            chapter: "電流的化學效應",
             desc: "觀察電解時的質量和顏色變化",
             tags: ["化學", "電解", "電鍍"],
             link: "6.html",
@@ -266,6 +234,7 @@
         {
             title: "電磁感應模擬實驗",
             category: "phy",
+            chapter: "電流的磁效應",
             desc: "觀察磁場變化時，線圈上的NS極變化",
             tags: ["物理", "電", "感應電流"],
             link: "7.html",
@@ -274,6 +243,7 @@
         {
             title: "靜電感應模擬實驗",
             category: "phy",
+            chapter: "電學",
             desc: "觀察電棒靠近離開時，金屬球上的電荷變化",
             tags: ["物理", "靜電", "感應起電"],
             link: "8.html",
@@ -282,6 +252,7 @@
         {
             title: "光學成像實驗室",
             category: "phy",
+            chapter: "光學",
             desc: "觀察五種鏡面的成像變化",
             tags: ["物理", "光", "面鏡", "透鏡"],
             link: "9.html",
@@ -290,6 +261,7 @@
         {
             title: "雙人平面鏡成像實驗室",
             category: "phy",
+            chapter: "光學",
             desc: "觀察照鏡子需要的平鏡面的長度",
             tags: ["物理", "光", "面鏡"],
             link: "10.html",
@@ -298,6 +270,7 @@
         {
             title: "日月食模擬器",
             category: "earth",
+            chapter: "日月地",
             desc: "觀察日蝕月蝕的變化",
             tags: ["地科", "天文" ],
             link: "12.html",
@@ -306,6 +279,7 @@
         {
             title: "月相變化與潮汐鎖定模擬",
             category: "earth",
+            chapter: "日月地",
             desc: "觀察月相的變化",
             tags: ["地科", "天文" ],
             link: "13.html",
@@ -314,6 +288,7 @@
         {
             title: "橫波的週期變化",
             category: "phy",
+            chapter: "波",
             desc: "觀察橫波的變化",
             tags: ["波", "頻率" ],
             link: "wave.html",
@@ -322,6 +297,7 @@
         {
             title: "三角形三心互動演示",
             category: "math",
+            chapter: "三心",
             desc: "觀察三心位置的變化",
             tags: ["重心", "外心" , "內心"],
             link: "14.html",
@@ -330,6 +306,7 @@
         {
             title: "地球公轉模擬器",
             category: "earth",
+            chapter: "日月地",
             desc: "觀察地球公轉時太陽直射位置的變化",
             tags: ["公轉", "地科" , "四季"],
             link: "earth.html",
@@ -338,6 +315,7 @@
         {
             title: "週期表",
             category: "phy",
+            chapter: "元素",
             desc: "觀察元素的樣貌與性質",
             tags: ["元素", "理化" ],
             link: "15.html",
@@ -346,6 +324,7 @@
         {
             title: "眼球成像實驗室",
             category: "phy",
+            chapter: "光學",
             desc: "觀察元素的樣貌與性質",
             tags: ["物理", "理化", "光學" ],
             link: "16.html",
@@ -354,6 +333,7 @@
         {
             title: "3D太陽軌跡模擬器",
             category: "earth",
+            chapter: "日月地",
             desc: "觀察四季太陽軌跡",
             tags: ["天文", "地科", "太陽" ],
             link: "SUN3D.html",
@@ -362,6 +342,7 @@
         {
             title: "3D海岸生態觀測站",
             category: "earth",
+            chapter: "日月地",
             desc: "觀察潮汐的變化",
             tags: ["地科", "潮汐" ],
             link: "3Dsea.html",
@@ -370,6 +351,7 @@
         {
             title: "水加熱時的溫度變化模擬器",
             category: "phy",
+            chapter: "熱",
             desc: "觀察水三態變化時吸熱溫度變化",
             tags: ["理化", "熱量" ],
             link: "water.html",
@@ -378,6 +360,7 @@
         {
             title: "神經系統演示",
             category: "bio",
+            chapter: "神經系統",
             desc: "觀察各種的神經反應路徑",
             tags: ["生物", "神經" ],
             link: "17.html",
@@ -386,6 +369,7 @@
         {
             title: "擴散作用演示",
             category: "bio",
+            chapter: "細胞",
             desc: "觀察擴散作用的粒子移動方向",
             tags: ["生物", "擴散" ],
             link: "18.html",
@@ -394,6 +378,7 @@
         {
             title: "呼吸運動模型",
             category: "bio",
+            chapter: "呼吸系統",
             desc: "觀察呼吸運動時的肺部變化情況",
             tags: ["生物", "呼吸" ],
             link: "19.html",
@@ -402,6 +387,7 @@
         {
             title: "斷層模型",
             category: "earth",
+            chapter: "板塊",
             desc: "觀察各種斷層的運動情況",
             tags: ["地科", "斷層" ],
             link: "20.html",
@@ -410,6 +396,7 @@
         {
             title: "同字輩模型",
             category: "phy",
+            chapter: "元素",
             desc: "觀察同位素、同素異形體，同分異構物的差別",
             tags: ["理化", "同位素", "同素異形體", "同分異構物" ],
             link: "21.html",
@@ -418,6 +405,7 @@
         {
             title: "光合作用模型",
             category: "bio",
+            chapter: "養分",
             desc: "觀察光合作用的反應物和生成物",
             tags: ["生物", "光合作用"],
             link: "22.html",
@@ -426,6 +414,7 @@
         {
             title: "雙金屬開關和溫度計模型",
             category: "phy",
+            chapter: "熱",
             desc: "觀察雙金屬加熱和冷卻後的彎曲變化",
             tags: ["理化", "雙金屬"],
             link: "23.html",
@@ -434,6 +423,7 @@
         {
             title: "能量金字塔與生物放大作用模擬器",
             category: "bio",
+            chapter: "人類與環境",
             desc: "觀察生物中能量和毒素的變化",
             tags: ["生物", "能量", "毒素"],
             link: "24.html",
@@ -442,6 +432,7 @@
         {
             title: "載流長直導線的磁力線模擬器",
             category: "phy",
+            chapter: "電流的磁效應",
             desc: "觀察長直導線上的磁場方向",
             tags: ["", "", ""],
             link: "26.html",
@@ -450,6 +441,7 @@
         {
             title: "細胞滲透作用模擬器",
             category: "bio",
+            chapter: "細胞",
             desc: "",
             tags: ["生物", "滲透", ],
             link: "28.html",
@@ -458,6 +450,7 @@
         {
             title: "複式顯微鏡模擬器",
             category: "bio",
+            chapter: "細胞",
             desc: "操作顯微鏡觀察影像的移動",
             tags: ["生物", "顯微鏡", ],
             link: "29.html",
@@ -466,6 +459,7 @@
         {
             title: "解剖顯微鏡模擬器",
             category: "bio",
+            chapter: "細胞",
             desc: "操作顯微鏡觀察影像的移動",
             tags: ["生物", "顯微鏡", ],
             link: "30.html",
@@ -553,77 +547,72 @@
         }
     ];
 
-    // --- 程式邏輯區 (不要動這裡) ---
+    // --- 程式邏輯 (自動分組) ---
     const homeScreen = document.getElementById('home-screen');
     const detailScreen = document.getElementById('detail-screen');
-    const gallery = document.getElementById('gallery-container');
+    const contentContainer = document.getElementById('content-container');
     const pageTitle = document.getElementById('page-title');
 
-    // 進入分類頁面
     function openCategory(catId, catName, color) {
-        // 1. 切換畫面
         homeScreen.style.display = 'none';
         detailScreen.style.display = 'block';
-        
-        // 2. 設定標題與顏色
         pageTitle.innerText = catName;
         pageTitle.style.color = color;
+        contentContainer.innerHTML = ''; // 清空
 
-        // 3. 篩選並產生卡片
-        gallery.innerHTML = ''; // 清空舊內容
-        
+        // 1. 篩選出該科目的所有卡片
         const filteredData = projects.filter(p => p.category === catId);
 
         if (filteredData.length === 0) {
-            gallery.innerHTML = '<p style="color:#777;">目前此分類尚無內容，敬請期待！🚧</p>';
+            contentContainer.innerHTML = '<p style="color:#777;text-align:center;">尚無內容 🚧</p>';
             return;
         }
 
-        filteredData.forEach(item => {
-            const card = document.createElement('a');
-            card.href = item.link || '#';
-            card.className = 'item-card';
-            card.style.borderLeftColor = color; // 設定左側顏色條
+        // 2. 抓出所有不重複的「章節名稱」
+        const chapters = [...new Set(filteredData.map(item => item.chapter))];
 
-            card.innerHTML = `
-                <div class="item-content">
-                    <div class="item-title">${item.icon} ${item.title}</div>
-                    <div class="item-desc">${item.desc}</div>
-                </div>
-            `;
-            gallery.appendChild(card);
+        // 3. 依照章節產生區塊
+        chapters.forEach(chapName => {
+            // 建立章節容器
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'chapter-group';
+
+            // 建立章節標題
+            const header = document.createElement('div');
+            header.className = 'chapter-header';
+            header.innerText = chapName;
+            header.style.borderLeftColor = color; // 跟隨主色系
+            groupDiv.appendChild(header);
+
+            // 建立卡片網格
+            const grid = document.createElement('div');
+            grid.className = 'gallery';
+
+            // 放入屬於該章節的卡片
+            const itemsInChapter = filteredData.filter(item => item.chapter === chapName);
+            itemsInChapter.forEach(item => {
+                const card = document.createElement('a');
+                card.href = item.link || '#';
+                card.className = 'item-card';
+                card.innerHTML = `
+                    <div class="item-content">
+                        <div class="item-title">${item.icon} ${item.title}</div>
+                        <div class="item-desc">${item.desc}</div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            groupDiv.appendChild(grid);
+            contentContainer.appendChild(groupDiv);
         });
     }
 
-    // 返回首頁
     function goHome() {
         detailScreen.style.display = 'none';
         homeScreen.style.display = 'grid';
     }
-
 </script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
