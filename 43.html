@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>氧氣爭奪戰：呼吸作用修正版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f0f9ff;
+            user-select: none;
+        }
+
+        .reaction-chamber {
+            position: relative;
+            height: 460px;
+            background: #e2e8f0;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+            border: 4px solid #cbd5e1;
+        }
+
+        /* === 原子樣式 === */
+        .atom {
+            position: absolute;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+            transition: background-color 0.5s;
+        }
+
+        /* === 層級管理 (Z-Index Strategy) === */
+        .charge-label {
+            position: absolute; top: -5px; right: -8px;
+            background-color: #facc15; color: #854d0e;
+            border: 1px solid #ca8a04; border-radius: 50%;
+            width: 22px; height: 22px;
+            font-size: 0.7rem; font-weight: 800;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; transform: scale(0.5);
+            transition: opacity 0.3s, transform 0.3s; 
+            z-index: 200 !important; pointer-events: none;
+        }
+        body.show-charges .charge-label { opacity: 1; transform: scale(1); }
+
+        .electron {
+            position: absolute; width: 14px; height: 14px;
+            background-color: #fbbf24; border: 1px solid #d97706; border-radius: 50%;
+            color: #78350f; font-size: 10px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 150 !important; opacity: 0; box-shadow: 0 0 5px #f59e0b;
+        }
+        .electron::after { content: 'e⁻'; }
+
+        /* 碳原子層級最高 */
+        .atom-c { width: 50px; height: 50px; background-color: #4b5563; color: white; font-size: 1rem; z-index: 100 !important; }
+        .atom-cu { width: 60px; height: 60px; background-color: #1a202c; color: white; border: 2px solid #4a5568; font-size: 1.2rem; z-index: 50 !important; }
+        .atom-o { width: 30px; height: 30px; background-color: #ef4444; color: white; font-size: 0.8rem; z-index: 50 !important; }
+        .atom-h { width: 30px; height: 30px; background-color: #ffffff; color: #333; border: 2px solid #cbd5e1; font-size: 0.8rem; z-index: 50 !important; }
+        .atom-cu.reduced { background-color: #b45309 !important; border-color: #d97706 !important; box-shadow: 0 0 15px #f59e0b; }
+
+        .interactive-zone { position: absolute; cursor: help; z-index: 300; background: transparent; }
+
+        .speech-bubble {
+            position: absolute; background: white; border: 2px solid #3b82f6; border-radius: 15px; padding: 12px 15px;
+            font-size: 0.95rem; font-weight: bold; line-height: 1.5; color: #1e40af; width: 240px; text-align: center;
+            z-index: 400; pointer-events: none; opacity: 0; transform: translateY(10px) scale(0.9); transition: all 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        .speech-bubble.show { opacity: 1; transform: translateY(-20px) scale(1); }
+        .bubble-oxidizer { border-color: #ef4444; color: #991b1b; }
+        .bubble-reducer { border-color: #22c55e; color: #166534; }
+        .bubble-auto { border-color: #8b5cf6; color: #5b21b6; } 
+        .bubble-bio { border-color: #10b981; color: #047857; } 
+        
+        .speech-bubble::after {
+            content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%);
+            border-width: 10px 10px 0; border-style: solid; border-color: inherit; border-left-color: transparent; border-right-color: transparent; border-bottom-color: transparent;
+        }
+
+        .sun {
+            position: absolute; top: 20px; left: 20px; width: 60px; height: 60px;
+            background: radial-gradient(circle, #fde047 40%, #eab308 100%);
+            border-radius: 50%; box-shadow: 0 0 20px #facc15;
+            z-index: 10; opacity: 0.3; transition: all 1s;
+        }
+        .sun.active { opacity: 1; box-shadow: 0 0 50px #facc15, 0 0 100px #fde047; transform: scale(1.1); }
+
+        /* === 電子流動動畫 === */
+        @keyframes electron_c_to_top { 0% { top: 185px; left: 335px; opacity: 1; } 100% { top: 80px; left: 100px; opacity: 0; } }
+        @keyframes electron_c_to_bot { 0% { top: 185px; left: 335px; opacity: 1; } 100% { top: 260px; left: 100px; opacity: 0; } }
+        @keyframes electron_cotop_to_cu { 0% { top: 85px; left: 335px; opacity: 1; } 100% { top: 80px; left: 100px; opacity: 0; } }
+        @keyframes electron_cobot_to_cu { 0% { top: 265px; left: 335px; opacity: 1; } 100% { top: 260px; left: 100px; opacity: 0; } }
+        @keyframes electron_h2o2_top { 0% { top: 85px; left: 265px; opacity: 1; } 100% { top: 85px; left: 225px; opacity: 0; } }
+        @keyframes electron_h2o2_bot { 0% { top: 265px; left: 265px; opacity: 1; } 100% { top: 265px; left: 225px; opacity: 0; } }
+        @keyframes electron_photo_top { 0% { top: 100px; left: 120px; opacity: 1; } 100% { top: 170px; left: 320px; opacity: 0; } }
+        @keyframes electron_photo_bot { 0% { top: 260px; left: 120px; opacity: 1; } 100% { top: 170px; left: 320px; opacity: 0; } }
+        /* Resp: Electrons move from C (Left) to O2 (Right) */
+        @keyframes electron_resp { 0% { top: 170px; left: 120px; opacity: 1; } 100% { top: 170px; left: 320px; opacity: 0; } }
+
+        /* === 原子移動動畫 === */
+        @keyframes moveO1_to_C { 0% { top: 80px; left: 140px; } 100% { top: 170px; left: 295px; } }
+        @keyframes moveO2_to_C { 0% { top: 260px; left: 140px; } 100% { top: 190px; left: 365px; } }
+        @keyframes moveO1_to_Top { 0% { top: 80px; left: 140px; } 100% { top: 80px; left: 295px; } }
+        @keyframes moveO2_to_Bottom { 0% { top: 260px; left: 140px; } 100% { top: 260px; left: 295px; } }
+        @keyframes moveO_h2o2_top { 0% { top: 80px; left: 260px; } 100% { top: 155px; left: 365px; } }
+        @keyframes moveH_h2o2_top { 0% { top: 80px; left: 300px; } 100% { top: 90px; left: 235px; } }
+        @keyframes moveO_h2o2_bottom { 0% { top: 260px; left: 260px; } 100% { top: 185px; left: 365px; } }
+        @keyframes moveH_h2o2_bottom { 0% { top: 260px; left: 300px; } 100% { top: 270px; left: 235px; } }
+
+        /* Photo */
+        @keyframes moveH_photo_1 { 0% { top: 80px; left: 80px; } 100% { top: 140px; left: 280px; } }
+        @keyframes moveH_photo_2 { 0% { top: 80px; left: 160px; } 100% { top: 140px; left: 360px; } }
+        @keyframes moveH_photo_3 { 0% { top: 240px; left: 80px; } 100% { top: 200px; left: 280px; } }
+        @keyframes moveH_photo_4 { 0% { top: 240px; left: 160px; } 100% { top: 200px; left: 360px; } }
+        @keyframes moveO_photo_merge_1 { 0% { top: 100px; left: 120px; } 100% { top: 155px; left: 120px; } }
+        @keyframes moveO_photo_merge_2 { 0% { top: 260px; left: 120px; } 100% { top: 185px; left: 120px; } }
+
+        /* Resp New: 4 Hydrogens fly from Sugar (Left) to O2 (Right) */
+        @keyframes moveH_resp_1 { 0% { top: 130px; left: 95px; } 100% { top: 90px; left: 345px; } }
+        @keyframes moveH_resp_2 { 0% { top: 130px; left: 145px; } 100% { top: 110px; left: 345px; } }
+        @keyframes moveH_resp_3 { 0% { top: 210px; left: 95px; } 100% { top: 230px; left: 345px; } }
+        @keyframes moveH_resp_4 { 0% { top: 210px; left: 145px; } 100% { top: 250px; left: 345px; } }
+        
+        /* Resp: O2 Splits to form water centers */
+        @keyframes moveO_resp_split_top { 0% { top: 155px; left: 320px; } 100% { top: 100px; left: 320px; } }
+        @keyframes moveO_resp_split_bot { 0% { top: 185px; left: 320px; } 100% { top: 240px; left: 320px; } }
+
+        .gas-hover { animation: hoverStay 3s infinite ease-in-out; }
+        @keyframes hoverStay { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+        .product-group { position: absolute; z-index: 50; pointer-events: none; }
+        .product-group .atom-c { z-index: 100; }
+        
+        .flame {
+            position: absolute; bottom: -50px; left: 50%; transform: translateX(-50%);
+            font-size: 3rem; opacity: 0; transition: opacity 0.5s, bottom 0.5s; z-index: 5;
+        }
+        .flame.active { opacity: 1; bottom: 10px; animation: flicker 0.5s infinite alternate; }
+        @keyframes flicker { 0% { transform: translateX(-50%) scale(1); } 100% { transform: translateX(-50%) scale(1.1); } }
+        .tab-btn.active { border-bottom: 3px solid #3b82f6; color: #2563eb; background-color: #eff6ff; }
+        
+        .toggle-checkbox:checked { right: 0; border-color: #3b82f6; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #3b82f6; }
+    </style>
+</head>
+<body class="text-gray-800 pb-20">
+
+    <header class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-5 shadow-lg relative">
+        <div class="container mx-auto max-w-4xl text-center">
+            <h1 class="text-3xl font-bold">⚗️ 氧化還原競技場</h1>
+            <p class="text-sm opacity-90 mb-2">含光合作用與呼吸作用</p>
+            <div class="inline-block mt-1">
+                <span class="bg-yellow-400 text-blue-900 px-4 py-1 rounded-full font-bold text-sm shadow-md border-2 border-yellow-200">
+                    ✨ 小粘製作
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto max-w-4xl p-4 space-y-6">
+
+        <section id="control-panel" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="bg-gray-50 p-3 border-b flex justify-between items-center flex-wrap gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-bold text-gray-700">🧪 選擇反應：</span>
+                    <button onclick="setMode('C')" id="tab-C" class="tab-btn active px-3 py-2 text-sm font-bold text-gray-600 rounded-t-lg hover:bg-gray-100 transition">碳還原</button>
+                    <button onclick="setMode('CO')" id="tab-CO" class="tab-btn px-3 py-2 text-sm font-bold text-gray-600 rounded-t-lg hover:bg-gray-100 transition">CO還原</button>
+                    <button onclick="setMode('H2O2')" id="tab-H2O2" class="tab-btn px-3 py-2 text-sm font-bold text-gray-600 rounded-t-lg hover:bg-gray-100 transition">雙氧水</button>
+                    <button onclick="setMode('Photo')" id="tab-Photo" class="tab-btn px-3 py-2 text-sm font-bold text-gray-600 rounded-t-lg hover:bg-gray-100 transition">光合作用</button>
+                    <button onclick="setMode('Resp')" id="tab-Resp" class="tab-btn px-3 py-2 text-sm font-bold text-gray-600 rounded-t-lg hover:bg-gray-100 transition">呼吸作用</button>
+                </div>
+                
+                <div class="flex items-center gap-2 bg-yellow-50 px-3 py-1 rounded-full border border-yellow-200 shadow-sm mt-2 sm:mt-0">
+                    <label for="toggle-ox" class="flex items-center cursor-pointer select-none">
+                        <div class="relative">
+                            <input type="checkbox" id="toggle-ox" class="sr-only" onchange="toggleOxidationNumbers(this)">
+                            <div class="block bg-gray-300 w-10 h-6 rounded-full transition toggle-label"></div>
+                            <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform duration-300 ease-in-out"></div>
+                        </div>
+                        <div class="ml-2 text-sm font-bold text-yellow-800">顯示氧化數</div>
+                    </label>
+                </div>
+            </div>
+
+            <style>
+                #toggle-ox:checked ~ .toggle-label { background-color: #facc15; }
+                #toggle-ox:checked ~ .dot { transform: translateX(100%); }
+            </style>
+
+            <div class="p-6 text-center">
+                <div class="inline-block bg-gray-800 text-white px-6 py-3 rounded-lg font-mono text-lg shadow-inner mb-6 min-w-[300px]">
+                    <span id="eq-display">2CuO + C → 2Cu + CO₂</span>
+                </div>
+
+                <div class="flex justify-center gap-4">
+                    <button onclick="startReaction()" id="btn-heat" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-8 rounded-full shadow-lg transition transform hover:scale-105 flex items-center gap-2 text-lg">
+                        <span>🔥 進行反應</span>
+                    </button>
+                    <button onclick="resetExperiment()" id="btn-reset" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-8 rounded-full shadow-lg transition hidden">
+                        🔄 重新設定
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <div class="reaction-chamber" id="chamber">
+            <div id="status-text" class="absolute top-4 left-4 bg-white/90 px-3 py-1 rounded text-sm font-bold text-gray-700 z-40 shadow-sm border border-gray-200">
+                請將滑鼠移到分子上聽聽它們說什麼...
+            </div>
+            
+            <div id="speech-bubble" class="speech-bubble">對話內容...</div>
+            <div class="sun" id="sun"></div> 
+
+            <div class="electron hidden" id="e-c-1"></div> <div class="electron hidden" id="e-c-2"></div>
+            <div class="electron hidden" id="e-co-1"></div> <div class="electron hidden" id="e-co-2"></div>
+            <div class="electron hidden" id="e-h2o2-1"></div> <div class="electron hidden" id="e-h2o2-2"></div>
+            <div class="electron hidden" id="e-photo-1"></div> <div class="electron hidden" id="e-photo-2"></div>
+            <div class="electron hidden" id="e-resp-1"></div>
+
+
+            <div id="group-cuo">
+                <div class="interactive-zone" style="top: 60px; left: 80px; width: 100px; height: 60px;" onmouseenter="showSpeech('oxidizer', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-cu" id="cu1" style="top: 60px; left: 80px;">Cu<span class="charge-label" id="charge-cu1">+2</span></div>
+                <div class="atom atom-o" id="o1" style="top: 80px; left: 140px;">O<span class="charge-label" id="charge-o1">-2</span></div>
+
+                <div class="interactive-zone" style="top: 240px; left: 80px; width: 100px; height: 60px;" onmouseenter="showSpeech('oxidizer', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-cu" id="cu2" style="top: 240px; left: 80px;">Cu<span class="charge-label" id="charge-cu2">+2</span></div>
+                <div class="atom atom-o" id="o2" style="top: 260px; left: 140px;">O<span class="charge-label" id="charge-o2">-2</span></div>
+            </div>
+
+            <div id="setup-c" class="setup-group">
+                <div class="interactive-zone" style="top: 170px; left: 320px; width: 50px; height: 50px;" onmouseenter="showSpeech('reducer', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-c" style="top: 170px; left: 320px;">C<span class="charge-label" id="charge-c">0</span></div>
+            </div>
+
+            <div id="setup-co" class="setup-group hidden">
+                <div class="interactive-zone" style="top: 70px; left: 320px; width: 80px; height: 50px;" onmouseenter="showSpeech('reducer', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-c" style="top: 70px; left: 320px;">C<span class="charge-label" id="charge-co-top-c">+2</span></div>
+                <div class="atom atom-o" style="top: 80px; left: 365px;">O<span class="charge-label">-2</span></div> 
+                
+                <div class="interactive-zone" style="top: 250px; left: 320px; width: 80px; height: 50px;" onmouseenter="showSpeech('reducer', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-c" style="top: 250px; left: 320px;">C<span class="charge-label" id="charge-co-bot-c">+2</span></div>
+                <div class="atom atom-o" style="top: 260px; left: 365px;">O<span class="charge-label">-2</span></div>
+            </div>
+
+            <div id="setup-h2o2" class="setup-group hidden">
+                <div class="interactive-zone" style="top: 70px; left: 180px; width: 160px; height: 50px;" onmouseenter="showSpeech('auto-redox', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-h" id="h2o2-top-h1" style="top: 80px; left: 180px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-o" id="h2o2-top-o1" style="top: 80px; left: 220px;">O<span class="charge-label" id="c-h2o2-to1">-1</span></div>
+                <div class="atom atom-o" id="h2o2-top-o2" style="top: 80px; left: 260px;">O<span class="charge-label" id="c-h2o2-to2">-1</span></div>
+                <div class="atom atom-h" id="h2o2-top-h2" style="top: 80px; left: 300px;">H<span class="charge-label">+1</span></div>
+
+                <div class="interactive-zone" style="top: 250px; left: 180px; width: 160px; height: 50px;" onmouseenter="showSpeech('auto-redox', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-h" id="h2o2-bot-h1" style="top: 260px; left: 180px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-o" id="h2o2-bot-o1" style="top: 260px; left: 220px;">O<span class="charge-label" id="c-h2o2-bo1">-1</span></div>
+                <div class="atom atom-o" id="h2o2-bot-o2" style="top: 260px; left: 260px;">O<span class="charge-label" id="c-h2o2-bo2">-1</span></div>
+                <div class="atom atom-h" id="h2o2-bot-h2" style="top: 260px; left: 300px;">H<span class="charge-label">+1</span></div>
+            </div>
+
+            <div id="setup-photo" class="setup-group hidden">
+                <div class="interactive-zone" style="top: 80px; left: 80px; width: 100px; height: 60px;" onmouseenter="showSpeech('photo-water', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-o" id="photo-o1" style="top: 100px; left: 120px;">O<span class="charge-label" id="c-ph-o1">-2</span></div>
+                <div class="atom atom-h" id="photo-h1" style="top: 80px; left: 80px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" id="photo-h2" style="top: 80px; left: 160px;">H<span class="charge-label">+1</span></div>
+
+                <div class="interactive-zone" style="top: 240px; left: 80px; width: 100px; height: 60px;" onmouseenter="showSpeech('photo-water', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-o" id="photo-o2" style="top: 260px; left: 120px;">O<span class="charge-label" id="c-ph-o2">-2</span></div>
+                <div class="atom atom-h" id="photo-h3" style="top: 240px; left: 80px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" id="photo-h4" style="top: 240px; left: 160px;">H<span class="charge-label">+1</span></div>
+
+                <div class="interactive-zone" style="top: 170px; left: 320px; width: 80px; height: 50px;" onmouseenter="showSpeech('photo-co2', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-c" id="photo-c" style="top: 170px; left: 320px;">C<span class="charge-label" id="c-ph-c">+4</span></div>
+                <div class="atom atom-o" style="top: 170px; left: 280px;">O<span class="charge-label">-2</span></div>
+                <div class="atom atom-o" style="top: 170px; left: 360px;">O<span class="charge-label">-2</span></div>
+            </div>
+
+            <div id="setup-resp" class="setup-group hidden">
+                <div class="interactive-zone" style="top: 130px; left: 80px; width: 80px; height: 120px;" onmouseenter="showSpeech('resp-sugar', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-c" id="resp-c" style="top: 170px; left: 120px;">C<span class="charge-label" id="c-resp-c">0</span></div>
+                <div class="atom atom-o" style="top: 130px; left: 120px;">O<span class="charge-label">-2</span></div> <div class="atom atom-o" style="top: 210px; left: 120px;">O<span class="charge-label">-2</span></div> <div class="atom atom-h" id="resp-h1" style="top: 130px; left: 95px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" id="resp-h2" style="top: 130px; left: 145px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" id="resp-h3" style="top: 210px; left: 95px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" id="resp-h4" style="top: 210px; left: 145px;">H<span class="charge-label">+1</span></div>
+
+                <div class="interactive-zone" style="top: 170px; left: 320px; width: 60px; height: 60px;" onmouseenter="showSpeech('resp-o2', this)" onmouseleave="hideSpeech()"></div>
+                <div class="atom atom-o" id="resp-o1" style="top: 155px; left: 320px;">O<span class="charge-label" id="c-resp-o1">0</span></div>
+                <div class="atom atom-o" id="resp-o2" style="top: 185px; left: 320px;">O<span class="charge-label" id="c-resp-o2">0</span></div>
+            </div>
+
+
+            <div id="product-co2" class="product-group hidden" style="top: 170px; left: 320px;">
+                <div class="atom atom-c" style="top:0; left:0;">C<span class="charge-label">+4</span></div>
+                <div class="atom atom-o" style="top:0px; left:-25px;">O<span class="charge-label">-2</span></div>
+                <div class="atom atom-o" style="top:20px; left:45px;">O<span class="charge-label">-2</span></div>
+            </div>
+
+            <div id="product-2co2-top" class="product-group hidden" style="top: 70px; left: 320px;">
+                <div class="atom atom-c" style="top:0; left:0;">C<span class="charge-label">+4</span></div>
+                <div class="atom atom-o" style="top:10px; left:-25px;">O<span class="charge-label">-2</span></div>
+                <div class="atom atom-o" style="top:10px; left:45px;">O<span class="charge-label">-2</span></div>
+            </div>
+            <div id="product-2co2-bottom" class="product-group hidden" style="top: 250px; left: 320px;">
+                <div class="atom atom-c" style="top:0; left:0;">C<span class="charge-label">+4</span></div>
+                <div class="atom atom-o" style="top:10px; left:-25px;">O<span class="charge-label">-2</span></div>
+                <div class="atom atom-o" style="top:10px; left:45px;">O<span class="charge-label">-2</span></div>
+            </div>
+
+            <div id="product-o2" class="product-group hidden" style="top: 170px; left: 365px;">
+                <div class="atom atom-o" style="top:-15px; left:0;">O<span class="charge-label">0</span></div>
+                <div class="atom atom-o" style="top:15px; left:0;">O<span class="charge-label">0</span></div>
+            </div>
+            <div id="product-h2o-top" class="product-group hidden" style="top: 80px; left: 220px;">
+                <div class="atom atom-o" style="top:0; left:0;">O<span class="charge-label">-2</span></div>
+                <div class="atom atom-h" style="top:0; left:-40px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" style="top:10px; left:15px;">H<span class="charge-label">+1</span></div>
+            </div>
+             <div id="product-h2o-bottom" class="product-group hidden" style="top: 260px; left: 220px;">
+                <div class="atom atom-o" style="top:0; left:0;">O<span class="charge-label">-2</span></div>
+                <div class="atom atom-h" style="top:0; left:-40px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" style="top:10px; left:15px;">H<span class="charge-label">+1</span></div>
+            </div>
+
+            <div id="product-photo-o2" class="product-group hidden" style="top: 170px; left: 120px;">
+                <div class="atom atom-o" style="top:-15px; left:0;">O<span class="charge-label">0</span></div>
+                <div class="atom atom-o" style="top:15px; left:0;">O<span class="charge-label">0</span></div>
+            </div>
+            <div id="product-photo-sugar" class="product-group hidden" style="top: 170px; left: 320px;">
+                <div class="atom atom-c" style="top:0; left:0;">C<span class="charge-label">0</span></div>
+                <div class="atom atom-o" style="top:0; left:-40px;">O<span class="charge-label">-2</span></div>
+                <div class="atom atom-o" style="top:0; left:40px;">O<span class="charge-label">-2</span></div>
+                <div class="atom atom-h" style="top:-30px; left:-40px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" style="top:-30px; left:40px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" style="top:30px; left:-40px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" style="top:30px; left:40px;">H<span class="charge-label">+1</span></div>
+            </div>
+
+            <div id="product-resp-co2" class="product-group hidden" style="top: 170px; left: 120px;">
+                <div class="atom atom-c" style="top:0; left:0;">C<span class="charge-label">+4</span></div>
+                <div class="atom atom-o" style="top:0; left:-40px;">O<span class="charge-label">-2</span></div>
+                <div class="atom atom-o" style="top:0; left:40px;">O<span class="charge-label">-2</span></div>
+            </div>
+            <div id="product-resp-h2o-1" class="product-group hidden" style="top: 100px; left: 320px;">
+                <div class="atom atom-o" style="top:0; left:0;">O<span class="charge-label">-2</span></div>
+                <div class="atom atom-h" style="top:-5px; left:-25px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" style="top:25px; left:-25px;">H<span class="charge-label">+1</span></div>
+            </div>
+            <div id="product-resp-h2o-2" class="product-group hidden" style="top: 240px; left: 320px;">
+                <div class="atom atom-o" style="top:0; left:0;">O<span class="charge-label">-2</span></div>
+                <div class="atom atom-h" style="top:-5px; left:-25px;">H<span class="charge-label">+1</span></div>
+                <div class="atom atom-h" style="top:25px; left:-25px;">H<span class="charge-label">+1</span></div>
+            </div>
+
+            <div class="flame" id="flame">🔥</div>
+        </div>
+
+        <div id="result-box" class="hidden bg-green-50 border border-green-200 p-4 rounded-lg mt-4">
+            <h3 class="font-bold text-green-800 text-lg mb-2">🎉 實驗觀察紀錄</h3>
+            <p id="result-text" class="text-gray-700"></p>
+        </div>
+
+    </main>
+
+    <script>
+        let currentMode = 'C'; 
+        let isReacting = false;
+        let showCharges = false;
+
+        const equations = {
+            'C': { text: '2CuO + C → 2Cu + CO₂', res: '碳原子失去電子(氧化)變成+4價，銅離子得到電子(還原)變成0價。' },
+            'CO': { text: '2CuO + 2CO → 2Cu + 2CO₂', res: 'CO中的碳失去電子(氧化)變成+4價，銅離子得到電子(還原)變成0價。' },
+            'H2O2': { text: '2H₂O₂ → 2H₂O + O₂', res: '雙氧水歧化：部分氧失去電子變0價，部分氧得到電子變-2價。' },
+            'Photo': { text: '6CO₂ + 6H₂O + 光能 → C₆H₁₂O₆ + 6O₂', res: '光合作用：水分解提供電子與氫給CO₂，水被氧化成O₂，CO₂被還原成醣。' },
+            'Resp': { text: 'C₆H₁₂O₆ + 6O₂ → 6CO₂ + 6H₂O + 能量', res: '呼吸作用：葡萄糖被氧化分解，釋放能量並產生二氧化碳與水。' }
+        };
+
+        const speeches = {
+            oxidizer: "嘿，我有氧，我是氧化劑，<br>我要把氧丟給你，把你氧化！",
+            reducer: "嘿，我缺氧，我是還原劑，<br>我要搶走氧，讓你還原！",
+            'auto-redox': "不穩定！我要自身氧化還原，<br>同時變成水和氧氣！",
+            'photo-water': "我是水，光來了！我要被分解氧化，把氫原子交出去！",
+            'photo-co2': "我是二氧化碳，我準備接收氫原子，還原成糖！",
+            'resp-sugar': "我是糖，充滿能量！我要被氧化分解，釋放氫原子！",
+            'resp-o2': "我是氧氣，我超愛電子！快把氫原子給我，我要變成水！"
+        };
+
+        function toggleOxidationNumbers(checkbox) {
+            showCharges = checkbox.checked;
+            if(showCharges) document.body.classList.add('show-charges');
+            else document.body.classList.remove('show-charges');
+        }
+
+        function setMode(mode) {
+            if (isReacting) return;
+            currentMode = mode;
+            
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`tab-${mode}`).classList.add('active');
+            document.getElementById('eq-display').textContent = equations[mode].text;
+            
+            document.querySelectorAll('.setup-group').forEach(el => el.classList.add('hidden'));
+            
+            const cuoGroup = document.getElementById('group-cuo');
+            if(mode === 'C' || mode === 'CO') {
+                cuoGroup.classList.remove('hidden');
+                document.getElementById(`setup-${mode.toLowerCase()}`).classList.remove('hidden');
+            } else {
+                cuoGroup.classList.add('hidden');
+                document.getElementById(`setup-${mode.toLowerCase()}`).classList.remove('hidden');
+            }
+            
+            if(mode === 'Photo') document.getElementById('sun').style.opacity = '0.3';
+            else document.getElementById('sun').style.opacity = '0';
+
+            resetExperimentUI();
+        }
+
+        async function startReaction() {
+            isReacting = true;
+            document.getElementById('btn-heat').classList.add('hidden');
+            if(currentMode !== 'Photo') document.getElementById('flame').classList.add('active');
+            else document.getElementById('sun').classList.add('active'); 
+            
+            updateStatus("反應進行中...電子轉移！");
+
+            if(showCharges) {
+                await playElectronAnimation(currentMode);
+            }
+
+            if (currentMode === 'C') animateC();
+            else if (currentMode === 'CO') animateDual();
+            else if (currentMode === 'H2O2') animateH2O2();
+            else if (currentMode === 'Photo') animatePhoto();
+            else if (currentMode === 'Resp') animateResp();
+        }
+
+        function setCharge(id, val) {
+            const el = document.getElementById(id);
+            if(el) el.textContent = val;
+        }
+
+        function playElectronAnimation(mode) {
+            return new Promise(resolve => {
+                if (mode === 'C') {
+                    setCharge('charge-c', '+4');
+                    const e1 = document.getElementById('e-c-1'); const e2 = document.getElementById('e-c-2');
+                    e1.classList.remove('hidden'); e2.classList.remove('hidden');
+                    e1.style.animation = "electron_c_to_top 1.5s forwards ease-in-out";
+                    e2.style.animation = "electron_c_to_bot 1.5s forwards ease-in-out";
+                    setTimeout(() => {
+                        setCharge('charge-cu1', '0'); setCharge('charge-cu2', '0');
+                        e1.classList.add('hidden'); e2.classList.add('hidden');
+                        resolve();
+                    }, 1450);
+                } 
+                else if (mode === 'CO') {
+                    setCharge('charge-co-top-c', '+4'); setCharge('charge-co-bot-c', '+4');
+                    const e1 = document.getElementById('e-co-1'); const e2 = document.getElementById('e-co-2');
+                    e1.classList.remove('hidden'); e2.classList.remove('hidden');
+                    e1.style.animation = "electron_cotop_to_cu 1.5s forwards ease-in-out";
+                    e2.style.animation = "electron_cobot_to_cu 1.5s forwards ease-in-out";
+                    setTimeout(() => {
+                        setCharge('charge-cu1', '0'); setCharge('charge-cu2', '0');
+                        e1.classList.add('hidden'); e2.classList.add('hidden');
+                        resolve();
+                    }, 1450);
+                } 
+                else if (mode === 'H2O2') {
+                    setCharge('c-h2o2-to2', '0'); setCharge('c-h2o2-bo2', '0'); 
+                    const e1 = document.getElementById('e-h2o2-1'); const e2 = document.getElementById('e-h2o2-2');
+                    e1.classList.remove('hidden'); e2.classList.remove('hidden');
+                    e1.style.animation = "electron_h2o2_top 1.5s forwards ease-in-out";
+                    e2.style.animation = "electron_h2o2_bot 1.5s forwards ease-in-out";
+                    setTimeout(() => {
+                        setCharge('c-h2o2-to1', '-2'); setCharge('c-h2o2-bo1', '-2');
+                        e1.classList.add('hidden'); e2.classList.add('hidden');
+                        resolve();
+                    }, 1450);
+                }
+                else if (mode === 'Photo') {
+                    setCharge('c-ph-o1', '0'); setCharge('c-ph-o2', '0');
+                    const e1 = document.getElementById('e-photo-1'); const e2 = document.getElementById('e-photo-2');
+                    e1.classList.remove('hidden'); e2.classList.remove('hidden');
+                    e1.style.animation = "electron_photo_top 1.5s forwards ease-in-out";
+                    e2.style.animation = "electron_photo_bot 1.5s forwards ease-in-out";
+                    setTimeout(() => {
+                        setCharge('c-ph-c', '0');
+                        e1.classList.add('hidden'); e2.classList.add('hidden');
+                        resolve();
+                    }, 1450);
+                }
+                else if (mode === 'Resp') {
+                    setCharge('c-resp-c', '+4');
+                    const e1 = document.getElementById('e-resp-1');
+                    e1.classList.remove('hidden');
+                    e1.style.animation = "electron_resp 1.5s forwards ease-in-out";
+                    setTimeout(() => {
+                        setCharge('c-resp-o1', '-2'); setCharge('c-resp-o2', '-2');
+                        e1.classList.add('hidden');
+                        resolve();
+                    }, 1450);
+                }
+            });
+        }
+
+        function animateC() {
+            const o1 = document.getElementById('o1'); const o2 = document.getElementById('o2');
+            setTimeout(() => { o1.style.animation = "moveO1_to_C 2s forwards ease-in-out"; o2.style.animation = "moveO2_to_C 2s forwards ease-in-out"; }, 0);
+            setTimeout(() => {
+                document.getElementById('setup-c').classList.add('opacity-0'); o1.classList.add('hidden'); o2.classList.add('hidden');
+                document.getElementById('product-co2').classList.remove('hidden'); document.getElementById('product-co2').classList.add('gas-hover');
+                if(!showCharges) { setCharge('charge-c', '+4'); setCharge('charge-cu1', '0'); setCharge('charge-cu2', '0'); }
+                document.getElementById('cu1').classList.add('reduced'); document.getElementById('cu2').classList.add('reduced');
+                finishReaction();
+            }, 2000);
+        }
+
+        function animateDual() {
+            const o1 = document.getElementById('o1'); const o2 = document.getElementById('o2');
+            setTimeout(() => { o1.style.animation = "moveO1_to_Top 2s forwards linear"; o2.style.animation = "moveO2_to_Bottom 2s forwards linear"; }, 0);
+            setTimeout(() => {
+                document.getElementById(`setup-co`).classList.add('opacity-0'); o1.classList.add('hidden'); o2.classList.add('hidden');
+                document.getElementById('product-2co2-top').classList.remove('hidden'); document.getElementById('product-2co2-top').classList.add('gas-hover');
+                document.getElementById('product-2co2-bottom').classList.remove('hidden'); document.getElementById('product-2co2-bottom').classList.add('gas-hover');
+                if(!showCharges) { setCharge('charge-co-top-c', '+4'); setCharge('charge-co-bot-c', '+4'); setCharge('charge-cu1', '0'); setCharge('charge-cu2', '0'); }
+                document.getElementById('cu1').classList.add('reduced'); document.getElementById('cu2').classList.add('reduced');
+                finishReaction();
+            }, 2000);
+        }
+
+        function animateH2O2() {
+            const topO = document.getElementById('h2o2-top-o2'); const botO = document.getElementById('h2o2-bot-o2');
+            const topH = document.getElementById('h2o2-top-h2'); const botH = document.getElementById('h2o2-bot-h2');
+            setTimeout(() => {
+                topO.style.animation = "moveO_h2o2_top 2s forwards ease-in-out"; botO.style.animation = "moveO_h2o2_bottom 2s forwards ease-in-out";
+                topH.style.animation = "moveH_h2o2_top 2s forwards ease-in-out"; botH.style.animation = "moveH_h2o2_bottom 2s forwards ease-in-out";
+            }, 0);
+            setTimeout(() => {
+                document.getElementById('setup-h2o2').classList.add('opacity-0');
+                const prodO2 = document.getElementById('product-o2'); prodO2.classList.remove('hidden'); prodO2.classList.add('gas-hover');
+                document.getElementById('product-h2o-top').classList.remove('hidden'); document.getElementById('product-h2o-top').classList.add('gas-hover');
+                document.getElementById('product-h2o-bottom').classList.remove('hidden'); document.getElementById('product-h2o-bottom').classList.add('gas-hover');
+                if(!showCharges) {
+                    setCharge('c-h2o2-to1', '-2'); setCharge('c-h2o2-bo1', '-2');
+                    setCharge('c-h2o2-to2', '0'); setCharge('c-h2o2-bo2', '0'); 
+                }
+                finishReaction();
+            }, 2000);
+        }
+
+        function animatePhoto() {
+            const h1 = document.getElementById('photo-h1'); const h2 = document.getElementById('photo-h2');
+            const h3 = document.getElementById('photo-h3'); const h4 = document.getElementById('photo-h4');
+            const o1 = document.getElementById('photo-o1'); const o2 = document.getElementById('photo-o2');
+            
+            setTimeout(() => {
+                o1.style.animation = "moveO_photo_merge_1 2s forwards ease-in-out";
+                o2.style.animation = "moveO_photo_merge_2 2s forwards ease-in-out";
+                h1.style.animation = "moveH_photo_1 2s forwards ease-in-out";
+                h2.style.animation = "moveH_photo_2 2s forwards ease-in-out";
+                h3.style.animation = "moveH_photo_3 2s forwards ease-in-out";
+                h4.style.animation = "moveH_photo_4 2s forwards ease-in-out";
+            }, 0);
+
+            setTimeout(() => {
+                document.getElementById('setup-photo').classList.add('opacity-0');
+                const prodO2 = document.getElementById('product-photo-o2'); prodO2.classList.remove('hidden'); prodO2.classList.add('gas-hover');
+                const prodSugar = document.getElementById('product-photo-sugar'); prodSugar.classList.remove('hidden'); prodSugar.classList.add('gas-hover');
+                
+                if(!showCharges) { setCharge('c-ph-c', '0'); setCharge('c-ph-o1', '0'); setCharge('c-ph-o2', '0'); }
+                finishReaction();
+            }, 2000);
+        }
+
+        function animateResp() {
+            const h1 = document.getElementById('resp-h1'); const h2 = document.getElementById('resp-h2');
+            const h3 = document.getElementById('resp-h3'); const h4 = document.getElementById('resp-h4');
+            const o1 = document.getElementById('resp-o1'); const o2 = document.getElementById('resp-o2');
+            
+            setTimeout(() => {
+                h1.style.animation = "moveH_resp_1 2s forwards ease-in-out";
+                h2.style.animation = "moveH_resp_2 2s forwards ease-in-out";
+                h3.style.animation = "moveH_resp_3 2s forwards ease-in-out";
+                h4.style.animation = "moveH_resp_4 2s forwards ease-in-out";
+                o1.style.animation = "moveO_resp_split_top 2s forwards ease-in-out";
+                o2.style.animation = "moveO_resp_split_bot 2s forwards ease-in-out";
+            }, 0);
+
+            setTimeout(() => {
+                document.getElementById('setup-resp').classList.add('opacity-0');
+                document.getElementById('product-resp-co2').classList.remove('hidden'); document.getElementById('product-resp-co2').classList.add('gas-hover');
+                document.getElementById('product-resp-h2o-1').classList.remove('hidden'); document.getElementById('product-resp-h2o-1').classList.add('gas-hover');
+                document.getElementById('product-resp-h2o-2').classList.remove('hidden'); document.getElementById('product-resp-h2o-2').classList.add('gas-hover');
+                
+                if(!showCharges) { setCharge('c-resp-c', '+4'); setCharge('c-resp-o1', '-2'); setCharge('c-resp-o2', '-2'); }
+                finishReaction();
+            }, 2000);
+        }
+
+        function finishReaction() {
+            setTimeout(() => {
+                document.getElementById('flame').classList.remove('active');
+                document.getElementById('sun').classList.remove('active');
+                document.getElementById('btn-reset').classList.remove('hidden');
+                updateStatus("反應結束。");
+                const resBox = document.getElementById('result-box');
+                resBox.classList.remove('hidden');
+                document.getElementById('result-text').textContent = equations[currentMode].res;
+            }, 500);
+        }
+
+        function resetExperiment() { location.reload(); }
+
+        function resetExperimentUI() {
+            document.getElementById('result-box').classList.add('hidden');
+            document.getElementById('btn-heat').classList.remove('hidden');
+            document.getElementById('btn-reset').classList.add('hidden');
+            document.getElementById('cu1').classList.remove('reduced');
+            document.getElementById('cu2').classList.remove('reduced');
+            
+            // Reset Charges
+            setCharge('charge-cu1', '+2'); setCharge('charge-cu2', '+2');
+            setCharge('charge-c', '0');
+            setCharge('charge-co-top-c', '+2'); setCharge('charge-co-bot-c', '+2');
+            setCharge('c-h2o2-to1', '-1'); setCharge('c-h2o2-to2', '-1');
+            setCharge('c-h2o2-bo1', '-1'); setCharge('c-h2o2-bo2', '-1');
+            setCharge('c-ph-o1', '-2'); setCharge('c-ph-o2', '-2'); setCharge('c-ph-c', '+4');
+            setCharge('c-resp-c', '0'); setCharge('c-resp-o1', '0'); setCharge('c-resp-o2', '0');
+
+            document.querySelectorAll('.atom').forEach(el => el.style.animation = '');
+            document.querySelectorAll('.electron').forEach(el => { el.style.animation = ''; el.classList.add('hidden'); });
+            document.querySelectorAll('.setup-group').forEach(el => el.classList.remove('opacity-0'));
+            
+            document.querySelectorAll('.product-group').forEach(el => {
+                el.classList.add('hidden');
+                el.classList.remove('gas-hover');
+            });
+            updateStatus("準備中...");
+        }
+
+        function updateStatus(text) { document.getElementById('status-text').textContent = "狀態：" + text; }
+        function showSpeech(role, element) {
+            if (isReacting) return;
+            const bubble = document.getElementById('speech-bubble'); bubble.innerHTML = speeches[role];
+            bubble.className = 'speech-bubble show';
+            if(role === 'oxidizer') bubble.classList.add('bubble-oxidizer');
+            else if(role === 'reducer') bubble.classList.add('bubble-reducer');
+            else if(role.startsWith('photo') || role.startsWith('resp')) bubble.classList.add('bubble-bio');
+            else bubble.classList.add('bubble-auto');
+            const chamberRect = document.getElementById('chamber').getBoundingClientRect();
+            const elRect = element.getBoundingClientRect();
+            const top = elRect.top - chamberRect.top - 80;
+            const left = elRect.left - chamberRect.left + (elRect.width / 2) - 120; 
+            bubble.style.top = `${top}px`; bubble.style.left = `${left}px`;
+        }
+        function hideSpeech() { document.getElementById('speech-bubble').classList.remove('show'); }
+    </script>
+</body>
+</html>
