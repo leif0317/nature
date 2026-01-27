@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>理化聲學實驗室 V9 | 小粘製作</title>
+    <style>
+        :root { --neon-green: #39ff14; --neon-blue: #00f2ff; --bg: #121212; --panel: #1e1e24; --text: #e0e0e0; }
+        body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; user-select: none; }
+        
+        /* Header Styles */
+        .app-header { text-align: center; margin: 15px 0 20px 0; }
+        .app-title { color: var(--neon-green); margin: 0; font-size: 1.8rem; text-shadow: 0 0 10px rgba(57, 255, 20, 0.3); }
+        .app-author { color: var(--neon-blue); font-weight: bold; font-size: 1.2rem; margin-top: 5px; letter-spacing: 3px; text-shadow: 0 0 8px rgba(0, 242, 255, 0.6); animation: pulse 2s infinite alternate; }
+        @keyframes pulse { from { opacity: 0.8; text-shadow: 0 0 5px rgba(0, 242, 255, 0.4); } to { opacity: 1; text-shadow: 0 0 15px rgba(0, 242, 255, 0.8); } }
+
+        .main-container { background: var(--panel); border-radius: 12px; padding: 20px; width: 95%; max-width: 950px; box-shadow: 0 8px 32px rgba(0,0,0,0.6); border: 1px solid #333; }
+        canvas { width: 100%; height: 140px; background: #000; border-radius: 6px; border: 1px solid #444; margin-bottom: 15px; }
+        
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; background: #111; padding: 5px; border-radius: 8px; }
+        .tab-btn { flex: 1; padding: 10px; background: transparent; border: none; color: #888; cursor: pointer; border-radius: 5px; font-weight: bold; transition: 0.2s; }
+        .tab-btn.active { background: var(--neon-blue); color: #000; box-shadow: 0 0 10px var(--neon-blue); }
+        .content { display: none; animation: fadeIn 0.3s; }
+        .content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .control-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; }
+        label { color: var(--neon-green); font-size: 0.9rem; min-width: 80px; }
+        input[type="range"] { flex: 1; cursor: pointer; accent-color: var(--neon-green); }
+        select { background: #333; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; }
+        .btn-action { width: 100%; padding: 12px; background: #ff4757; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+
+        /* --- 樂器舞台樣式 --- */
+        .inst-stage { min-height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 20px; background: #18181b; border-radius: 8px; border: 1px dashed #444; position: relative; overflow: hidden; }
+
+        /* 鼓組 */
+        .drum-set { display: flex; gap: 30px; align-items: flex-end; }
+        .drum-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; color: rgba(0,0,0,0.5); font-weight: bold; font-size: 14px; text-shadow: 0 1px 1px rgba(255,255,255,0.5); }
+        .drum { border-radius: 50%; background: radial-gradient(circle at 30% 30%, #fff, #bbb); border: 8px solid #4e342e; cursor: pointer; position: relative; transition: transform 0.05s; box-shadow: 0 10px 20px #000; }
+        .drum:active { transform: scale(0.95); border-color: #3e2723; }
+
+        /* 吉他 */
+        .guitar-wrapper { width: 100%; max-width: 600px; height: 160px; position: relative; display: flex; user-select: none; }
+        .g-neck { width: 70%; background: #3e2723; height: 100%; position: relative; display: flex; flex-direction: column; justify-content: space-evenly; border-right: 5px solid #222; cursor: crosshair; }
+        .g-body { flex: 1; background: #5d4037; height: 100%; border-radius: 0 30px 30px 0; position: relative; display: flex; align-items: center; justify-content: center; box-shadow: inset 10px 0 20px rgba(0,0,0,0.5); }
+        .g-hole { width: 90px; height: 90px; background: #111; border-radius: 50%; border: 4px solid #8d6e63; }
+        .strings-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: space-evenly; pointer-events: none; z-index: 5; padding: 12px 0; box-sizing: border-box; }
+        .g-string-line { width: 100%; background: #e0e0e0; box-shadow: 0 2px 3px rgba(0,0,0,0.6); pointer-events: auto; cursor: pointer; transition: 0.05s; }
+        .g-string-line:hover { background: var(--neon-blue); }
+        .g-string-line:active { transform: translateY(1px); filter: brightness(1.5); }
+        .fret { position: absolute; top: 0; bottom: 0; width: 2px; background: #999; pointer-events: none; }
+        #left-hand-marker { position: absolute; top: -25px; width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 12px solid var(--neon-green); transform: translateX(-50%); transition: left 0.05s; z-index: 10; pointer-events: none; }
+        #marker-txt { position: absolute; top: -45px; color: var(--neon-green); font-size: 12px; transform: translateX(-50%); white-space: nowrap; pointer-events: none;}
+
+        /* 木琴 */
+        .xylo-wrapper { display: flex; gap: 4px; align-items: flex-end; height: 200px; width: 100%; overflow-x: auto; padding-bottom: 10px;}
+        .xylo-bar { flex: 1; background: linear-gradient(to bottom, #d84315, #bf360c); border-radius: 4px; cursor: pointer; border-top: 1px solid rgba(255,255,255,0.4); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; color: rgba(255,255,255,0.9); font-size: 11px; min-width: 20px; box-shadow: 0 2px 5px #000; transition: height 0.3s; }
+        .xylo-bar:active { background: #ff5722; }
+
+        /* 直笛 */
+        .flute-h { display: flex; align-items: center; background: #ffe0b2; width: 320px; height: 36px; border-radius: 18px; border: 2px solid #5d4037; position: relative; padding-left: 45px; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
+        .mouthpiece { position: absolute; left: 0; top: -4px; width: 45px; height: 44px; background: #3e2723; border-radius: 12px 0 0 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; z-index: 2; border-right: 2px solid #222; }
+        .flute-holes { display: flex; justify-content: space-evenly; width: 100%; padding-right: 10px; }
+        .hole { width: 12px; height: 12px; background: #333; border-radius: 50%; cursor: pointer; border: 1px solid #aaa; box-shadow: inset 0 0 3px #000; }
+        .hole.closed { background: #d84315; border-color: #ff5722; box-shadow: 0 0 5px #ff5722; }
+
+        /* SVG */
+        .svg-inst { cursor: pointer; filter: drop-shadow(0 3px 3px #000); }
+        .svg-inst:active { transform: scale(0.95); }
+        .tri-path { fill: none; stroke: url(#metalGrad); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+        .fork-path { fill: none; stroke: url(#metalGrad); stroke-width: 6; stroke-linecap: round; }
+        .fork-handle { fill: url(#metalGrad); }
+    </style>
+</head>
+<body>
+
+    <svg width="0" height="0">
+        <defs>
+            <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#fff" />
+                <stop offset="100%" style="stop-color:#777" />
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <div class="app-header">
+        <h2 class="app-title">🎛️ 理化聲學實驗室 V9</h2>
+        <div class="app-author">✨ 小粘製作 ✨</div>
+    </div>
+
+    <div class="main-container">
+        <canvas id="scope"></canvas>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('wave')">1. 波形實驗</button>
+            <button class="tab-btn" onclick="switchTab('inst')">2. 真實樂器</button>
+            <button class="tab-btn" onclick="switchTab('noise')">3. 樂音 vs 噪音</button>
+        </div>
+
+        <div id="wave-tab" class="content active">
+            <div class="control-row"><label>振幅</label><input type="range" id="w-amp" min="0" max="1" step="0.01" value="0.5"></div>
+            <div class="control-row"><label>頻率</label><input type="range" id="w-freq" min="10" max="21000" step="1" value="440" oninput="document.getElementById('freq-txt').innerText=this.value+'Hz'"><span id="freq-txt" style="width:60px; text-align:right;">440Hz</span></div>
+            <div class="control-row"><label>波形</label><select id="w-type" style="width:100%"><option value="sine">正弦波</option><option value="square">方波</option><option value="triangle">三角波</option><option value="sawtooth">鋸齒波</option></select></div>
+            <button class="btn-action" onclick="toggleWave(this)">開啟波形聲音</button>
+        </div>
+
+        <div id="inst-tab" class="content">
+            <div class="control-row" style="background:rgba(0,242,255,0.1);"><label>🤚 彈奏力道</label><input type="range" id="force-val" min="0.1" max="1.5" step="0.1" value="0.8"></div>
+            <div class="control-row"><label>選擇樂器</label><select id="inst-sel" onchange="renderInst()" style="width:100%; padding:8px;"><option value="drum">1. 鼓組 (低/中/高)</option><option value="tri">2. 三角鐵 (大小)</option><option value="fork">3. 音叉 (長短)</option><option value="guitar">4. 吉他 (弦線連動)</option><option value="xylo">5. 木琴 (20音)</option><option value="flute">6. 直笛 (氣鳴)</option></select></div>
+            <div id="inst-stage" class="inst-stage"></div>
+            <p id="hint-txt" style="color:#aaa; font-size:0.9rem; text-align:center; margin-top:10px;"></p>
+        </div>
+
+        <div id="noise-tab" class="content">
+            <div style="display:flex; gap:20px; justify-content:center;">
+                <button class="btn-action" style="background:#27ae60" onmousedown="playNoise(false)">🎵 樂音 (規律)</button>
+                <button class="btn-action" style="background:#7f8c8d" onmousedown="playNoise(true)">🏗️ 噪音 (雜亂)</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let audioCtx, analyser, osc = null;
+        const canvas = document.getElementById('scope');
+        const ctx = canvas.getContext('2d');
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                analyser.connect(audioCtx.destination);
+                draw();
+            }
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        function getForce() { return parseFloat(document.getElementById('force-val').value); }
+
+        // --- 樂器邏輯 ---
+        function playDrum(type) {
+            initAudio();
+            const t = audioCtx.currentTime;
+            const f = getForce();
+            const g = audioCtx.createGain();
+            const o = audioCtx.createOscillator();
+            g.connect(analyser);
+
+            if (type === 'bass') {
+                o.frequency.setValueAtTime(120, t);
+                o.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+                g.gain.setValueAtTime(f * 3.5, t);
+                g.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+            } else if (type === 'mid') {
+                o.frequency.setValueAtTime(220, t);
+                o.frequency.exponentialRampToValueAtTime(120, t + 0.2);
+                g.gain.setValueAtTime(f * 1.5, t);
+                g.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+            } else if (type === 'high') {
+                o.frequency.setValueAtTime(500, t);
+                g.gain.setValueAtTime(f * 1.2, t);
+                g.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+            }
+            o.connect(g); o.start(); o.stop(t + 0.5);
+        }
+
+        const guitarBase = [82.4, 110.0, 146.8, 196.0, 246.9, 329.6]; 
+        let leftHandRatio = 1;
+
+        function playString(index) {
+            initAudio();
+            const baseFreq = guitarBase[index];
+            const freq = baseFreq / leftHandRatio;
+            const t = audioCtx.currentTime;
+            
+            const o = audioCtx.createOscillator();
+            o.type = 'sawtooth';
+            
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(3000, t);
+            filter.frequency.exponentialRampToValueAtTime(freq, t + 0.4);
+
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(getForce(), t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+
+            o.frequency.value = freq;
+            o.connect(filter).connect(g).connect(analyser);
+            o.start(); o.stop(t + 1.2);
+        }
+
+        function playXylo(i) {
+            initAudio();
+            const freq = 261.6 * Math.pow(1.05946, i);
+            const t = audioCtx.currentTime;
+            const o = audioCtx.createOscillator();
+            o.type = 'triangle';
+            o.frequency.value = freq;
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(getForce(), t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+            o.connect(g).connect(analyser);
+            o.start(); o.stop(t + 0.4);
+        }
+
+        function playFlute() {
+            initAudio();
+            const holes = document.querySelectorAll('.hole.closed').length;
+            const freq = 523.25 * Math.pow(0.943, holes);
+            const t = audioCtx.currentTime;
+            const o = audioCtx.createOscillator();
+            o.type = 'sine';
+            o.frequency.value = freq;
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(getForce(), t + 0.1);
+            g.gain.linearRampToValueAtTime(0, t + 0.8);
+            o.connect(g).connect(analyser);
+            o.start(); o.stop(t + 0.8);
+        }
+
+        function playFork(freq) {
+            initAudio();
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.frequency.value = freq;
+            g.gain.setValueAtTime(getForce(), audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 3);
+            o.connect(g).connect(analyser);
+            o.start(); o.stop(audioCtx.currentTime + 3);
+        }
+
+        function playTri(freq) {
+            initAudio(); const f=getForce(); const t=audioCtx.currentTime;
+            [freq, freq*2.5, freq*4.2].forEach((fr, i) => {
+                const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+                o.frequency.value = fr; g.gain.setValueAtTime(f/(i+1), t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+                o.connect(g).connect(analyser); o.start(); o.stop(t + 2);
+            });
+        }
+        function playNoise(isN) {
+            initAudio(); const g=audioCtx.createGain(); g.gain.value=0.5; 
+            g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+1); g.connect(analyser);
+            if(isN){ const b=audioCtx.createBuffer(1,audioCtx.sampleRate,audioCtx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1; const s=audioCtx.createBufferSource(); s.buffer=b; s.connect(g); s.start(); }
+            else{ const o=audioCtx.createOscillator(); o.frequency.value=440; o.connect(g); o.start(); o.stop(audioCtx.currentTime+1); }
+        }
+        function toggleWave(btn) {
+            initAudio();
+            if(osc){ osc.stop(); osc=null; btn.innerText="開啟波形聲音"; btn.style.background="#ff4757"; }
+            else{ osc=audioCtx.createOscillator(); const g=audioCtx.createGain(); osc.type=document.getElementById('w-type').value; osc.frequency.value=document.getElementById('w-freq').value; g.gain.value=document.getElementById('w-amp').value; osc.connect(g).connect(analyser); osc.start(); btn.innerText="停止波形聲音"; btn.style.background="#2ecc71"; }
+        }
+
+        // --- 渲染介面 ---
+        function renderInst() {
+            const type = document.getElementById('inst-sel').value;
+            const stage = document.getElementById('inst-stage');
+            const hint = document.getElementById('hint-txt');
+            stage.innerHTML = '';
+
+            if (type === 'drum') {
+                hint.innerText = "大鼓(低音加強) / 中鼓 / 高鼓";
+                stage.innerHTML = `
+                    <div class="drum-set">
+                        <div class="drum" style="width:160px; height:160px;" onclick="playDrum('bass')"><div class="drum-label">Bass</div></div>
+                        <div class="drum" style="width:120px; height:120px;" onclick="playDrum('mid')"><div class="drum-label">Mid</div></div>
+                        <div class="drum" style="width:90px; height:90px;" onclick="playDrum('high')"><div class="drum-label">High</div></div>
+                    </div>`;
+            } else if (type === 'guitar') {
+                hint.innerText = "滑鼠移動=左手按弦 | 點擊弦線=右手撥弦 (粗細音調不同)";
+                stage.innerHTML = `
+                    <div class="guitar-wrapper">
+                        <div class="g-neck" id="g-neck">
+                            <div id="left-hand-marker"></div><div id="marker-txt">Open</div>
+                        </div>
+                        <div class="g-body"><div class="g-hole"></div></div>
+                        <div class="strings-layer" id="g-strings"></div>
+                    </div>`;
+                setTimeout(() => {
+                    const neck = document.getElementById('g-neck');
+                    const strLayer = document.getElementById('g-strings');
+                    const marker = document.getElementById('left-hand-marker');
+                    const mTxt = document.getElementById('marker-txt');
+                    for(let i=1; i<=12; i++){ const f=document.createElement('div'); f.className='fret'; f.style.left=(i*7.5)+'%'; neck.appendChild(f); }
+                    for(let i=0; i<6; i++) {
+                        const s = document.createElement('div');
+                        s.className = 'g-string-line';
+                        s.style.height = (7 - i) + 'px';
+                        s.onclick = () => playString(i);
+                        strLayer.appendChild(s);
+                    }
+                    neck.onmousemove = (e) => {
+                        const r = neck.getBoundingClientRect();
+                        let x = e.clientX - r.left;
+                        if(x < 0) x = 0; if(x > r.width) x = r.width;
+                        marker.style.left = x + 'px';
+                        mTxt.style.left = x + 'px';
+                        const ratio = 1 - (x / r.width * 0.5);
+                        leftHandRatio = ratio;
+                        const fretNum = Math.round((1-ratio)*24);
+                        mTxt.innerText = fretNum === 0 ? "Open" : fretNum + " 格";
+                    };
+                }, 0);
+            } else if (type === 'xylo') {
+                hint.innerText = "木琴 (20音)：長度遞減";
+                let h = '<div class="xylo-wrapper">';
+                for(let i=0; i<20; i++) {
+                    const height = 100 - (i * 3.5);
+                    h += `<div class="xylo-bar" style="height:${height}%" onclick="playXylo(${i})">${i+1}</div>`;
+                }
+                stage.innerHTML = h + '</div>';
+            } else if (type === 'flute') {
+                hint.innerText = "直笛：點擊孔洞開關，點擊吹嘴發聲";
+                stage.innerHTML = `
+                    <div class="flute-h">
+                        <div class="mouthpiece" onclick="playFlute()">吹氣</div>
+                        <div class="flute-holes">${[...Array(7)].map(() => `<div class="hole" onclick="this.classList.toggle('closed')"></div>`).join('')}</div>
+                    </div>`;
+            } else if (type === 'fork') {
+                hint.innerText = "音叉：長度與頻率成反比";
+                const mkFork = (f, len) => `
+                    <div style="text-align:center; cursor:pointer;" onclick="playFork(${f})">
+                        <svg width="40" height="${len + 50}" class="svg-inst">
+                            <path d="M10,10 V${len} Q20,${len+20} 30,${len} V10" class="fork-path" />
+                            <rect x="17" y="${len}" width="6" height="40" class="fork-handle" />
+                        </svg>
+                        <div style="font-size:12px; color:#aaa; margin-top:5px;">${f}Hz</div>
+                    </div>`;
+                stage.innerHTML = `<div style="display:flex; gap:30px; align-items:flex-end;">${mkFork(256, 100)}${mkFork(440, 70)}${mkFork(512, 50)}</div>`;
+            } else if (type === 'tri') {
+                hint.innerText = "三角鐵";
+                const mkTri = (sz, f) => `<svg width="${sz+20}" height="${sz+20}" class="svg-inst" onclick="playTri(${f})"><path d="M10,${sz+10} L${sz/2+10},10 L${sz+10},${sz+10} M${sz/2},${sz+10}" class="tri-path" /></svg>`;
+                stage.innerHTML = `<div style="display:flex; gap:30px; align-items:flex-end;">${mkTri(120, 1500)}${mkTri(90, 2500)}${mkTri(60, 4000)}</div>`;
+            }
+        }
+
+        function switchTab(t) { document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.getElementById(t + '-tab').classList.add('active'); event.target.classList.add('active'); if(t === 'inst') renderInst(); }
+        function draw() { requestAnimationFrame(draw); const b = new Uint8Array(analyser.frequencyBinCount); analyser.getByteTimeDomainData(b); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.lineWidth = 2; ctx.strokeStyle = '#39ff14'; ctx.beginPath(); const w = canvas.width / b.length; for(let i = 0; i < b.length; i++) { const y = (b[i] / 128.0) * canvas.height / 2; i === 0 ? ctx.moveTo(0, y) : ctx.lineTo(i * w, y); } ctx.stroke(); }
+        renderInst();
+        document.getElementById('w-freq').oninput=function(){document.getElementById('freq-txt').innerText=this.value+'Hz';if(osc)osc.frequency.value=this.value;};
+    </script>
+</body>
+</html>
