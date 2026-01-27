@@ -1,0 +1,283 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小粘製作 - 遺傳學進階模擬器</title>
+    <style>
+        :root {
+            --dad-color: #0077b6;
+            --mom-color: #d81159;
+            --bg-main: #f0f4f8;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background-color: var(--bg-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .author-tag {
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            color: white;
+            padding: 10px 30px;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+
+        .app-section {
+            background: white;
+            max-width: 950px;
+            width: 100%;
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            margin-bottom: 40px;
+        }
+
+        h2 { border-left: 6px solid #a777e3; padding-left: 15px; color: #444; }
+
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 220px 1fr 240px;
+            gap: 25px;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .layout-grid { grid-template-columns: 1fr; }
+        }
+
+        .input-area select {
+            width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 10px; border: 2px solid #eee; font-size: 1rem;
+        }
+
+        /* 棋盤樣式 */
+        .punnett-square {
+            display: grid;
+            grid-template-columns: 60px 1fr 1fr;
+            grid-template-rows: 60px 1fr 1fr;
+            gap: 10px;
+        }
+
+        .cell {
+            background: #fff; border: 2px solid #f0f0f0; border-radius: 12px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 120px;
+        }
+
+        .header-cell { border: none; font-weight: bold; font-size: 1.1rem; }
+        .dad-allele { color: var(--dad-color); }
+        .mom-allele { color: var(--mom-color); }
+
+        /* 染色體視覺化元件 */
+        .chromo-pair { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
+        
+        .chromosome {
+            width: 12px; border-radius: 6px; position: relative;
+            display: flex; justify-content: center;
+        }
+        
+        .chromo-x { height: 60px; }
+        .chromo-y { height: 30px; } /* Y只有一半長 */
+        
+        .gene-dot {
+            position: absolute; top: 5px; width: 100%; height: 15px;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 10px; font-weight: bold; color: white; border-radius: 3px;
+        }
+
+        .dad-style { background-color: var(--dad-color); opacity: 0.8; }
+        .mom-style { background-color: var(--mom-color); opacity: 0.8; }
+        .gene-label { font-size: 1.2rem; font-weight: bold; }
+
+        /* 統計區 */
+        .stats-area { background: #fdfdfd; padding: 20px; border-radius: 15px; border: 1px solid #eee; }
+        .stat-header { font-weight: bold; margin-bottom: 10px; color: #333; border-bottom: 1px solid #eee; }
+        .stat-row { margin: 10px 0; display: flex; justify-content: space-between; font-size: 0.9rem; }
+        .stat-val { background: #ffe5ec; color: #d81159; padding: 2px 8px; border-radius: 10px; font-weight: bold; }
+
+        footer { margin-top: 20px; color: #888; font-size: 0.9rem; }
+        sup { font-size: 0.6em; }
+    </style>
+</head>
+<body>
+
+    <div class="author-tag">✨ 小粘製作 ✨</div>
+
+    <div class="app-section">
+        <h2>1. 雙眼皮遺傳 (單基因)</h2>
+        <div class="layout-grid">
+            <div class="input-area">
+                <label>👨 爸爸基因型</label>
+                <select id="dad-eye" onchange="calcEye()">
+                    <option value="A,A">AA (顯性純合)</option>
+                    <option value="A,a" selected>Aa (異合子)</option>
+                    <option value="a,a">aa (隱性)</option>
+                </select>
+                <label>👩 媽媽基因型</label>
+                <select id="mom-eye" onchange="calcEye()">
+                    <option value="A,A">AA (顯性純合)</option>
+                    <option value="A,a" selected>Aa (異合子)</option>
+                    <option value="a,a">aa (隱性)</option>
+                </select>
+            </div>
+            <div class="punnett-square" id="grid-eye"></div>
+            <div class="stats-area" id="stat-eye"></div>
+        </div>
+    </div>
+
+    <div class="app-section">
+        <h2>2. ABO 血型 (複等位基因)</h2>
+        <div class="layout-grid">
+            <div class="input-area">
+                <label>👨 爸爸基因型</label>
+                <select id="dad-blood" onchange="calcBlood()">
+                    <option value="I<sup>A</sup>,I<sup>A</sup>">A型 (I<sup>A</sup>I<sup>A</sup>)</option>
+                    <option value="I<sup>A</sup>,i" selected>A型 (I<sup>A</sup>i)</option>
+                    <option value="I<sup>B</sup>,I<sup>B</sup>">B型 (I<sup>B</sup>I<sup>B</sup>)</option>
+                    <option value="I<sup>B</sup>,i">B型 (I<sup>B</sup>i)</option>
+                    <option value="I<sup>A</sup>,I<sup>B</sup>">AB型 (I<sup>A</sup>I<sup>B</sup>)</option>
+                    <option value="i,i">O型 (ii)</option>
+                </select>
+                <label>👩 媽媽基因型</label>
+                <select id="mom-blood" onchange="calcBlood()">
+                    <option value="I<sup>A</sup>,I<sup>A</sup>">A型 (I<sup>A</sup>I<sup>A</sup>)</option>
+                    <option value="I<sup>A</sup>,i">A型 (I<sup>A</sup>i)</option>
+                    <option value="I<sup>B</sup>,I<sup>B</sup>">B型 (I<sup>B</sup>I<sup>B</sup>)</option>
+                    <option value="I<sup>B</sup>,i" selected>B型 (I<sup>B</sup>i)</option>
+                    <option value="I<sup>A</sup>,I<sup>B</sup>">AB型 (I<sup>A</sup>I<sup>B</sup>)</option>
+                    <option value="i,i">O型 (ii)</option>
+                </select>
+            </div>
+            <div class="punnett-square" id="grid-blood"></div>
+            <div class="stats-area" id="stat-blood"></div>
+        </div>
+    </div>
+
+    <div class="app-section">
+        <h2>3. 性聯遺傳視覺化 (色盲例子)</h2>
+        <p style="font-size: 0.85rem; color: #666;">觀察：Y 染色體較短且不帶有此基因位置。</p>
+        <div class="layout-grid">
+            <div class="input-area">
+                <label>👨 爸爸 (XY)</label>
+                <select id="dad-color" onchange="calcColor()">
+                    <option value="XR,Y">正常 (X<sup>R</sup>Y)</option>
+                    <option value="Xr,Y">色盲 (X<sup>r</sup>Y)</option>
+                </select>
+                <label>👩 媽媽 (XX)</label>
+                <select id="mom-color" onchange="calcColor()">
+                    <option value="XR,XR">正常 (X<sup>R</sup>X<sup>R</sup>)</option>
+                    <option value="XR,Xr" selected>帶因者 (X<sup>R</sup>X<sup>r</sup>)</option>
+                    <option value="Xr,Xr">色盲 (X<sup>r</sup>X<sup>r</sup>)</option>
+                </select>
+            </div>
+            <div class="punnett-square" id="grid-color"></div>
+            <div class="stats-area" id="stat-color"></div>
+        </div>
+    </div>
+
+    <footer>© 2026 國中生物教學輔助工具 - 小粘製作</footer>
+
+    <script>
+        // 生成染色體 HTML
+        function getChromoHTML(type, isDad) {
+            const styleClass = isDad ? 'dad-style' : 'mom-style';
+            if (type === 'Y') {
+                return `<div class="chromosome chromo-y ${styleClass}"></div>`;
+            }
+            const gene = type.includes('r') ? 'r' : (type.includes('R') ? 'R' : '');
+            return `
+                <div class="chromosome chromo-x ${styleClass}">
+                    ${gene ? `<div class="gene-dot" style="background:rgba(0,0,0,0.3)">${gene}</div>` : ''}
+                </div>`;
+        }
+
+        function renderSquare(gridId, dadAlleles, momAlleles, type) {
+            const grid = document.getElementById(gridId);
+            grid.innerHTML = `<div class="cell header-cell"></div>
+                              <div class="cell header-cell dad-allele">${dadAlleles[0]}</div>
+                              <div class="cell header-cell dad-allele">${dadAlleles[1]}</div>
+                              <div class="cell header-cell mom-allele">${momAlleles[0]}</div>
+                              <div id="${gridId}-1" class="cell"></div>
+                              <div id="${gridId}-2" class="cell"></div>
+                              <div class="cell header-cell mom-allele">${momAlleles[1]}</div>
+                              <div id="${gridId}-3" class="cell"></div>
+                              <div id="${gridId}-4" class="cell"></div>`;
+            
+            let results = [];
+            let index = 1;
+            for (let m of momAlleles) {
+                for (let d of dadAlleles) {
+                    const cell = document.getElementById(`${gridId}-${index}`);
+                    let content = "";
+                    let pheno = "";
+
+                    if (type === 'color') {
+                        content = `<div class="chromo-pair">
+                                    ${getChromoHTML(d, true)}
+                                    ${getChromoHTML(m, false)}
+                                   </div>`;
+                        pheno = getColorPheno([d, m]);
+                    } else {
+                        const combo = [d, m];
+                        if (type === 'eye') combo.sort();
+                        if (type === 'blood') combo.sort((a,b) => (a === 'i' ? 1 : -1));
+                        content = `<div class="gene-label"><span style="color:var(--dad-color)">${combo[0]}</span><span style="color:var(--mom-color)">${combo[1]}</span></div>`;
+                        pheno = type === 'eye' ? (combo.join('').includes('A') ? '👀 雙眼皮' : '😑 單眼皮') : getBloodPheno(combo);
+                    }
+
+                    cell.innerHTML = `${content}<div class="pheno-text">${pheno}</div>`;
+                    results.push(pheno);
+                    index++;
+                }
+            }
+            updateStats(gridId.replace('grid', 'stat'), results);
+        }
+
+        function getBloodPheno(combo) {
+            const s = combo.join('');
+            if (s.includes('IA') && s.includes('IB')) return '🅾️ AB型';
+            if (s.includes('IA')) return '🅰️ A型';
+            if (s.includes('IB')) return '🅱️ B型';
+            return '🅾️ O型';
+        }
+
+        function getColorPheno(combo) {
+            const hasY = combo.includes('Y');
+            const rCount = combo.filter(g => g.includes('r')).length;
+            if (!hasY) {
+                if (rCount === 0) return '♀️ 正常女孩';
+                if (rCount === 1) return '♀️ 帶因女孩';
+                return '❌ 色盲女孩';
+            } else {
+                const isSick = combo.some(g => g.includes('r'));
+                return isSick ? '❌ 色盲男孩' : '♂️ 正常男孩';
+            }
+        }
+
+        function updateStats(statId, results) {
+            const counts = {};
+            results.forEach(r => counts[r] = (counts[r] || 0) + 1);
+            const container = document.getElementById(statId);
+            container.innerHTML = '<div class="stat-header">📊 統計結果</div>';
+            for (let p in counts) {
+                container.innerHTML += `<div class="stat-row"><span>${p}</span><span class="stat-val">${(counts[p]/4)*100}%</span></div>`;
+            }
+        }
+
+        function calcEye() { renderSquare('grid-eye', document.getElementById('dad-eye').value.split(','), document.getElementById('mom-eye').value.split(','), 'eye'); }
+        function calcBlood() { renderSquare('grid-blood', document.getElementById('dad-blood').value.split(','), document.getElementById('mom-blood').value.split(','), 'blood'); }
+        function calcColor() { renderSquare('grid-color', document.getElementById('dad-color').value.split(','), document.getElementById('mom-color').value.split(','), 'color'); }
+
+        calcEye(); calcBlood(); calcColor();
+    </script>
+</body>
+</html>
