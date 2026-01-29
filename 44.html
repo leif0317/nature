@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>理化聲學實驗室 V9 | 小粘製作</title>
+    <title>理化聲學實驗室 V11 | 小粘製作</title>
     <style>
-        :root { --neon-green: #39ff14; --neon-blue: #00f2ff; --bg: #121212; --panel: #1e1e24; --text: #e0e0e0; }
+        :root { --neon-green: #39ff14; --neon-blue: #00f2ff; --neon-pink: #ff00ff; --bg: #121212; --panel: #1e1e24; --text: #e0e0e0; }
         body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; user-select: none; }
         
-        /* Header Styles */
+        /* Header */
         .app-header { text-align: center; margin: 15px 0 20px 0; }
         .app-title { color: var(--neon-green); margin: 0; font-size: 1.8rem; text-shadow: 0 0 10px rgba(57, 255, 20, 0.3); }
         .app-author { color: var(--neon-blue); font-weight: bold; font-size: 1.2rem; margin-top: 5px; letter-spacing: 3px; text-shadow: 0 0 8px rgba(0, 242, 255, 0.6); animation: pulse 2s infinite alternate; }
@@ -32,13 +32,11 @@
 
         /* --- 樂器舞台樣式 --- */
         .inst-stage { min-height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 20px; background: #18181b; border-radius: 8px; border: 1px dashed #444; position: relative; overflow: hidden; }
-
         /* 鼓組 */
         .drum-set { display: flex; gap: 30px; align-items: flex-end; }
         .drum-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; color: rgba(0,0,0,0.5); font-weight: bold; font-size: 14px; text-shadow: 0 1px 1px rgba(255,255,255,0.5); }
         .drum { border-radius: 50%; background: radial-gradient(circle at 30% 30%, #fff, #bbb); border: 8px solid #4e342e; cursor: pointer; position: relative; transition: transform 0.05s; box-shadow: 0 10px 20px #000; }
         .drum:active { transform: scale(0.95); border-color: #3e2723; }
-
         /* 吉他 */
         .guitar-wrapper { width: 100%; max-width: 600px; height: 160px; position: relative; display: flex; user-select: none; }
         .g-neck { width: 70%; background: #3e2723; height: 100%; position: relative; display: flex; flex-direction: column; justify-content: space-evenly; border-right: 5px solid #222; cursor: crosshair; }
@@ -51,19 +49,16 @@
         .fret { position: absolute; top: 0; bottom: 0; width: 2px; background: #999; pointer-events: none; }
         #left-hand-marker { position: absolute; top: -25px; width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 12px solid var(--neon-green); transform: translateX(-50%); transition: left 0.05s; z-index: 10; pointer-events: none; }
         #marker-txt { position: absolute; top: -45px; color: var(--neon-green); font-size: 12px; transform: translateX(-50%); white-space: nowrap; pointer-events: none;}
-
         /* 木琴 */
         .xylo-wrapper { display: flex; gap: 4px; align-items: flex-end; height: 200px; width: 100%; overflow-x: auto; padding-bottom: 10px;}
         .xylo-bar { flex: 1; background: linear-gradient(to bottom, #d84315, #bf360c); border-radius: 4px; cursor: pointer; border-top: 1px solid rgba(255,255,255,0.4); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; color: rgba(255,255,255,0.9); font-size: 11px; min-width: 20px; box-shadow: 0 2px 5px #000; transition: height 0.3s; }
         .xylo-bar:active { background: #ff5722; }
-
         /* 直笛 */
         .flute-h { display: flex; align-items: center; background: #ffe0b2; width: 320px; height: 36px; border-radius: 18px; border: 2px solid #5d4037; position: relative; padding-left: 45px; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
         .mouthpiece { position: absolute; left: 0; top: -4px; width: 45px; height: 44px; background: #3e2723; border-radius: 12px 0 0 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; z-index: 2; border-right: 2px solid #222; }
         .flute-holes { display: flex; justify-content: space-evenly; width: 100%; padding-right: 10px; }
         .hole { width: 12px; height: 12px; background: #333; border-radius: 50%; cursor: pointer; border: 1px solid #aaa; box-shadow: inset 0 0 3px #000; }
         .hole.closed { background: #d84315; border-color: #ff5722; box-shadow: 0 0 5px #ff5722; }
-
         /* SVG */
         .svg-inst { cursor: pointer; filter: drop-shadow(0 3px 3px #000); }
         .svg-inst:active { transform: scale(0.95); }
@@ -84,7 +79,7 @@
     </svg>
 
     <div class="app-header">
-        <h2 class="app-title">🎛️ 理化聲學實驗室 V9</h2>
+        <h2 class="app-title">🎛️ 理化聲學實驗室 V11</h2>
         <div class="app-author">✨ 小粘製作 ✨</div>
     </div>
 
@@ -100,7 +95,26 @@
         <div id="wave-tab" class="content active">
             <div class="control-row"><label>振幅</label><input type="range" id="w-amp" min="0" max="1" step="0.01" value="0.5"></div>
             <div class="control-row"><label>頻率</label><input type="range" id="w-freq" min="10" max="21000" step="1" value="440" oninput="document.getElementById('freq-txt').innerText=this.value+'Hz'"><span id="freq-txt" style="width:60px; text-align:right;">440Hz</span></div>
-            <div class="control-row"><label>波形</label><select id="w-type" style="width:100%"><option value="sine">正弦波</option><option value="square">方波</option><option value="triangle">三角波</option><option value="sawtooth">鋸齒波</option></select></div>
+            <div class="control-row">
+                <label>波形</label>
+                <select id="w-type" style="width:100%">
+                    <optgroup label="基礎波形">
+                        <option value="sine">正弦波 (Sine)</option>
+                        <option value="square">方波 (Square)</option>
+                        <option value="triangle">三角波 (Triangle)</option>
+                        <option value="sawtooth">鋸齒波 (Sawtooth)</option>
+                        <option value="pulse">脈衝波 (Pulse 8-bit)</option>
+                    </optgroup>
+                    <optgroup label="樂器模擬 (Fourier Synthesis)">
+                        <option value="clarinet">單簧管 (Clarinet - 奇次諧波)</option>
+                        <option value="violin">小提琴 (Violin - 鋸齒諧波)</option>
+                        <option value="piano">鋼琴 (Piano - 穩態)</option>
+                        <option value="bass">貝斯 (Bass - 深沉)</option>
+                        <option value="organ">管風琴 (Organ)</option>
+                        <option value="horn">銅管樂 (Horn)</option>
+                    </optgroup>
+                </select>
+            </div>
             <button class="btn-action" onclick="toggleWave(this)">開啟波形聲音</button>
         </div>
 
@@ -120,7 +134,7 @@
     </div>
 
     <script>
-        let audioCtx, analyser, osc = null;
+        let audioCtx, analyser, osc = null, waveGain = null;
         const canvas = document.getElementById('scope');
         const ctx = canvas.getContext('2d');
 
@@ -135,100 +149,122 @@
         }
         function getForce() { return parseFloat(document.getElementById('force-val').value); }
 
-        // --- 樂器邏輯 ---
-        function playDrum(type) {
-            initAudio();
-            const t = audioCtx.currentTime;
-            const f = getForce();
-            const g = audioCtx.createGain();
-            const o = audioCtx.createOscillator();
-            g.connect(analyser);
+        // --- 1. 波形實驗核心邏輯 ---
+        function setWaveType(oscillator, type) {
+            const imag = new Float32Array(32); // 虛部 (Sine terms) - 控制諧波振幅
+            const real = new Float32Array(32); // 實部 (Cosine terms) - 設為0簡化相位
+            
+            if (['sine', 'square', 'triangle', 'sawtooth'].includes(type)) {
+                oscillator.type = type;
+                return;
+            }
 
+            // 傅立葉合成 (Fourier Synthesis)
+            // 係數定義了基頻(index 1)與泛音(index 2, 3...)的比例
+            if (type === 'clarinet') {
+                // 單簧管: 閉管空氣柱，奇次諧波為主 (1, 3, 5...)
+                imag[1]=1; imag[3]=0.75; imag[5]=0.5; imag[7]=0.14; imag[9]=0.05;
+            } else if (type === 'violin') {
+                // 小提琴: 鋸齒波變體，豐富的整數諧波
+                imag[1]=1; imag[2]=1; imag[3]=0.8; imag[4]=0.6; imag[5]=0.5; imag[6]=0.4; imag[7]=0.3;
+            } else if (type === 'piano') {
+                // 鋼琴: 穩態模擬，基頻強，衰減快
+                imag[1]=0.6; imag[2]=0.5; imag[3]=0.3; imag[4]=0.2; imag[5]=0.1;
+            } else if (type === 'bass') {
+                // 貝斯: 強勁的基頻
+                imag[1]=1; imag[2]=0.4; imag[3]=0.1;
+            } else if (type === 'organ') {
+                // 管風琴: 諧波平均
+                imag[1]=1; imag[2]=0.8; imag[4]=0.6; imag[8]=0.4;
+            } else if (type === 'horn') {
+                // 銅管
+                for (let i=1; i<20; i++) imag[i] = 1/i; 
+            } else if (type === 'pulse') {
+                // 脈衝
+                for (let i=1; i<32; i++) imag[i] = Math.cos(i*0.2);
+            }
+            
+            const wave = audioCtx.createPeriodicWave(real, imag);
+            oscillator.setPeriodicWave(wave);
+        }
+
+        function toggleWave(btn) {
+            initAudio();
+            if(osc){ 
+                osc.stop(); osc=null; waveGain=null;
+                btn.innerText="開啟波形聲音"; btn.style.background="#ff4757"; 
+            } else {
+                osc = audioCtx.createOscillator();
+                waveGain = audioCtx.createGain(); 
+                
+                setWaveType(osc, document.getElementById('w-type').value);
+                
+                osc.frequency.value = document.getElementById('w-freq').value;
+                waveGain.gain.setValueAtTime(document.getElementById('w-amp').value, audioCtx.currentTime);
+                
+                osc.connect(waveGain).connect(analyser);
+                osc.start();
+                btn.innerText="停止波形聲音"; btn.style.background="#2ecc71"; 
+            }
+        }
+
+        // V10: 即時監聽
+        document.getElementById('w-amp').oninput = function() {
+            if(waveGain) waveGain.gain.setTargetAtTime(this.value, audioCtx.currentTime, 0.05);
+        };
+        document.getElementById('w-freq').oninput = function() {
+            document.getElementById('freq-txt').innerText = this.value + 'Hz';
+            if(osc) osc.frequency.setTargetAtTime(this.value, audioCtx.currentTime, 0.05);
+        };
+        document.getElementById('w-type').onchange = function() {
+            if(osc) setWaveType(osc, this.value);
+        };
+
+        // --- 2. 樂器模擬 (V9 Logic) ---
+        function playDrum(type) {
+            initAudio(); const t = audioCtx.currentTime; const f = getForce();
+            const g = audioCtx.createGain(); const o = audioCtx.createOscillator(); g.connect(analyser);
             if (type === 'bass') {
-                o.frequency.setValueAtTime(120, t);
-                o.frequency.exponentialRampToValueAtTime(40, t + 0.3);
-                g.gain.setValueAtTime(f * 3.5, t);
-                g.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+                o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+                g.gain.setValueAtTime(f * 3.5, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
             } else if (type === 'mid') {
-                o.frequency.setValueAtTime(220, t);
-                o.frequency.exponentialRampToValueAtTime(120, t + 0.2);
-                g.gain.setValueAtTime(f * 1.5, t);
-                g.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(120, t + 0.2);
+                g.gain.setValueAtTime(f * 1.5, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
             } else if (type === 'high') {
-                o.frequency.setValueAtTime(500, t);
-                g.gain.setValueAtTime(f * 1.2, t);
+                o.frequency.setValueAtTime(500, t); g.gain.setValueAtTime(f * 1.2, t);
                 g.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
             }
             o.connect(g); o.start(); o.stop(t + 0.5);
         }
-
-        const guitarBase = [82.4, 110.0, 146.8, 196.0, 246.9, 329.6]; 
-        let leftHandRatio = 1;
-
+        const guitarBase = [82.4, 110.0, 146.8, 196.0, 246.9, 329.6]; let leftHandRatio = 1;
         function playString(index) {
-            initAudio();
-            const baseFreq = guitarBase[index];
-            const freq = baseFreq / leftHandRatio;
-            const t = audioCtx.currentTime;
-            
-            const o = audioCtx.createOscillator();
-            o.type = 'sawtooth';
-            
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(3000, t);
-            filter.frequency.exponentialRampToValueAtTime(freq, t + 0.4);
-
-            const g = audioCtx.createGain();
-            g.gain.setValueAtTime(getForce(), t);
-            g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
-
-            o.frequency.value = freq;
-            o.connect(filter).connect(g).connect(analyser);
-            o.start(); o.stop(t + 1.2);
+            initAudio(); const baseFreq = guitarBase[index]; const freq = baseFreq / leftHandRatio;
+            const t = audioCtx.currentTime; const o = audioCtx.createOscillator(); o.type = 'sawtooth';
+            const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(3000, t); filter.frequency.exponentialRampToValueAtTime(freq, t + 0.4);
+            const g = audioCtx.createGain(); g.gain.setValueAtTime(getForce(), t); g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+            o.frequency.value = freq; o.connect(filter).connect(g).connect(analyser); o.start(); o.stop(t + 1.2);
         }
-
         function playXylo(i) {
-            initAudio();
-            const freq = 261.6 * Math.pow(1.05946, i);
-            const t = audioCtx.currentTime;
-            const o = audioCtx.createOscillator();
-            o.type = 'triangle';
-            o.frequency.value = freq;
-            const g = audioCtx.createGain();
-            g.gain.setValueAtTime(getForce(), t);
-            g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-            o.connect(g).connect(analyser);
-            o.start(); o.stop(t + 0.4);
+            initAudio(); const freq = 261.6 * Math.pow(1.05946, i); const t = audioCtx.currentTime;
+            const o = audioCtx.createOscillator(); o.type = 'triangle'; o.frequency.value = freq;
+            const g = audioCtx.createGain(); g.gain.setValueAtTime(getForce(), t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.4); o.connect(g).connect(analyser); o.start(); o.stop(t + 0.4);
         }
-
         function playFlute() {
-            initAudio();
-            const holes = document.querySelectorAll('.hole.closed').length;
-            const freq = 523.25 * Math.pow(0.943, holes);
-            const t = audioCtx.currentTime;
-            const o = audioCtx.createOscillator();
-            o.type = 'sine';
-            o.frequency.value = freq;
-            const g = audioCtx.createGain();
-            g.gain.setValueAtTime(0, t);
-            g.gain.linearRampToValueAtTime(getForce(), t + 0.1);
-            g.gain.linearRampToValueAtTime(0, t + 0.8);
-            o.connect(g).connect(analyser);
-            o.start(); o.stop(t + 0.8);
+            initAudio(); const holes = document.querySelectorAll('.hole.closed').length;
+            const freq = 523.25 * Math.pow(0.943, holes); const t = audioCtx.currentTime;
+            const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+            const g = audioCtx.createGain(); g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(getForce(), t + 0.1); g.gain.linearRampToValueAtTime(0, t + 0.8);
+            o.connect(g).connect(analyser); o.start(); o.stop(t + 0.8);
         }
-
         function playFork(freq) {
-            initAudio();
-            const o = audioCtx.createOscillator();
-            const g = audioCtx.createGain();
-            o.frequency.value = freq;
-            g.gain.setValueAtTime(getForce(), audioCtx.currentTime);
+            initAudio(); const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+            o.frequency.value = freq; g.gain.setValueAtTime(getForce(), audioCtx.currentTime);
             g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 3);
-            o.connect(g).connect(analyser);
-            o.start(); o.stop(audioCtx.currentTime + 3);
+            o.connect(g).connect(analyser); o.start(); o.stop(audioCtx.currentTime + 3);
         }
-
         function playTri(freq) {
             initAudio(); const f=getForce(); const t=audioCtx.currentTime;
             [freq, freq*2.5, freq*4.2].forEach((fr, i) => {
@@ -243,11 +279,6 @@
             g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+1); g.connect(analyser);
             if(isN){ const b=audioCtx.createBuffer(1,audioCtx.sampleRate,audioCtx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1; const s=audioCtx.createBufferSource(); s.buffer=b; s.connect(g); s.start(); }
             else{ const o=audioCtx.createOscillator(); o.frequency.value=440; o.connect(g); o.start(); o.stop(audioCtx.currentTime+1); }
-        }
-        function toggleWave(btn) {
-            initAudio();
-            if(osc){ osc.stop(); osc=null; btn.innerText="開啟波形聲音"; btn.style.background="#ff4757"; }
-            else{ osc=audioCtx.createOscillator(); const g=audioCtx.createGain(); osc.type=document.getElementById('w-type').value; osc.frequency.value=document.getElementById('w-freq').value; g.gain.value=document.getElementById('w-amp').value; osc.connect(g).connect(analyser); osc.start(); btn.innerText="停止波形聲音"; btn.style.background="#2ecc71"; }
         }
 
         // --- 渲染介面 ---
@@ -276,28 +307,19 @@
                         <div class="strings-layer" id="g-strings"></div>
                     </div>`;
                 setTimeout(() => {
-                    const neck = document.getElementById('g-neck');
-                    const strLayer = document.getElementById('g-strings');
-                    const marker = document.getElementById('left-hand-marker');
-                    const mTxt = document.getElementById('marker-txt');
+                    const neck = document.getElementById('g-neck'); const strLayer = document.getElementById('g-strings');
+                    const marker = document.getElementById('left-hand-marker'); const mTxt = document.getElementById('marker-txt');
                     for(let i=1; i<=12; i++){ const f=document.createElement('div'); f.className='fret'; f.style.left=(i*7.5)+'%'; neck.appendChild(f); }
                     for(let i=0; i<6; i++) {
-                        const s = document.createElement('div');
-                        s.className = 'g-string-line';
-                        s.style.height = (7 - i) + 'px';
-                        s.onclick = () => playString(i);
-                        strLayer.appendChild(s);
+                        const s = document.createElement('div'); s.className = 'g-string-line'; s.style.height = (7 - i) + 'px';
+                        s.onclick = () => playString(i); strLayer.appendChild(s);
                     }
                     neck.onmousemove = (e) => {
-                        const r = neck.getBoundingClientRect();
-                        let x = e.clientX - r.left;
+                        const r = neck.getBoundingClientRect(); let x = e.clientX - r.left;
                         if(x < 0) x = 0; if(x > r.width) x = r.width;
-                        marker.style.left = x + 'px';
-                        mTxt.style.left = x + 'px';
-                        const ratio = 1 - (x / r.width * 0.5);
-                        leftHandRatio = ratio;
-                        const fretNum = Math.round((1-ratio)*24);
-                        mTxt.innerText = fretNum === 0 ? "Open" : fretNum + " 格";
+                        marker.style.left = x + 'px'; mTxt.style.left = x + 'px';
+                        const ratio = 1 - (x / r.width * 0.5); leftHandRatio = ratio;
+                        const fretNum = Math.round((1-ratio)*24); mTxt.innerText = fretNum === 0 ? "Open" : fretNum + " 格";
                     };
                 }, 0);
             } else if (type === 'xylo') {
@@ -336,7 +358,6 @@
         function switchTab(t) { document.querySelectorAll('.content').forEach(c => c.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.getElementById(t + '-tab').classList.add('active'); event.target.classList.add('active'); if(t === 'inst') renderInst(); }
         function draw() { requestAnimationFrame(draw); const b = new Uint8Array(analyser.frequencyBinCount); analyser.getByteTimeDomainData(b); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.lineWidth = 2; ctx.strokeStyle = '#39ff14'; ctx.beginPath(); const w = canvas.width / b.length; for(let i = 0; i < b.length; i++) { const y = (b[i] / 128.0) * canvas.height / 2; i === 0 ? ctx.moveTo(0, y) : ctx.lineTo(i * w, y); } ctx.stroke(); }
         renderInst();
-        document.getElementById('w-freq').oninput=function(){document.getElementById('freq-txt').innerText=this.value+'Hz';if(osc)osc.frequency.value=this.value;};
     </script>
 </body>
 </html>
