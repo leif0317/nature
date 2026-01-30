@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>莫耳數袋子工廠 - 小粘製作 (滿載版)</title>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3b82f6;
+            --accent: #f59e0b;
+            --bag-bg: rgba(255, 255, 255, 0.1);
+            --bag-border: rgba(255, 255, 255, 0.8);
+            --text-main: #1e293b;
+            --bg-gradient: linear-gradient(135deg, #8ec5fc 0%, #e0c3fc 100%);
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 標題與屬名 */
+        header { text-align: center; margin-bottom: 20px; position: relative; }
+        h1 { color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2); margin: 0; display: inline-block; }
+        .author-tag {
+            background: var(--accent); color: white; font-size: 0.9rem; padding: 4px 10px;
+            border-radius: 20px; vertical-align: middle; margin-left: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2); transform: rotate(-5deg); display: inline-block; font-weight: bold;
+        }
+
+        /* 公式面板 */
+        .toggle-btn {
+            background: rgba(255,255,255,0.2); border: 1px solid white; color: white;
+            padding: 5px 15px; border-radius: 20px; cursor: pointer; margin-top: 10px;
+            font-size: 0.9rem; transition: all 0.3s;
+        }
+        .toggle-btn:hover { background: white; color: var(--primary); }
+        
+        .formula-board {
+            background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            margin-top: 15px; margin-bottom: 20px; display: none; animation: slideDown 0.3s ease-out;
+            border-left: 5px solid var(--accent);
+        }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .math-equation {
+            display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+            font-family: 'Times New Roman', serif; gap: 15px; color: #334155;
+        }
+        .fraction { display: inline-block; text-align: center; vertical-align: middle; }
+        .numerator { border-bottom: 2px solid #334155; padding-bottom: 2px; display: block; }
+        .denominator { padding-top: 2px; display: block; }
+        .operator { font-weight: bold; color: var(--primary); font-size: 1.5rem; }
+
+        /* 化學式樣式 */
+        .chem-formula { font-family: 'Times New Roman', serif; font-weight: bold; }
+        sub { font-size: 0.7em; vertical-align: -0.25em; }
+        sup { font-size: 0.7em; vertical-align: super; }
+
+        /* 控制面板 */
+        .controls {
+            background: white; padding: 20px; border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); width: 100%; max-width: 800px;
+            display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; align-items: center; margin-bottom: 30px;
+        }
+        .control-group { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+        label { font-weight: bold; color: #475569; }
+        .btn-group { display: flex; gap: 10px; }
+        button.opt-btn {
+            padding: 10px 20px; border: 2px solid #e2e8f0; background: #f8fafc; border-radius: 8px;
+            cursor: pointer; font-size: 1rem; transition: all 0.2s; color: #475569;
+        }
+        button.opt-btn:hover { border-color: var(--primary); color: var(--primary); }
+        button.opt-btn.active {
+            background: var(--primary); color: white; border-color: var(--primary);
+            box-shadow: 0 4px 6px -1px rgba(67, 97, 238, 0.4);
+        }
+        button.opt-btn.active .chem-formula { color: white; }
+
+        /* 視覺展示區 */
+        .stage {
+            display: flex; justify-content: center; gap: 30px; flex-wrap: wrap;
+            min-height: 350px; width: 100%; padding: 20px; box-sizing: border-box;
+        }
+
+        .mole-bag {
+            width: 220px; height: 280px; position: relative;
+            /* 調整袋子樣式，使其更像裝滿東西的透明袋 */
+            background: var(--bag-bg);
+            border: 3px solid var(--bag-border);
+            border-radius: 20px 20px 40px 40px; /* 下方圓潤一點像重物下墜 */
+            box-shadow: 
+                inset 10px 10px 20px rgba(255,255,255,0.4),
+                inset -5px -10px 20px rgba(0,0,0,0.1),
+                0 20px 40px rgba(0,0,0,0.3);
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+            overflow: hidden; /* 關鍵：裁切掉超出袋子的粒子 */
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-origin: bottom center;
+        }
+        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* 袋口束帶 */
+        .mole-bag::after {
+            content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+            width: 80px; height: 15px; background: rgba(255,255,255,0.9);
+            border-radius: 0 0 10px 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10;
+        }
+
+        .particle-canvas {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0; /* 在標籤底下 */
+        }
+
+        .bag-label {
+            background: rgba(255, 255, 255, 0.95); padding: 8px 15px; border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-align: center;
+            margin-bottom: 30px; border: 1px solid #cbd5e1; z-index: 5; 
+            transform: rotate(-2deg);
+        }
+        .bag-label .chem-formula { display: block; font-size: 1.4rem; color: var(--primary); line-height: 1.2; }
+
+        /* 統計與題庫區 (樣式維持) */
+        .stats-panel { background: white; width: 100%; max-width: 900px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 20px; }
+        .stats-header { background: #1e293b; color: white; padding: 15px; text-align: center; font-size: 1.1rem; letter-spacing: 1px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 12px 20px; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; color: #64748b; font-weight: 600; }
+        .highlight-num { color: var(--primary); font-weight: bold; font-family: 'Consolas', monospace; }
+        .atom-row { background-color: #fffbeb; }
+
+        .quiz-section { width: 100%; max-width: 900px; margin-top: 40px; margin-bottom: 40px; }
+        .quiz-title { color: white; font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; border-left: 5px solid var(--accent); padding-left: 10px; }
+        .quiz-card { background: white; margin-bottom: 15px; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .quiz-question { padding: 15px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .quiz-question:hover { background-color: #f8fafc; }
+        .quiz-answer { padding: 15px 20px; background-color: #f0fdf4; border-top: 1px solid #e2e8f0; color: #15803d; display: none; }
+        details[open] .quiz-answer { display: block; animation: fadeIn 0.3s; }
+        summary { list-style: none; }
+        summary::-webkit-details-marker { display: none; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🧪 莫耳數袋子工廠 <span class="author-tag">小粘製作</span></h1>
+        <br>
+        <button class="toggle-btn" onclick="toggleFormula()">📖 顯示 / 隱藏 莫耳公式</button>
+        <div id="formulaPanel" class="formula-board">
+            <div class="math-equation">
+                <div class="fraction"><span class="numerator">質量 (Mass)</span><span class="denominator">分子量 (M)</span></div>
+                <span class="operator">=</span>
+                <div style="font-weight:bold; color:var(--primary);">mole (莫耳數)</div>
+                <span class="operator">=</span>
+                <div class="fraction"><span class="numerator">分子數 (Particles)</span><span class="denominator">6 × 10<sup>23</sup></span></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>1. 選擇物質</label>
+            <div class="btn-group" id="substance-btns">
+                <button class="opt-btn active" data-formula="H2O" data-mass="18" data-comp='{"H":2,"O":1}' data-hue="210">
+                    水 (<span class="chem-formula">H<sub>2</sub>O</span>)
+                </button>
+                <button class="opt-btn" data-formula="C6H12O6" data-mass="180" data-comp='{"C":6,"H":12,"O":6}' data-hue="150">
+                    葡萄糖 (<span class="chem-formula">C<sub>6</sub>H<sub>12</sub>O<sub>6</sub></span>)
+                </button>
+                <button class="opt-btn" data-formula="C2H5OH" data-mass="46" data-comp='{"C":2,"H":6,"O":1}' data-hue="35">
+                    乙醇 (<span class="chem-formula">C<sub>2</sub>H<sub>5</sub>OH</span>)
+                </button>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>2. 選擇莫耳數 (袋數)</label>
+            <div class="btn-group" id="mole-btns">
+                <button class="opt-btn active" data-val="1">1 Mole</button>
+                <button class="opt-btn" data-val="2">2 Moles</button>
+                <button class="opt-btn" data-val="3">3 Moles</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="stage" id="stage"></div>
+
+    <div class="stats-panel">
+        <div class="stats-header">📊 物質清單統計表 (Nₐ = 6 × 10²³)</div>
+        <table>
+            <thead><tr><th>項目</th><th>莫耳數 (mol)</th><th>粒子數 / 原子數 (個)</th><th>備註</th></tr></thead>
+            <tbody id="stats-body"></tbody>
+        </table>
+    </div>
+
+    <div class="quiz-section">
+        <div class="quiz-title">📝 國中理化精選試題 (點擊題目看答案)</div>
+        <div class="quiz-card"><details><summary class="quiz-question"><span>Q1. 36g 水 (<span class="chem-formula">H<sub>2</sub>O</span>) 有多少 mole？</span><span>🔽</span></summary><div class="quiz-answer">36 ÷ 18 = <strong>2 mole</strong></div></details></div>
+        <div class="quiz-card"><details><summary class="quiz-question"><span>Q2. 1 mole 乙醇含多少個 H 原子？</span><span>🔽</span></summary><div class="quiz-answer">1 × 6 × (6×10<sup>23</sup>) = <strong>3.6 × 10<sup>24</sup> 個</strong></div></details></div>
+        <div class="quiz-card"><details><summary class="quiz-question"><span>Q3. 90g 葡萄糖是幾個分子？</span><span>🔽</span></summary><div class="quiz-answer">90 ÷ 180 = 0.5 mole<br>0.5 × (6×10<sup>23</sup>) = <strong>3 × 10<sup>23</sup> 個</strong></div></details></div>
+        <div class="quiz-card"><details><summary class="quiz-question"><span>Q4. 1.2×10<sup>24</sup> 個水分子多重？</span><span>🔽</span></summary><div class="quiz-answer">2 mole × 18 = <strong>36g</strong></div></details></div>
+    </div>
+
+<script>
+    const NA_TEXT = "6 × 10<sup>23</sup>";
+    
+    // 狀態
+    let currentState = {
+        formula: "H2O",
+        molarMass: 18,
+        composition: {"H":2, "O":1},
+        moles: 1,
+        hue: 210 // 顏色色相
+    };
+
+    const stage = document.getElementById('stage');
+    const statsBody = document.getElementById('stats-body');
+    const substanceBtns = document.querySelectorAll('#substance-btns button');
+    const moleBtns = document.querySelectorAll('#mole-btns button');
+
+    function formatFormula(str) {
+        return '<span class="chem-formula">' + str.replace(/(\d+)/g, '<sub>$1</sub>') + '</span>';
+    }
+
+    function toggleFormula() {
+        const panel = document.getElementById('formulaPanel');
+        panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+    }
+
+    function init() {
+        bindEvents();
+        updateDisplay();
+    }
+
+    function bindEvents() {
+        substanceBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                substanceBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentState.formula = btn.dataset.formula;
+                currentState.molarMass = parseInt(btn.dataset.mass);
+                currentState.composition = JSON.parse(btn.dataset.comp);
+                currentState.hue = parseInt(btn.dataset.hue);
+                updateDisplay();
+            });
+        });
+
+        moleBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                moleBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentState.moles = parseInt(btn.dataset.val);
+                updateDisplay();
+            });
+        });
+    }
+
+    function updateDisplay() {
+        renderBags();
+        renderStats();
+    }
+
+    function renderBags() {
+        stage.innerHTML = ''; 
+        for(let i = 0; i < currentState.moles; i++) {
+            const bag = document.createElement('div');
+            bag.className = 'mole-bag';
+            
+            const prettyFormula = formatFormula(currentState.formula);
+            const label = document.createElement('div');
+            label.className = 'bag-label';
+            label.innerHTML = `${prettyFormula}<span>${NA_TEXT} 個</span><br><span style="color:#000; font-weight:bold;">${currentState.molarMass}g</span>`;
+            
+            const canvas = document.createElement('canvas');
+            canvas.className = 'particle-canvas';
+            // 設定高解析度 Canvas
+            canvas.width = 220; 
+            canvas.height = 280; 
+
+            bag.appendChild(canvas); 
+            bag.appendChild(label); 
+            stage.appendChild(bag);
+
+            fillBagWithParticles(canvas, currentState.hue);
+        }
+    }
+
+    // 新版：塞滿袋子的邏輯
+    function fillBagWithParticles(canvas, hue) {
+        const ctx = canvas.getContext('2d');
+        const particles = [];
+        // 增加粒子數量以達到「塞滿」的效果
+        const particleCount = 180; 
+        
+        // 初始化粒子
+        for(let i=0; i<particleCount; i++){
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                // 速度變很慢，模擬擠在一起
+                vx: (Math.random() - 0.5) * 0.2, 
+                vy: (Math.random() - 0.5) * 0.2,
+                // 變大顆：半徑 8~14px
+                radius: Math.random() * 6 + 8 
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            particles.forEach(p => {
+                // 移動
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // 邊界反彈
+                if(p.x < -p.radius) p.x = canvas.width + p.radius;
+                if(p.x > canvas.width + p.radius) p.x = -p.radius;
+                if(p.y < -p.radius) p.y = canvas.height + p.radius;
+                if(p.y > canvas.height + p.radius) p.y = -p.radius;
+
+                // 繪製立體球體效果
+                ctx.beginPath();
+                // 建立放射狀漸層 (看起來像球體)
+                const gradient = ctx.createRadialGradient(
+                    p.x - p.radius/3, p.y - p.radius/3, p.radius/5, // 光源點
+                    p.x, p.y, p.radius // 球體邊界
+                );
+                
+                // 根據 Hue 設定顏色 (中心亮，邊緣暗)
+                gradient.addColorStop(0, `hsla(${hue}, 100%, 85%, 0.9)`);
+                gradient.addColorStop(1, `hsla(${hue}, 80%, 50%, 0.95)`);
+
+                ctx.fillStyle = gradient;
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // 加一點邊框讓堆疊感更明顯
+                ctx.strokeStyle = `hsla(${hue}, 80%, 30%, 0.1)`;
+                ctx.stroke();
+            });
+
+            if(document.body.contains(canvas)) requestAnimationFrame(draw);
+        }
+        draw();
+    }
+
+    function renderStats() {
+        const n = currentState.moles;
+        const totalMass = n * currentState.molarMass;
+        const prettyFormula = formatFormula(currentState.formula);
+        let html = `<tr style="background:#f1f5f9; border-bottom: 2px solid #cbd5e1;">
+            <td><strong>${prettyFormula} 分子總和</strong></td>
+            <td class="highlight-num">${n} mol</td>
+            <td class="highlight-num">${n} × (${NA_TEXT})</td>
+            <td>總質量: <strong>${totalMass}g</strong></td>
+        </tr>`;
+        for (const [atom, count] of Object.entries(currentState.composition)) {
+            const atomMoles = n * count;
+            const atomParticlesDisplay = atomMoles === 1 ? NA_TEXT : `${atomMoles} × (${NA_TEXT})`;
+            html += `<tr class="atom-row">
+                <td>└ 原子: ${atom}</td>
+                <td class="highlight-num">${atomMoles} mol</td>
+                <td class="highlight-num">${atomParticlesDisplay}</td>
+                <td style="font-size:0.9em; color:#64748b;">(1個 ${prettyFormula} 含 ${count} 個 ${atom})</td>
+            </tr>`;
+        }
+        statsBody.innerHTML = html;
+    }
+
+    init();
+</script>
+
+</body>
+</html>
