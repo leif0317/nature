@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>完整版：電池實驗室 (含充電功能)</title>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --panel-bg: #ffffff;
+            --wire-color: #2c3e50;
+            --electron-color: #f1c40f;
+            
+            /* 金屬顏色 */
+            --zn-color: #bdc3c7;   
+            --cu-color: #d35400;   
+            --pb-color: #7f8c8d;   
+            --pbo2-color: #4e342e; 
+
+            /* 離子顏色 */
+            --ion-zn: #7f8c8d;
+            --ion-cu: #2980b9;
+            --ion-so4: #f39c12;
+            --ion-h: #e74c3c;
+            --ion-k: #8e44ad;   /* 鹽橋 K+ */
+            --ion-no3: #27ae60; /* 鹽橋 NO3- */
+        }
+
+        body {
+            font-family: 'Segoe UI', '微軟正黑體', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh;
+        }
+
+        .signature {
+            position: fixed; top: 10px; right: 20px;
+            background: rgba(255,255,255,0.9); padding: 5px 15px;
+            border-radius: 20px; border: 1px solid #ddd;
+            font-weight: bold; color: #555; z-index: 1000;
+        }
+
+        h1 { margin-bottom: 20px; color: #2c3e50; }
+
+        /* --- 標籤切換 --- */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn {
+            padding: 10px 25px; font-size: 1.1rem; cursor: pointer;
+            background: #e0e0e0; border: none; border-radius: 8px; transition: 0.3s;
+        }
+        .tab-btn.active {
+            background: #3498db; color: white; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.4);
+        }
+
+        /* --- 主佈局 --- */
+        .main-wrapper { display: flex; gap: 20px; align-items: flex-start; }
+
+        .experiment-area {
+            position: relative; width: 700px; height: 480px;
+            background: var(--panel-bg); border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden;
+            display: none;
+        }
+        .experiment-area.active { display: block; }
+
+        .data-panel {
+            width: 280px; background: var(--panel-bg);
+            border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+            padding: 20px; display: flex; flex-direction: column; gap: 15px;
+        }
+
+        .data-group { border-bottom: 1px solid #eee; padding-bottom: 15px; }
+        .data-label { font-size: 0.9rem; color: #7f8c8d; margin-bottom: 5px; }
+        .data-value { font-size: 1.4rem; font-weight: bold; color: #2c3e50; font-family: monospace; }
+        .unit { font-size: 0.8rem; color: #95a5a6; }
+        .chem-title { font-weight: bold; color: #3498db; margin-bottom: 8px; display: block; }
+        .delta { font-size: 0.8rem; margin-left: 5px; }
+        .delta.pos { color: #e74c3c; } /* 增加 */
+        .delta.neg { color: #27ae60; } /* 減少 */
+
+        /* --- 視覺元件 --- */
+        .wiring-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+        .wire { position: absolute; background-color: var(--wire-color); }
+        .joint { position: absolute; width: 12px; height: 12px; background: #2c3e50; border-radius: 50%; z-index: 25; }
+
+        /* 燈泡 */
+        .bulb {
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+            width: 40px; height: 40px; background: #bdc3c7; border-radius: 50%;
+            border: 3px solid #7f8c8d; z-index: 22; transition: 0.3s;
+        }
+        .bulb.lit { background: #f1c40f; box-shadow: 0 0 30px #f1c40f; border-color: #f39c12; }
+
+        /* 電源供應器 (充電用) */
+        .power-source {
+            position: absolute; top: 5px; left: 50%; transform: translateX(-50%);
+            width: 60px; height: 50px; background: #34495e; border-radius: 5px;
+            border: 2px solid #2c3e50; z-index: 23; display: none;
+            color: white; text-align: center; font-size: 10px; padding-top: 5px;
+            box-shadow: 0 0 15px rgba(52, 152, 219, 0.5);
+        }
+        .power-source::after { content: "DC Power"; display: block; }
+        .power-source::before { content: "-  +"; font-size: 16px; font-weight: bold; word-spacing: 20px; display: block; margin-bottom: 2px; }
+        
+        /* 鉛蓄電池模式控制 - 充電時顯示電源 */
+        .experiment-area.charging .bulb { display: none; }
+        .experiment-area.charging .power-source { display: block; }
+
+        /* 燒杯與電極 */
+        .beaker-container { position: absolute; bottom: 0; width: 180px; height: 250px; }
+        .left-beaker { left: 100px; }
+        .right-beaker { right: 100px; }
+        .beaker {
+            width: 100%; height: 100%; border: 4px solid #dfe6e9; border-top: none;
+            border-radius: 0 0 15px 15px; background: rgba(255,255,255,0.4);
+            position: relative; overflow: hidden;
+        }
+        .liquid { position: absolute; bottom: 0; left: 0; width: 100%; height: 80%; transition: background 0.5s; }
+        #zn-liquid { background: rgba(236, 240, 241, 0.5); }
+        #cu-liquid { background: rgba(52, 152, 219, 0.6); }
+
+        .electrode {
+            width: 40px; height: 280px; position: absolute; bottom: 20px; left: 50%;
+            transform: translateX(-50%); border: 1px solid rgba(0,0,0,0.2); z-index: 10;
+        }
+        #zn-plate { background: var(--zn-color); }
+        #cu-plate { background: var(--cu-color); }
+
+        /* 鹽橋 */
+        .salt-bridge {
+            position: absolute; bottom: 180px; left: 50%; transform: translateX(-50%);
+            width: 240px; height: 100px; border: 20px solid rgba(240, 230, 140, 0.7);
+            border-bottom: none; border-radius: 100px 100px 0 0; z-index: 5;
+            overflow: hidden; /* 確保離子不跑出去 */
+        }
+        /* 為了讓離子在管內移動，我們需要一個內部容器來做遮罩，或簡單地限制位置 */
+        .salt-bridge-mask {
+            position: absolute; width: 100%; height: 100%; 
+            border-radius: 80px 80px 0 0; 
+            top: 0; left: 0; overflow: hidden;
+        }
+
+        /* 鉛蓄電池組件 */
+        .lead-tank {
+            position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+            width: 400px; height: 280px; border: 6px solid #95a5a6; border-top: none;
+            border-radius: 0 0 10px 10px; background: rgba(255,255,255,0.3); overflow: hidden;
+        }
+        .acid { position: absolute; bottom: 0; left: 0; width: 100%; height: 90%; background: rgba(178, 235, 242, 0.4); }
+        .lead-elec { width: 50px; height: 300px; position: absolute; bottom: 20px; border: 2px solid #555; z-index: 10; }
+        #pb-plate { left: 80px; background: var(--pb-color); }
+        #pbo2-plate { right: 80px; background: var(--pbo2-color); }
+
+        /* 導線定位 */
+        .w-zncu-v-left { position: absolute; width: 4px; background: var(--wire-color); height: 155px; top: 30px; left: 188px; }
+        .w-zncu-h { position: absolute; height: 4px; background: var(--wire-color); width: 324px; top: 30px; left: 188px; }
+        .w-zncu-v-right { position: absolute; width: 4px; background: var(--wire-color); height: 155px; top: 30px; left: 508px; }
+        
+        .w-lead-v-left { position: absolute; width: 4px; background: var(--wire-color); height: 155px; top: 30px; left: 253px; }
+        .w-lead-h { position: absolute; height: 4px; background: var(--wire-color); width: 194px; top: 30px; left: 253px; }
+        .w-lead-v-right { position: absolute; width: 4px; background: var(--wire-color); height: 155px; top: 30px; left: 445px; }
+
+        /* --- 動畫系統 --- */
+        .particle { position: absolute; width: 10px; height: 10px; border-radius: 50%; z-index: 30; opacity: 0; }
+        .electron { background: var(--electron-color); box-shadow: 0 0 5px yellow; }
+
+        /* 鋅銅電子流：左 -> 右 */
+        @keyframes flowLeftToRight {
+            0% { top: 180px; left: 185px; opacity: 1; } 10% { top: 25px; left: 185px; }
+            50% { top: 25px; left: 505px; } 60% { top: 180px; left: 505px; } 100% { top: 180px; left: 505px; opacity: 0; }
+        }
+        /* 鉛蓄放電：左 -> 右 */
+        @keyframes flowLeadDischarge {
+            0% { top: 180px; left: 250px; opacity: 1; } 10% { top: 25px; left: 250px; }
+            50% { top: 25px; left: 442px; } 60% { top: 180px; left: 442px; } 100% { top: 180px; left: 442px; opacity: 0; }
+        }
+        /* 鉛蓄充電：右 -> 左 (被電源強制推回負極) */
+        @keyframes flowLeadCharge {
+            0% { top: 180px; left: 442px; opacity: 1; } 10% { top: 25px; left: 442px; }
+            50% { top: 25px; left: 250px; } 60% { top: 180px; left: 250px; } 100% { top: 180px; left: 250px; opacity: 0; }
+        }
+
+        .running .ele-zncu { animation: flowLeftToRight 8s linear infinite; }
+        
+        /* 鉛蓄電池根據模式切換動畫 */
+        .running:not(.charging) .ele-lead { animation: flowLeadDischarge 8s linear infinite; }
+        .running.charging .ele-lead { animation: flowLeadCharge 8s linear infinite; }
+
+        /* 離子通用 */
+        .ion { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: white; font-weight: bold; opacity: 0; z-index: 15; }
+        .ion-zn { width: 18px; height: 18px; background: var(--ion-zn); }
+        .ion-cu { width: 18px; height: 18px; background: var(--ion-cu); }
+        .ion-so4 { width: 22px; height: 22px; background: var(--ion-so4); font-size: 8px; }
+        .ion-h   { width: 12px; height: 12px; background: var(--ion-h); font-size: 8px; }
+        /* 鹽橋離子 */
+        .ion-sb { width: 16px; height: 16px; font-size: 9px; opacity: 0; z-index: 6; }
+        .ion-k { background: var(--ion-k); }
+        .ion-no3 { background: var(--ion-no3); }
+
+        /* Zn-Cu 動畫 */
+        @keyframes znDissolve { 0% { top: 100px; left: 78px; opacity: 1; transform: scale(0.5); } 100% { top: 160px; left: 30px; opacity: 0; transform: scale(1); } }
+        @keyframes cuDeposit { 0% { top: 160px; left: 30px; opacity: 1; transform: scale(1); } 100% { top: 100px; left: 78px; opacity: 0; transform: scale(0.5); } }
+        
+        /* 鹽橋動畫: K+ 往右 (正極 Cu), NO3- 往左 (負極 Zn) */
+        /* 因為 U 型管形狀，我們簡單模擬從中間往兩邊下方移動 */
+        @keyframes kMove { 0% { top: 10px; left: 120px; opacity: 1; } 100% { top: 80px; left: 200px; opacity: 0; } }
+        @keyframes no3Move { 0% { top: 10px; left: 120px; opacity: 1; } 100% { top: 80px; left: 40px; opacity: 0; } }
+
+        .running .ion-zn.move { animation: znDissolve 4s ease-out infinite; }
+        .running .ion-cu.move { animation: cuDeposit 4s ease-in infinite; }
+        .running .ion-k.move { animation: kMove 5s linear infinite; }
+        .running .ion-no3.move { animation: no3Move 5s linear infinite; }
+
+        /* 鉛蓄放電動畫 (消耗 SO4, H+) */
+        @keyframes so4ToPb { 0% { top: 200px; left: 200px; opacity: 1; } 100% { top: 150px; left: 100px; opacity: 0; } }
+        @keyframes so4ToPbO2 { 0% { top: 200px; left: 200px; opacity: 1; } 100% { top: 150px; left: 300px; opacity: 0; } }
+        @keyframes hToPbO2 { 0% { top: 100px; left: 150px; opacity: 1; } 100% { top: 150px; left: 300px; opacity: 0; } }
+
+        /* 鉛蓄充電動畫 (生成 SO4, H+ 從電極回到溶液) */
+        @keyframes so4FromPb { 0% { top: 150px; left: 100px; opacity: 1; transform: scale(0.8); } 100% { top: 200px; left: 200px; opacity: 0; transform: scale(1); } }
+        @keyframes so4FromPbO2 { 0% { top: 150px; left: 300px; opacity: 1; transform: scale(0.8); } 100% { top: 200px; left: 200px; opacity: 0; transform: scale(1); } }
+
+        /* 放電時 */
+        .running:not(.charging) .ion-so4.to-pb { animation: so4ToPb 5s ease-in infinite; }
+        .running:not(.charging) .ion-so4.to-pbo2 { animation: so4ToPbO2 5s ease-in infinite 1s; }
+        .running:not(.charging) .ion-h.to-pbo2 { animation: hToPbO2 4s ease-in infinite; }
+
+        /* 充電時 */
+        .running.charging .ion-so4.to-pb { animation: so4FromPb 5s ease-out infinite; }
+        .running.charging .ion-so4.to-pbo2 { animation: so4FromPbO2 5s ease-out infinite 1s; }
+        .running.charging .ion-h.to-pbo2 { opacity: 0; } /* 充電時簡化 H+ 動畫，或者反向 */
+
+        /* 暫停 */
+        .experiment-area.running.paused *, 
+        .experiment-area.running.paused *::before, 
+        .experiment-area.running.paused *::after {
+            animation-play-state: paused !important;
+        }
+
+        /* --- 按鈕組 --- */
+        .control-area { display: flex; gap: 10px; margin-top: auto; flex-wrap: wrap; }
+        .btn-action {
+            flex: 2; padding: 15px; font-size: 1.1rem; font-weight: bold;
+            border: none; border-radius: 10px; cursor: pointer; color: white;
+            background: #27ae60; transition: 0.2s; min-width: 120px;
+        }
+        .btn-action:hover { opacity: 0.9; }
+        .btn-action.playing { background: #e67e22; }
+        
+        .btn-reset {
+            flex: 1; background: #95a5a6; color: white; border: none;
+            border-radius: 10px; font-weight: bold; cursor: pointer;
+        }
+        
+        /* 充電切換按鈕 */
+        .btn-mode {
+            flex: 3; width: 100%; background: #8e44ad; color: white; border: none;
+            border-radius: 10px; font-weight: bold; cursor: pointer; padding: 10px;
+            margin-bottom: 10px; display: none; /* 預設隱藏，僅在鉛蓄電池出現 */
+        }
+        .btn-mode.charge-active { background: #c0392b; } /* 充電中顏色 */
+
+    </style>
+</head>
+<body>
+
+    <div class="signature">小粘製作</div>
+
+    <h1>虛擬電化學實驗室</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchMode('zncu')">鋅銅電池 (Zn-Cu)</button>
+        <button class="tab-btn" onclick="switchMode('lead')">鉛蓄電池 (Pb-Acid)</button>
+    </div>
+
+    <div class="main-wrapper">
+        
+        <div class="experiment-wrapper">
+            
+            <div class="experiment-area active" id="view-zncu">
+                <div class="wiring-layer">
+                    <div class="w-zncu-v-left"></div> <div class="w-zncu-h"></div> <div class="w-zncu-v-right"></div>
+                    <div class="joint" style="top: 180px; left: 184px;"></div> <div class="joint" style="top: 180px; left: 504px;"></div>
+                    <div class="bulb" id="bulb-zncu"></div>
+                    <div class="particle electron ele-zncu" style="animation-delay: 0s;"></div>
+                    <div class="particle electron ele-zncu" style="animation-delay: 2.6s;"></div>
+                    <div class="particle electron ele-zncu" style="animation-delay: 5.3s;"></div>
+                </div>
+                
+                <div class="salt-bridge">
+                    <div class="salt-bridge-mask">
+                        <div class="ion ion-sb ion-k move" style="animation-delay: 0s;">K<sup>+</sup></div>
+                        <div class="ion ion-sb ion-k move" style="animation-delay: 2.5s;">K<sup>+</sup></div>
+                        <div class="ion ion-sb ion-no3 move" style="animation-delay: 1.2s;">NO<sub>3</sub><sup>-</sup></div>
+                        <div class="ion ion-sb ion-no3 move" style="animation-delay: 3.7s;">NO<sub>3</sub><sup>-</sup></div>
+                    </div>
+                </div>
+
+                <div class="beaker-container left-beaker">
+                    <div class="beaker">
+                        <div class="liquid" id="zn-liquid"></div>
+                        <div class="ion ion-zn move" style="animation-delay: 0s;">Zn<sup>2+</sup></div>
+                        <div class="ion ion-zn move" style="animation-delay: 2s;">Zn<sup>2+</sup></div>
+                        <div class="electrode" id="zn-plate"></div>
+                    </div>
+                    <div style="text-align: center; font-weight:bold;">Zn 負極</div>
+                </div>
+                <div class="beaker-container right-beaker">
+                    <div class="beaker">
+                        <div class="liquid" id="cu-liquid"></div>
+                        <div class="ion ion-cu move" style="animation-delay: 1s;">Cu<sup>2+</sup></div>
+                        <div class="ion ion-cu move" style="animation-delay: 3s;">Cu<sup>2+</sup></div>
+                        <div class="electrode" id="cu-plate"></div>
+                    </div>
+                    <div style="text-align: center; font-weight:bold;">Cu 正極</div>
+                </div>
+            </div>
+
+            <div class="experiment-area" id="view-lead">
+                <div class="wiring-layer">
+                    <div class="w-lead-v-left"></div> <div class="w-lead-h"></div> <div class="w-lead-v-right"></div>
+                    <div class="joint" style="top: 180px; left: 249px;"></div> <div class="joint" style="top: 180px; left: 441px;"></div>
+                    <div class="bulb" id="bulb-lead"></div>
+                    <div class="power-source" id="power-lead"></div> <div class="particle electron ele-lead" style="animation-delay: 0s;"></div>
+                    <div class="particle electron ele-lead" style="animation-delay: 2.6s;"></div>
+                    <div class="particle electron ele-lead" style="animation-delay: 5.3s;"></div>
+                </div>
+                <div class="lead-tank">
+                    <div class="acid" id="acid-liquid"></div>
+                    <div class="ion ion-so4 to-pb">SO<sub>4</sub></div>
+                    <div class="ion ion-so4 to-pbo2">SO<sub>4</sub></div>
+                    <div class="ion ion-h to-pbo2" style="animation-delay: 0.5s;">H<sup>+</sup></div>
+                    <div class="ion ion-h to-pbo2" style="animation-delay: 2.5s;">H<sup>+</sup></div>
+                    <div class="lead-elec" id="pb-plate"></div>
+                    <div class="lead-elec" id="pbo2-plate"></div>
+                </div>
+                <div style="position: absolute; bottom: 10px; width: 100%; display: flex; justify-content: space-around; font-weight: bold;">
+                    <span style="margin-left: 120px;">Pb (負極)</span>
+                    <span style="margin-right: 120px;">PbO<sub>2</sub> (正極)</span>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="data-panel">
+            <h3 style="margin-top:0; border-bottom: 2px solid #3498db; padding-bottom:10px;">實驗數據監控</h3>
+            
+            <div id="data-zncu">
+                <div class="data-group">
+                    <span class="chem-title">負極 (Zn)</span>
+                    <div class="data-label">即時質量: <span class="delta neg">↓</span></div>
+                    <span class="data-value" id="zn-mass">10.00</span> <span class="unit">g</span>
+                </div>
+                <div class="data-group">
+                    <span class="chem-title">正極 (Cu)</span>
+                    <div class="data-label">即時質量: <span class="delta pos">↑</span></div>
+                    <span class="data-value" id="cu-mass">10.00</span> <span class="unit">g</span>
+                </div>
+                <div class="data-group">
+                    <div class="data-label">電壓:</div>
+                    <span class="data-value" id="zncu-volt">1.10</span> <span class="unit">V</span>
+                </div>
+            </div>
+
+            <div id="data-lead" style="display: none;">
+                <button class="btn-mode" id="btn-lead-mode" onclick="toggleLeadMode()">切換至：充電模式</button>
+                
+                <div class="data-group">
+                    <span class="chem-title">負極 (Pb)</span>
+                    <div class="data-label" id="label-pb">反應: Pb &rarr; PbSO<sub>4</sub></div>
+                    <div class="data-label">即時質量: <span class="delta pos" id="arrow-pb">↑</span></div>
+                    <span class="data-value" id="pb-mass">50.00</span> <span class="unit">g</span>
+                </div>
+                <div class="data-group">
+                    <span class="chem-title">正極 (PbO<sub>2</sub>)</span>
+                    <div class="data-label" id="label-pbo2">反應: PbO<sub>2</sub> &rarr; PbSO<sub>4</sub></div>
+                    <div class="data-label">即時質量: <span class="delta pos" id="arrow-pbo2">↑</span></div>
+                    <span class="data-value" id="pbo2-mass">50.00</span> <span class="unit">g</span>
+                </div>
+                <div class="data-group">
+                    <span class="chem-title">電解液 (H<sub>2</sub>SO<sub>4</sub>)</span>
+                    <div class="data-label">比重 (濃度): <span class="delta neg" id="arrow-acid">↓</span></div>
+                    <span class="data-value" id="acid-conc">1.280</span> <span class="unit">sg</span>
+                </div>
+            </div>
+
+            <div class="control-area">
+                <button class="btn-action" id="btn-play" onclick="togglePlay()">啟動反應</button>
+                <button class="btn-reset" onclick="resetSimulation()">重置</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 狀態變數
+        let currentMode = 'zncu';
+        let state = 'stopped';
+        let isCharging = false; // 鉛蓄電池充電狀態
+        let timer = null;
+        let timeElapsed = 0;
+
+        // 常數
+        const M_Zn = 65.38, M_Cu = 63.55;
+        const M_Pb = 207.2, M_PbO2 = 239.2, M_PbSO4 = 303.3;
+
+        // 初始數值
+        const InitStats = {
+            zn: 10.00, cu: 10.00,
+            pb: 50.00, pbo2: 50.00,
+            acid: 1.280,
+            voltZnCu: 1.10
+        };
+        let stats = { ...InitStats };
+
+        // DOM
+        const views = { zncu: document.getElementById('view-zncu'), lead: document.getElementById('view-lead') };
+        const dataPanels = { zncu: document.getElementById('data-zncu'), lead: document.getElementById('data-lead') };
+        const bulbs = { zncu: document.getElementById('bulb-zncu'), lead: document.getElementById('bulb-lead') };
+        const btnPlay = document.getElementById('btn-play');
+        const btnLeadMode = document.getElementById('btn-lead-mode');
+        
+        const displays = {
+            zn: document.getElementById('zn-mass'), cu: document.getElementById('cu-mass'),
+            pb: document.getElementById('pb-mass'), pbo2: document.getElementById('pbo2-mass'),
+            acid: document.getElementById('acid-conc'),
+            voltZnCu: document.getElementById('zncu-volt')
+        };
+        const visuals = {
+            znPlate: document.getElementById('zn-plate'), cuPlate: document.getElementById('cu-plate'),
+            cuLiquid: document.getElementById('cu-liquid'),
+            pbPlate: document.getElementById('pb-plate'), pbo2Plate: document.getElementById('pbo2-plate')
+        };
+        const leadLabels = {
+            pb: document.getElementById('label-pb'), pbo2: document.getElementById('label-pbo2'),
+            arrowPb: document.getElementById('arrow-pb'), arrowPbo2: document.getElementById('arrow-pbo2'), arrowAcid: document.getElementById('arrow-acid')
+        };
+
+        function switchMode(mode) {
+            resetSimulation();
+            currentMode = mode;
+            isCharging = false; // 切換時重置為放電
+            updateLeadUI();
+            
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+
+            views.zncu.classList.remove('active');
+            views.lead.classList.remove('active');
+            views[mode].classList.add('active');
+
+            dataPanels.zncu.style.display = 'none';
+            dataPanels.lead.style.display = 'none';
+            dataPanels[mode].style.display = 'block';
+
+            if(mode === 'lead') {
+                btnLeadMode.style.display = 'block';
+            }
+        }
+
+        function toggleLeadMode() {
+            // 切換充電/放電，必須先暫停
+            if (state === 'running') togglePlay();
+            isCharging = !isCharging;
+            updateLeadUI();
+        }
+
+        function updateLeadUI() {
+            if (isCharging) {
+                btnLeadMode.innerText = "切換至：放電模式";
+                btnLeadMode.classList.add('charge-active');
+                views.lead.classList.add('charging');
+                
+                leadLabels.pb.innerHTML = "反應: PbSO<sub>4</sub> &rarr; Pb";
+                leadLabels.pbo2.innerHTML = "反應: PbSO<sub>4</sub> &rarr; PbO<sub>2</sub>";
+                
+                leadLabels.arrowPb.innerText = "↓"; leadLabels.arrowPb.className = "delta neg";
+                leadLabels.arrowPbo2.innerText = "↓"; leadLabels.arrowPbo2.className = "delta neg";
+                leadLabels.arrowAcid.innerText = "↑"; leadLabels.arrowAcid.className = "delta pos";
+            } else {
+                btnLeadMode.innerText = "切換至：充電模式";
+                btnLeadMode.classList.remove('charge-active');
+                views.lead.classList.remove('charging');
+                
+                leadLabels.pb.innerHTML = "反應: Pb &rarr; PbSO<sub>4</sub>";
+                leadLabels.pbo2.innerHTML = "反應: PbO<sub>2</sub> &rarr; PbSO<sub>4</sub>";
+
+                leadLabels.arrowPb.innerText = "↑"; leadLabels.arrowPb.className = "delta pos";
+                leadLabels.arrowPbo2.innerText = "↑"; leadLabels.arrowPbo2.className = "delta pos";
+                leadLabels.arrowAcid.innerText = "↓"; leadLabels.arrowAcid.className = "delta neg";
+            }
+        }
+
+        function togglePlay() {
+            if (state === 'stopped' || state === 'paused') {
+                state = 'running';
+                btnPlay.innerText = "暫停";
+                btnPlay.classList.add('playing');
+                views[currentMode].classList.add('running');
+                views[currentMode].classList.remove('paused');
+                if(!isCharging) bulbs[currentMode].classList.add('lit');
+                startTimer();
+            } else {
+                state = 'paused';
+                btnPlay.innerText = "繼續";
+                btnPlay.classList.remove('playing');
+                views[currentMode].classList.add('paused');
+                bulbs[currentMode].classList.remove('lit');
+                clearInterval(timer);
+            }
+        }
+
+        function resetSimulation() {
+            state = 'stopped';
+            clearInterval(timer);
+            timeElapsed = 0;
+            
+            // 只有重置時才會把數值歸零，切換充放電不歸零(為了模擬連續性)
+            if(!isCharging) stats = { ...InitStats }; 
+            
+            btnPlay.innerText = "啟動反應";
+            btnPlay.classList.remove('playing');
+            Object.values(views).forEach(v => { v.classList.remove('running', 'paused'); });
+            Object.values(bulbs).forEach(b => b.classList.remove('lit'));
+            updateDisplay();
+            resetVisuals();
+        }
+
+        function startTimer() {
+            if (timer) clearInterval(timer);
+            const molesPerTick = 0.0005; 
+
+            timer = setInterval(() => {
+                
+                if (currentMode === 'zncu') {
+                    timeElapsed += 0.1;
+                    stats.zn = Math.max(0, stats.zn - (molesPerTick * M_Zn));
+                    stats.cu = stats.cu + (molesPerTick * M_Cu);
+                    stats.voltZnCu = Math.max(0, InitStats.voltZnCu - (timeElapsed * 0.001));
+
+                    let znRatio = stats.zn / InitStats.zn;
+                    visuals.znPlate.style.transform = `translateX(-50%) scaleX(${Math.max(0.1, znRatio)})`;
+                    let cuRatio = stats.cu / InitStats.cu;
+                    visuals.cuPlate.style.transform = `translateX(-50%) scaleX(${Math.min(1.5, cuRatio)})`;
+                    visuals.cuLiquid.style.opacity = Math.max(0.1, 1 - (timeElapsed * 0.01));
+                } 
+                else { // Lead Acid
+                    if (!isCharging) {
+                        // 放電
+                        timeElapsed += 0.1;
+                        stats.pb += (molesPerTick * (M_PbSO4 - M_Pb));
+                        stats.pbo2 += (molesPerTick * (M_PbSO4 - M_PbO2));
+                        stats.acid = Math.max(1.10, stats.acid - 0.0002);
+                        
+                        // 視覺變白
+                        let factor = Math.min(1, (stats.pb - InitStats.pb) / 10); // 簡易視覺係數
+                        visuals.pbPlate.style.background = `linear-gradient(to bottom, #7f8c8d ${100-factor*100}%, #ecf0f1)`;
+                        visuals.pbo2Plate.style.background = `linear-gradient(to bottom, #4e342e ${100-factor*100}%, #ecf0f1)`;
+                    } else {
+                        // 充電 (逆反應)
+                        if (stats.pb <= InitStats.pb) {
+                            // 充飽了
+                            togglePlay();
+                            alert("已充飽電 (Fully Charged)!");
+                            return;
+                        }
+                        timeElapsed = Math.max(0, timeElapsed - 0.1);
+                        stats.pb -= (molesPerTick * (M_PbSO4 - M_Pb));
+                        stats.pbo2 -= (molesPerTick * (M_PbSO4 - M_PbO2));
+                        stats.acid = Math.min(1.30, stats.acid + 0.0002);
+
+                        // 視覺變回原色
+                        let factor = Math.max(0, (stats.pb - InitStats.pb) / 10);
+                        visuals.pbPlate.style.background = `linear-gradient(to bottom, #7f8c8d ${100-factor*100}%, #ecf0f1)`;
+                        visuals.pbo2Plate.style.background = `linear-gradient(to bottom, #4e342e ${100-factor*100}%, #ecf0f1)`;
+                    }
+                }
+                updateDisplay();
+            }, 100);
+        }
+
+        function resetVisuals() {
+            visuals.znPlate.style.transform = `translateX(-50%) scaleX(1)`;
+            visuals.cuPlate.style.transform = `translateX(-50%) scaleX(1)`;
+            visuals.cuLiquid.style.opacity = 1;
+            // 鉛蓄電池重置顏色
+            visuals.pbPlate.style.background = 'var(--pb-color)';
+            visuals.pbo2Plate.style.background = 'var(--pbo2-color)';
+        }
+
+        function updateDisplay() {
+            displays.zn.innerText = stats.zn.toFixed(2);
+            displays.cu.innerText = stats.cu.toFixed(2);
+            displays.pb.innerText = stats.pb.toFixed(2);
+            displays.pbo2.innerText = stats.pbo2.toFixed(2);
+            displays.acid.innerText = stats.acid.toFixed(3);
+            displays.voltZnCu.innerText = stats.voltZnCu.toFixed(2);
+        }
+    </script>
+</body>
+</html>
