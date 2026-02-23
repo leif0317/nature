@@ -3,109 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 影像一鍵去背 - 附下載功能</title>
+    <title>AI 影像一鍵去背</title>
     <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            text-align: center; 
-            padding: 30px 20px; 
-            background-color: #f0f2f5; 
-            color: #333;
-        }
-        .container { 
-            background: white; 
-            padding: 30px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-            max-width: 900px; 
-            margin: auto; 
-        }
-        h2 { margin-bottom: 10px; color: #444; }
-        .description { color: #666; margin-bottom: 25px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 30px 20px; background-color: #f0f2f5; color: #333; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 900px; margin: auto; }
+        .file-upload-wrapper { margin: 20px auto; max-width: 400px; }
+        input[type="file"] { display: block; width: 100%; padding: 10px; border: 2px dashed #ccc; border-radius: 8px; background: #fafafa; cursor: pointer; }
+        .image-container { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 30px; gap: 30px; align-items: flex-start; }
+        .image-box { flex: 1; min-width: 300px; max-width: 400px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        img { width: 100%; height: auto; border-radius: 8px; border: 1px solid #eee; background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="10" height="10" fill="%23eee"/><rect x="10" y="10" width="10" height="10" fill="%23eee"/></svg>'); }
         
-        /* 檔案上傳樣式優化 */
-        .file-upload-wrapper {
-            margin: 20px auto;
-            max-width: 400px;
+        /* 狀態提示框樣式 */
+        #statusMessage { 
+            font-weight: bold; margin: 20px 0; padding: 15px; border-radius: 6px; display: none;
         }
-        input[type="file"] {
-            display: block;
-            width: 100%;
-            padding: 10px;
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            background: #fafafa;
-            cursor: pointer;
-        }
-        input[type="file"]:hover { border-color: #007bff; background: #f0f8ff; }
-
-        .image-container { 
-            display: flex; 
-            flex-wrap: wrap;
-            justify-content: center; 
-            margin-top: 30px; 
-            gap: 30px;
-            align-items: flex-start;
-        }
-        .image-box {
-            flex: 1;
-            min-width: 300px;
-            max-width: 400px;
-            background: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        }
-        h4 { margin: 0 0 15px 0; color: #555; }
         
-        img { 
-            width: 100%;
-            height: auto;
-            border-radius: 8px; 
-            border: 1px solid #eee;
-            /* 棋盤格背景，顯示透明效果 */
-            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="10" height="10" fill="%23eee"/><rect x="10" y="10" width="10" height="10" fill="%23eee"/></svg>');
-        }
-        #loading { 
-            display: none; 
-            color: #0056b3; font-weight: bold; margin: 20px 0; padding: 15px;
-            background-color: #e6f2ff; border-radius: 6px;
-        }
         /* 下載按鈕樣式 */
-        #downloadSection {
-            display: none; /* 預設隱藏 */
-            margin-top: 20px;
-        }
-        .btn-download {
-            background-color: #28a745;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            font-size: 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
+        #downloadSection { display: none; margin-top: 20px; }
+        .btn-download { background-color: #28a745; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
         .btn-download:hover { background-color: #218838; }
-        .btn-download:active { transform: scale(0.98); }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h2>✨ AI 影像一鍵去背</h2>
-    <p class="description">在瀏覽器內直接處理，保護隱私。完成後可一鍵下載透明 PNG 圖檔。</p>
+    <p>在瀏覽器內直接處理，保護隱私。完成後可一鍵下載透明 PNG 圖檔。</p>
     
+    <div id="statusMessage">準備中...</div>
+
     <div class="file-upload-wrapper">
         <input type="file" id="imageInput" accept="image/*">
-    </div>
-    
-    <div id="loading">
-        ⏳ AI 模型正在努力運算中，請稍候... <br>
-        <small style="font-weight: normal; color: #666;">(初次使用需要載入模型，可能需等待 5~15 秒，請耐心等候)</small>
     </div>
 
     <div class="image-container">
@@ -113,83 +41,105 @@
             <h4>原始圖片</h4>
             <img id="originalImage" style="display:none;" alt="原始圖片預覽">
         </div>
-        
         <div class="image-box">
-            <h4>去背結果 (透明背景)</h4>
+            <h4>去背結果</h4>
             <img id="resultImage" style="display:none;" alt="去背結果預覽">
-            
             <div id="downloadSection">
-                <button id="downloadBtn" class="btn-download">
-                   📥 下載去背圖片
-                </button>
+                <button id="downloadBtn" class="btn-download">📥 下載去背圖片</button>
             </div>
         </div>
     </div>
 </div>
 
 <script type="module">
-    import imglyRemoveBackground from "https://unpkg.com/@imgly/background-removal@1.4.3/dist/imgly-background-removal.esm.js";
-
     const imageInput = document.getElementById('imageInput');
     const originalImage = document.getElementById('originalImage');
     const resultImage = document.getElementById('resultImage');
-    const loading = document.getElementById('loading');
+    const statusMessage = document.getElementById('statusMessage');
     const downloadSection = document.getElementById('downloadSection');
     const downloadBtn = document.getElementById('downloadBtn');
 
-    let currentResultBlob = null; // 用來暫存去背後的圖檔資料
+    let imglyRemoveBackground = null;
+    let currentResultBlob = null;
+
+    // 顯示狀態的輔助函數
+    function showStatus(text, type = 'info') {
+        statusMessage.innerHTML = text;
+        statusMessage.style.display = 'block';
+        if (type === 'error') {
+            statusMessage.style.backgroundColor = '#ffe6e6';
+            statusMessage.style.color = '#cc0000';
+        } else if (type === 'success') {
+            statusMessage.style.backgroundColor = '#e6ffe6';
+            statusMessage.style.color = '#006600';
+        } else {
+            statusMessage.style.backgroundColor = '#e6f2ff';
+            statusMessage.style.color = '#0056b3';
+        }
+    }
+
+    // 網頁一打開，先嘗試載入 AI 模組
+    async function initModel() {
+        showStatus("⏳ 正在連線載入 AI 模型，請稍候...");
+        try {
+            const module = await import("https://unpkg.com/@imgly/background-removal@1.4.3/dist/imgly-background-removal.esm.js");
+            imglyRemoveBackground = module.default;
+            showStatus("✅ 系統準備就緒！請上傳照片開始去背。", "success");
+        } catch (error) {
+            console.error(error);
+            showStatus("❌ 初始化失敗。可能是因為直接雙擊打開網頁遭到瀏覽器安全阻擋（CORS）。", "error");
+        }
+    }
+    initModel();
 
     imageInput.addEventListener('change', async (event) => {
+        if (!imglyRemoveBackground) {
+            alert("系統尚未準備好，請稍後再試。");
+            return;
+        }
+
         const file = event.target.files[0];
         if (!file) return;
 
-        // 重置介面狀態
+        // 重置畫面
         const imageUrl = URL.createObjectURL(file);
         originalImage.src = imageUrl;
         originalImage.style.display = 'block';
         resultImage.style.display = 'none';
-        downloadSection.style.display = 'none'; // 隱藏之前的下載按鈕
-        currentResultBlob = null; // 清空之前的資料
+        downloadSection.style.display = 'none';
         
-        loading.style.display = 'block';
+        showStatus("⏳ AI 正在努力去背中...<br><small style='color:#666;'>(初次去背需下載約 20MB 模型資料，請耐心等待)</small>");
 
         try {
-            // 執行 AI 去背
-            const blob = await imglyRemoveBackground(imageUrl);
+            // 【重要修復】：明確指定模型的官方下載來源，避免找不到檔案
+            const config = {
+                publicPath: "https://staticimgly.com/@imgly/background-removal-data/1.4.3/dist/"
+            };
             
-            // 處理成功，顯示結果
+            const blob = await imglyRemoveBackground(imageUrl, config);
+            
             const resultUrl = URL.createObjectURL(blob);
             resultImage.src = resultUrl;
             resultImage.style.display = 'block';
             
-            // 儲存 blob 並顯示下載按鈕
             currentResultBlob = blob;
             downloadSection.style.display = 'block';
+            showStatus("✨ 去背完成！點擊下方按鈕即可下載圖片。", "success");
 
         } catch (error) {
             console.error("去背失敗:", error);
-            alert("抱歉，處理過程中發生錯誤。請確認網路連線或嘗試其他圖片。");
-        } finally {
-            loading.style.display = 'none';
+            showStatus("❌ 處理過程中發生錯誤，請確認網路連線。", "error");
         }
     });
 
-    // 新增：下載按鈕點擊事件
     downloadBtn.addEventListener('click', () => {
-        if (!currentResultBlob) {
-            alert("尚未產生去背圖片");
-            return;
-        }
-        
-        // 建立一個暫時的 <a> 標籤來觸發下載
+        if (!currentResultBlob) return;
         const link = document.createElement('a');
         link.href = URL.createObjectURL(currentResultBlob);
-        // 設定下載的檔名 (加上時間戳記避免重複)
         link.download = `removed_bg_${new Date().getTime()}.png`;
         document.body.appendChild(link);
-        link.click(); // 模擬點擊
-        document.body.removeChild(link); // 清理 DOM
-        // URL.revokeObjectURL(link.href); // 釋放記憶體 (選擇性)
+        link.click();
+        document.body.removeChild(link);
     });
 </script>
 
