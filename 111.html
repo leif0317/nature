@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 影像一鍵去背</title>
+    <title>AI 影像一鍵去背 (穩定版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 30px 20px; background-color: #f0f2f5; color: #333; }
         .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 900px; margin: auto; }
@@ -13,12 +13,11 @@
         .image-box { flex: 1; min-width: 300px; max-width: 400px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
         img { width: 100%; height: auto; border-radius: 8px; border: 1px solid #eee; background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="10" height="10" fill="%23eee"/><rect x="10" y="10" width="10" height="10" fill="%23eee"/></svg>'); }
         
-        /* 狀態提示框樣式 */
-        #statusMessage { 
-            font-weight: bold; margin: 20px 0; padding: 15px; border-radius: 6px; display: none;
-        }
+        #statusMessage { font-weight: bold; margin: 20px 0; padding: 15px; border-radius: 6px; display: none; }
         
-        /* 下載按鈕樣式 */
+        /* 新增：專屬的錯誤訊息面板 */
+        #errorMessage { display: none; color: #cc0000; background-color: #ffe6e6; padding: 15px; margin: 20px 0; border-radius: 6px; font-family: monospace; text-align: left; word-break: break-all; border: 1px solid #ffcccc; }
+        
         #downloadSection { display: none; margin-top: 20px; }
         .btn-download { background-color: #28a745; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
         .btn-download:hover { background-color: #218838; }
@@ -28,9 +27,10 @@
 
 <div class="container">
     <h2>✨ AI 影像一鍵去背</h2>
-    <p>在瀏覽器內直接處理，保護隱私。完成後可一鍵下載透明 PNG 圖檔。</p>
+    <p>完全在瀏覽器內執行，保護您的隱私安全。</p>
     
     <div id="statusMessage">準備中...</div>
+    <div id="errorMessage"></div>
 
     <div class="file-upload-wrapper">
         <input type="file" id="imageInput" accept="image/*">
@@ -39,37 +39,38 @@
     <div class="image-container">
         <div class="image-box">
             <h4>原始圖片</h4>
-            <img id="originalImage" style="display:none;" alt="原始圖片預覽">
+            <img id="originalImage" style="display:none;" alt="原始圖片">
         </div>
         <div class="image-box">
             <h4>去背結果</h4>
-            <img id="resultImage" style="display:none;" alt="去背結果預覽">
+            <img id="resultImage" style="display:none;" alt="去背結果">
             <div id="downloadSection">
-                <button id="downloadBtn" class="btn-download">📥 下載去背圖片</button>
+                <button id="downloadBtn" class="btn-download">📥 下載透明圖片</button>
             </div>
         </div>
     </div>
 </div>
 
 <script type="module">
+    // 【修改 1】：改用更穩定的 jsDelivr CDN 引入程式模組
+    import imglyRemoveBackground from "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.3/dist/imgly-background-removal.esm.js";
+
     const imageInput = document.getElementById('imageInput');
     const originalImage = document.getElementById('originalImage');
     const resultImage = document.getElementById('resultImage');
     const statusMessage = document.getElementById('statusMessage');
+    const errorMessage = document.getElementById('errorMessage');
     const downloadSection = document.getElementById('downloadSection');
     const downloadBtn = document.getElementById('downloadBtn');
 
-    let imglyRemoveBackground = null;
     let currentResultBlob = null;
 
-    // 顯示狀態的輔助函數
     function showStatus(text, type = 'info') {
         statusMessage.innerHTML = text;
         statusMessage.style.display = 'block';
-        if (type === 'error') {
-            statusMessage.style.backgroundColor = '#ffe6e6';
-            statusMessage.style.color = '#cc0000';
-        } else if (type === 'success') {
+        errorMessage.style.display = 'none'; // 隱藏錯誤面板
+        
+        if (type === 'success') {
             statusMessage.style.backgroundColor = '#e6ffe6';
             statusMessage.style.color = '#006600';
         } else {
@@ -78,42 +79,31 @@
         }
     }
 
-    // 網頁一打開，先嘗試載入 AI 模組
-    async function initModel() {
-        showStatus("⏳ 正在連線載入 AI 模型，請稍候...");
-        try {
-            const module = await import("https://unpkg.com/@imgly/background-removal@1.4.3/dist/imgly-background-removal.esm.js");
-            imglyRemoveBackground = module.default;
-            showStatus("✅ 系統準備就緒！請上傳照片開始去背。", "success");
-        } catch (error) {
-            console.error(error);
-            showStatus("❌ 初始化失敗。可能是因為直接雙擊打開網頁遭到瀏覽器安全阻擋（CORS）。", "error");
-        }
+    function showError(err) {
+        statusMessage.style.display = 'none';
+        errorMessage.innerHTML = `<strong>❌ 發生錯誤：</strong><br>${err.message || err}<br><br><small>請將這段紅字複製給 AI 助理查看。</small>`;
+        errorMessage.style.display = 'block';
     }
-    initModel();
+
+    // 初始化狀態
+    showStatus("✅ 系統載入完畢！請上傳照片。", "success");
 
     imageInput.addEventListener('change', async (event) => {
-        if (!imglyRemoveBackground) {
-            alert("系統尚未準備好，請稍後再試。");
-            return;
-        }
-
         const file = event.target.files[0];
         if (!file) return;
 
-        // 重置畫面
         const imageUrl = URL.createObjectURL(file);
         originalImage.src = imageUrl;
         originalImage.style.display = 'block';
         resultImage.style.display = 'none';
         downloadSection.style.display = 'none';
         
-        showStatus("⏳ AI 正在努力去背中...<br><small style='color:#666;'>(初次去背需下載約 20MB 模型資料，請耐心等待)</small>");
+        showStatus("⏳ AI 模型正在下載與運算中，請稍候...<br><small>(初次處理需下載約 20MB 模型檔案，取決於您的網速)</small>");
 
         try {
-            // 【重要修復】：明確指定模型的官方下載來源，避免找不到檔案
+            // 【修改 2】：強制指定模型資料夾的來源為 jsDelivr，繞過 GitHub Pages 潛在的阻擋
             const config = {
-                publicPath: "https://staticimgly.com/@imgly/background-removal-data/1.4.3/dist/"
+                publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@1.4.3/dist/"
             };
             
             const blob = await imglyRemoveBackground(imageUrl, config);
@@ -124,11 +114,11 @@
             
             currentResultBlob = blob;
             downloadSection.style.display = 'block';
-            showStatus("✨ 去背完成！點擊下方按鈕即可下載圖片。", "success");
+            showStatus("✨ 去背完美成功！", "success");
 
         } catch (error) {
-            console.error("去背失敗:", error);
-            showStatus("❌ 處理過程中發生錯誤，請確認網路連線。", "error");
+            console.error("錯誤詳情:", error);
+            showError(error); // 顯示具體錯誤代碼
         }
     });
 
