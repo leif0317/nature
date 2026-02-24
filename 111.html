@@ -3,21 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 影像一鍵去背 (穩定版)</title>
+    <title>AI 影像一鍵去背 (終極防呆版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 30px 20px; background-color: #f0f2f5; color: #333; }
         .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 900px; margin: auto; }
         .file-upload-wrapper { margin: 20px auto; max-width: 400px; }
+        /* 限制只能上傳一般常見圖片格式 */
         input[type="file"] { display: block; width: 100%; padding: 10px; border: 2px dashed #ccc; border-radius: 8px; background: #fafafa; cursor: pointer; }
         .image-container { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 30px; gap: 30px; align-items: flex-start; }
         .image-box { flex: 1; min-width: 300px; max-width: 400px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
         img { width: 100%; height: auto; border-radius: 8px; border: 1px solid #eee; background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="10" height="10" fill="%23eee"/><rect x="10" y="10" width="10" height="10" fill="%23eee"/></svg>'); }
         
         #statusMessage { font-weight: bold; margin: 20px 0; padding: 15px; border-radius: 6px; display: none; }
-        
-        /* 新增：專屬的錯誤訊息面板 */
         #errorMessage { display: none; color: #cc0000; background-color: #ffe6e6; padding: 15px; margin: 20px 0; border-radius: 6px; font-family: monospace; text-align: left; word-break: break-all; border: 1px solid #ffcccc; }
-        
         #downloadSection { display: none; margin-top: 20px; }
         .btn-download { background-color: #28a745; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
         .btn-download:hover { background-color: #218838; }
@@ -33,7 +31,7 @@
     <div id="errorMessage"></div>
 
     <div class="file-upload-wrapper">
-        <input type="file" id="imageInput" accept="image/*">
+        <input type="file" id="imageInput" accept="image/jpeg, image/png, image/webp">
     </div>
 
     <div class="image-container">
@@ -51,10 +49,7 @@
     </div>
 </div>
 
-<script type="module">
-    // 【修改 1】：改用更穩定的 jsDelivr CDN 引入程式模組
-    import imglyRemoveBackground from "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.3/dist/imgly-background-removal.esm.js";
-
+<script>
     const imageInput = document.getElementById('imageInput');
     const originalImage = document.getElementById('originalImage');
     const resultImage = document.getElementById('resultImage');
@@ -63,12 +58,13 @@
     const downloadSection = document.getElementById('downloadSection');
     const downloadBtn = document.getElementById('downloadBtn');
 
+    let imglyRemoveBackground = null;
     let currentResultBlob = null;
 
     function showStatus(text, type = 'info') {
         statusMessage.innerHTML = text;
         statusMessage.style.display = 'block';
-        errorMessage.style.display = 'none'; // 隱藏錯誤面板
+        errorMessage.style.display = 'none';
         
         if (type === 'success') {
             statusMessage.style.backgroundColor = '#e6ffe6';
@@ -79,31 +75,51 @@
         }
     }
 
-    function showError(err) {
+    function showError(text) {
         statusMessage.style.display = 'none';
-        errorMessage.innerHTML = `<strong>❌ 發生錯誤：</strong><br>${err.message || err}<br><br><small>請將這段紅字複製給 AI 助理查看。</small>`;
+        errorMessage.innerHTML = `<strong>❌ 發生錯誤：</strong><br>${text}<br><br><small>請將這段紅字複製給 AI 助理查看。</small>`;
         errorMessage.style.display = 'block';
     }
 
-    // 初始化狀態
-    showStatus("✅ 系統載入完畢！請上傳照片。", "success");
+    showStatus("✅ 網頁準備就緒！請先上傳照片，我們會在背景為您啟動 AI。");
 
     imageInput.addEventListener('change', async (event) => {
         const file = event.target.files[0];
         if (!file) return;
 
+        // 【終極防呆 1】：強制先顯示原始圖片，證明按鈕有反應
         const imageUrl = URL.createObjectURL(file);
         originalImage.src = imageUrl;
         originalImage.style.display = 'block';
         resultImage.style.display = 'none';
         downloadSection.style.display = 'none';
-        
+        errorMessage.style.display = 'none';
+
+        // 阻擋 Apple HEIC 格式
+        if (file.name.toLowerCase().endsWith('.heic')) {
+            showError("抱歉，瀏覽器無法直接顯示蘋果的 HEIC 格式照片。請上傳 JPG 或 PNG 格式。");
+            return;
+        }
+
+        showStatus("⏳ 正在啟動 AI 核心模組，請稍候...");
+
+        // 【終極防呆 2】：動態載入 AI，若網路阻擋會精準報錯，不會卡死畫面
+        if (!imglyRemoveBackground) {
+            try {
+                const module = await import("https://unpkg.com/@imgly/background-removal@1.4.3/dist/imgly-background-removal.esm.js");
+                imglyRemoveBackground = module.default;
+            } catch (err) {
+                showError("無法連線到 AI 伺服器，可能是網路限制或連線異常：<br>" + err.message);
+                return;
+            }
+        }
+
         showStatus("⏳ AI 模型正在下載與運算中，請稍候...<br><small>(初次處理需下載約 20MB 模型檔案，取決於您的網速)</small>");
 
         try {
-            // 【修改 2】：強制指定模型資料夾的來源為 jsDelivr，繞過 GitHub Pages 潛在的阻擋
+            // 指定官方資源路徑
             const config = {
-                publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@1.4.3/dist/"
+                publicPath: "https://unpkg.com/@imgly/background-removal-data@1.4.3/dist/"
             };
             
             const blob = await imglyRemoveBackground(imageUrl, config);
@@ -118,7 +134,7 @@
 
         } catch (error) {
             console.error("錯誤詳情:", error);
-            showError(error); // 顯示具體錯誤代碼
+            showError("去背處理失敗：<br>" + (error.message || error));
         }
     });
 
