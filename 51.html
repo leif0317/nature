@@ -8,78 +8,50 @@
         :root {
             --primary: #2c3e50;
             --accent: #3498db;
-            --water: #e0f2f1;
+            --water: #e0f7fa;
         }
         body {
             font-family: "Microsoft JhengHei", sans-serif;
             background: #f0f2f5;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0; padding: 20px;
-            user-select: none;
+            display: flex; flex-direction: column; align-items: center;
+            margin: 0; padding: 20px; user-select: none;
         }
         .header { text-align: center; margin-bottom: 5px; }
         .author { font-weight: bold; color: #d32f2f; font-size: 1.2em; border: 3px solid #d32f2f; padding: 3px 12px; border-radius: 8px; background: white; margin-left: 10px; display: inline-block; }
         
         #formula-display {
-            font-size: 1.5em;
-            background: #fff;
-            padding: 10px 25px;
-            border-radius: 30px;
-            margin: 10px 0;
-            color: #2c3e50;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            min-height: 1.6em;
-            display: flex;
-            align-items: center;
-            font-weight: bold;
+            font-size: 1.4em; background: #fff; padding: 12px 30px; border-radius: 30px;
+            margin: 10px 0; color: #2c3e50; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-height: 1.6em; display: flex; align-items: center; font-weight: bold;
         }
 
         .main-layout { display: flex; gap: 40px; align-items: flex-start; margin-top: 10px; }
 
         #beaker-area {
-            position: relative;
-            width: 550px;
-            height: 550px;
-            background: var(--water);
-            border: 6px solid #99aab5;
-            border-top: none;
-            border-radius: 0 0 60px 60px;
+            position: relative; width: 550px; height: 550px;
+            background: var(--water); border: 6px solid #99aab5;
+            border-top: none; border-radius: 0 0 60px 60px;
             box-shadow: inset 0 -20px 50px rgba(255,255,255,0.3);
         }
 
         .sidebar {
-            width: 280px;
-            background: white;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            width: 280px; background: white; padding: 25px;
+            border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1);
         }
 
         label { display: block; margin-bottom: 10px; font-weight: bold; color: var(--primary); }
         select { width: 100%; padding: 10px; border-radius: 8px; border: 2px solid #ddd; margin-bottom: 20px; font-size: 16px; }
 
-        /* 藥包樣式：預覽圖會動態生成 */
         #packet-container {
-            width: 140px;
-            height: 180px;
-            background: #fff9c4;
-            border: 2px dashed #fbc02d;
-            border-radius: 10px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            align-items: center;
-            padding: 10px;
-            cursor: grab;
-            transition: transform 0.1s;
+            width: 140px; height: 180px; background: #fff9c4;
+            border: 2px dashed #fbc02d; border-radius: 10px;
+            display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+            padding: 10px; cursor: grab; transition: transform 0.1s;
         }
         #packet-container:active { cursor: grabbing; transform: scale(1.1); }
         
-        /* 動態生成的預覽分子 */
         .preview-mol { display: flex; gap: 1px; margin: 3px; align-items: center; }
-        .preview-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .preview-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); }
 
         canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
         .reset-btn { background: #e74c3c; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 15px; }
@@ -89,7 +61,7 @@
 
 <div class="header">
     <h1>電解質解離模擬器 <span class="author">小粘製作</span></h1>
-    <div id="formula-display">選擇物質以顯示方程式</div>
+    <div id="formula-display">請選擇物質</div>
 </div>
 
 <div class="main-layout">
@@ -98,23 +70,26 @@
     </div>
 
     <div class="sidebar">
-        <label>1. 選擇溶質</label>
+        <label>1. 選擇物質類型</label>
         <select id="substanceSelect" onchange="updateUI()">
-            <optgroup label="強電解質">
+            <optgroup label="強電解質 (完全解離)">
                 <option value="NaCl">食鹽 (NaCl)</option>
                 <option value="NaOH">氫氧化鈉 (NaOH)</option>
                 <option value="CaCl2">氯化鈣 (CaCl₂)</option>
                 <option value="H2SO4">硫酸 (H₂SO₄)</option>
             </optgroup>
-            <optgroup label="弱電解質">
+            <optgroup label="弱電解質 (部分解離)">
                 <option value="CH3COOH">醋酸 (CH₃COOH)</option>
                 <option value="NH4OH">氫氧化銨 (NH₄OH)</option>
+            </optgroup>
+            <optgroup label="非電解質 (不解離)">
+                <option value="Glucose">葡萄糖 (C₆H₁₂O₆)</option>
+                <option value="Alcohol">酒精 (C₂H₅OH)</option>
             </optgroup>
         </select>
         
         <label>2. 拖曳藥包 (10個單位)</label>
-        <div id="packet-container">
-            </div>
+        <div id="packet-container"></div>
         
         <button class="reset-btn" onclick="resetSim()">清空燒杯</button>
     </div>
@@ -128,47 +103,37 @@
     const subSelect = document.getElementById('substanceSelect');
     const formulaDiv = document.getElementById('formula-display');
 
-    canvas.width = 550;
-    canvas.height = 550;
+    canvas.width = 550; canvas.height = 550;
 
     let particles = [];
     let isDragging = false;
     let molecules = {}; 
 
     const data = {
-        'NaCl':    { name: 'NaCl', formula: 'NaCl → Na⁺ + Cl⁻', p: 'Na⁺', n: 'Cl⁻', strong: true,  cp: '#F44336', cn: '#2196F3', ratio: [1,1] },
-        'NaOH':    { name: 'NaOH', formula: 'NaOH → Na⁺ + OH⁻', p: 'Na⁺', n: 'OH⁻', strong: true,  cp: '#F44336', cn: '#4CAF50', ratio: [1,1] },
-        'CaCl2':   { name: 'CaCl₂', formula: 'CaCl₂ → Ca²⁺ + 2Cl⁻', p: 'Ca²⁺', n: 'Cl⁻', strong: true,  cp: '#FF9800', cn: '#2196F3', ratio: [1,2] },
-        'H2SO4':   { name: 'H₂SO₄', formula: 'H₂SO₄ → 2H⁺ + SO₄²⁻', p: 'H⁺',  n: 'SO₄²⁻', strong: true,  cp: '#FFEB3B', cn: '#9C27B0', ratio: [2,1] },
-        'CH3COOH': { name: 'CH₃COOH', formula: 'CH₃COOH ⇌ H⁺ + CH₃COO⁻', p: 'H⁺',  n: 'Ac⁻', strong: false, cp: '#FFEB3B', cn: '#607D8B', ratio: [1,1] },
-        'NH4OH':   { name: 'NH₄OH', formula: 'NH₄OH ⇌ NH₄⁺ + OH⁻', p: 'NH₄⁺', n: 'OH⁻', strong: false, cp: '#8D6E63', cn: '#4CAF50', ratio: [1,1] }
+        'NaCl':    { formula: 'NaCl → Na⁺ + Cl⁻', p: 'Na⁺', n: 'Cl⁻', type: 'strong', cp: '#F44336', cn: '#2196F3', ratio: [1,1] },
+        'NaOH':    { formula: 'NaOH → Na⁺ + OH⁻', p: 'Na⁺', n: 'OH⁻', type: 'strong', cp: '#F44336', cn: '#4CAF50', ratio: [1,1] },
+        'CaCl2':   { formula: 'CaCl₂ → Ca²⁺ + 2Cl⁻', p: 'Ca²⁺', n: 'Cl⁻', type: 'strong', cp: '#FF9800', cn: '#2196F3', ratio: [1,2] },
+        'H2SO4':   { formula: 'H₂SO₄ → 2H⁺ + SO₄²⁻', p: 'H⁺', n: 'SO₄²⁻', type: 'strong', cp: '#FFEB3B', cn: '#9C27B0', ratio: [2,1] },
+        'CH3COOH': { formula: 'CH₃COOH ⇌ H⁺ + CH₃COO⁻', p: 'H⁺', n: 'Ac⁻', type: 'weak', cp: '#FFEB3B', cn: '#607D8B', ratio: [1,1] },
+        'NH4OH':   { formula: 'NH₄OH ⇌ NH₄⁺ + OH⁻', p: 'NH₄⁺', n: 'OH⁻', type: 'weak', cp: '#8D6E63', cn: '#4CAF50', ratio: [1,1] },
+        'Glucose': { formula: 'C₆H₁₂O₆(s) → C₆H₁₂O₆(aq)', p: 'C₆H₁₂O₆', n: '', type: 'none', cp: '#009688', cn: '', ratio: [1,0] },
+        'Alcohol': { formula: 'C₂H₅OH(l) → C₂H₅OH(aq)', p: 'C₂H₅OH', n: '', type: 'none', cp: '#795548', cn: '', ratio: [1,0] }
     };
 
     function updateUI() {
         const s = data[subSelect.value];
-        // 1. 更新方程式
         formulaDiv.innerText = s.formula;
-        
-        // 2. 更新藥包預覽圖 (10個單位)
         packet.innerHTML = '';
         for (let i = 0; i < 10; i++) {
             const molDiv = document.createElement('div');
             molDiv.className = 'preview-mol';
-            
-            // 根據比例決定顯示幾個點
-            // 正離子點
             for(let j=0; j<s.ratio[0]; j++) {
-                let dot = document.createElement('div');
-                dot.className = 'preview-dot';
-                dot.style.backgroundColor = s.cp;
-                molDiv.appendChild(dot);
+                let d = document.createElement('div'); d.className = 'preview-dot'; d.style.backgroundColor = s.cp;
+                molDiv.appendChild(d);
             }
-            // 負離子點
             for(let k=0; k<s.ratio[1]; k++) {
-                let dot = document.createElement('div');
-                dot.className = 'preview-dot';
-                dot.style.backgroundColor = s.cn;
-                molDiv.appendChild(dot);
+                let d = document.createElement('div'); d.className = 'preview-dot'; d.style.backgroundColor = s.cn;
+                molDiv.appendChild(d);
             }
             packet.appendChild(molDiv);
         }
@@ -177,58 +142,50 @@
     class MoleculeCenter {
         constructor(x, y) {
             this.x = x; this.y = y;
-            this.vx = (Math.random() - 0.5) * 0.7;
-            this.vy = (Math.random() - 0.5) * 0.7;
+            this.vx = (Math.random() - 0.5) * 0.8;
+            this.vy = (Math.random() - 0.5) * 0.8;
             this.angle = Math.random() * Math.PI * 2;
             this.vAngle = (Math.random() - 0.5) * 0.015;
         }
         update() {
-            this.x += this.vx; this.y += this.vy;
-            this.angle += this.vAngle;
-            if (this.x < 40 || this.x > canvas.width - 40) this.vx *= -1;
-            if (this.y < 40 || this.y > canvas.height - 40) this.vy *= -1;
+            this.x += this.vx; this.y += this.vy; this.angle += this.vAngle;
+            if (this.x < 50 || this.x > canvas.width - 50) this.vx *= -1;
+            if (this.y < 50 || this.y > canvas.height - 50) this.vy *= -1;
         }
     }
 
     class Particle {
         constructor(x, y, label, color, pairId = null, offset = {x:0, y:0}) {
-            this.x = x; this.y = y;
-            this.label = label; this.color = color;
-            this.pairId = pairId;
-            this.offset = offset;
-            this.vx = (Math.random() - 0.5) * 1.0;
-            this.vy = (Math.random() - 0.5) * 1.0;
-            this.radius = 13;
+            this.x = x; this.y = y; this.label = label; this.color = color;
+            this.pairId = pairId; this.offset = offset;
+            this.vx = (Math.random() - 0.5) * 1.2;
+            this.vy = (Math.random() - 0.5) * 1.2;
+            this.radius = (label.length > 3) ? 22 : 14; // 分子大一點
         }
         update() {
             if (this.pairId && molecules[this.pairId]) {
                 const m = molecules[this.pairId];
-                const cosA = Math.cos(m.angle);
-                const sinA = Math.sin(m.angle);
+                const cosA = Math.cos(m.angle); const sinA = Math.sin(m.angle);
                 this.x = m.x + (this.offset.x * cosA - this.offset.y * sinA);
                 this.y = m.y + (this.offset.x * sinA + this.offset.y * cosA);
             } else {
                 this.x += this.vx; this.y += this.vy;
-                if (this.x < 15 || this.x > canvas.width - 15) this.vx *= -1;
-                if (this.y < 15 || this.y > canvas.height - 15) this.vy *= -1;
+                if (this.x < 25 || this.x > canvas.width - 25) this.vx *= -1;
+                if (this.y < 25 || this.y > canvas.height - 25) this.vy *= -1;
             }
         }
         draw() {
-            ctx.save();
-            ctx.beginPath();
+            ctx.save(); ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-            ctx.fillStyle = this.color;
-            ctx.shadowBlur = 10; ctx.shadowColor = this.color;
-            ctx.fill();
-            ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = this.color; ctx.shadowBlur = 10; ctx.shadowColor = this.color;
+            ctx.fill(); ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.stroke();
             ctx.fillStyle = (this.color === '#FFEB3B') ? "black" : "white";
-            ctx.font = "bold 9px Arial"; ctx.textAlign = "center";
-            ctx.fillText(this.label, this.x, this.y + 4);
+            ctx.font = (this.label.length > 5) ? "bold 8px Arial" : "bold 10px Arial";
+            ctx.textAlign = "center"; ctx.fillText(this.label, this.x, this.y + 4);
             ctx.restore();
         }
     }
 
-    // 拖曳邏輯與投放
     packet.onmousedown = (e) => { isDragging = true; packet.style.position = 'fixed'; };
     window.onmousemove = (e) => { if (isDragging) { packet.style.left = (e.clientX-70)+'px'; packet.style.top = (e.clientY-90)+'px'; } };
     window.onmouseup = (e) => {
@@ -243,24 +200,22 @@
         const s = data[subSelect.value];
         const tid = Date.now();
         for (let i = 0; i < 10; i++) {
-            let rx = sx + (Math.random()-0.5)*80;
-            let ry = sy + (Math.random()-0.5)*80;
-            
-            if (s.strong) {
-                // 強電解質：100% 解離。CaCl2 會產生 1個橘色Ca, 2個藍色Cl
-                for(let j=0; j<s.ratio[0]; j++) particles.push(new Particle(rx+(j*10), ry, s.p, s.cp));
-                for(let k=0; k<s.ratio[1]; k++) particles.push(new Particle(rx-(k*10), ry+15, s.n, s.cn));
-            } else {
-                // 弱電解質：1解離，9維持成對
-                if (i === 0) {
+            let rx = sx + (Math.random()-0.5)*80; let ry = sy + (Math.random()-0.5)*80;
+            if (s.type === 'strong') {
+                for(let j=0; j<s.ratio[0]; j++) particles.push(new Particle(rx+j*10, ry, s.p, s.cp));
+                for(let k=0; k<s.ratio[1]; k++) particles.push(new Particle(rx-k*10, ry+15, s.n, s.cn));
+            } else if (s.type === 'weak') {
+                if (i === 0) { // 模擬 1/10 解離
                     particles.push(new Particle(rx, ry, s.p, s.cp));
                     particles.push(new Particle(rx+15, ry, s.n, s.cn));
                 } else {
-                    let pid = `p_${tid}_${i}`;
-                    molecules[pid] = new MoleculeCenter(rx, ry);
+                    let pid = `p_${tid}_${i}`; molecules[pid] = new MoleculeCenter(rx, ry);
                     particles.push(new Particle(rx, ry, s.p, s.cp, pid, {x:-10, y:0}));
                     particles.push(new Particle(rx, ry, s.n, s.cn, pid, {x:10, y:0}));
                 }
+            } else { // 非電解質：10個分子全部保持完整
+                let pid = `p_${tid}_${i}`; molecules[pid] = new MoleculeCenter(rx, ry);
+                particles.push(new Particle(rx, ry, s.p, s.cp, pid, {x:0, y:0}));
             }
         }
     }
@@ -272,9 +227,7 @@
         particles.forEach(p => { p.update(); p.draw(); });
         requestAnimationFrame(animate);
     }
-    
-    updateUI();
-    animate();
+    updateUI(); animate();
 </script>
 
 </body>
