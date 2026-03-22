@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>進階密度與浮沉虛擬實驗室 - 小粘製作</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #34495e;
+            --accent: #3498db;
+            --bg: #ecf0f1;
+            --panel-bg: #ffffff;
+            --tank-width: 320px;
+            --tank-height: 400px;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        body {
+            margin: 0; padding: 0; background-color: var(--bg); color: var(--primary);
+            display: flex; flex-direction: column; min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        header {
+            background-color: var(--primary); color: white; padding: 15px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 100;
+        }
+
+        header h1 { margin: 0; font-size: 1.5rem; }
+        .author-badge {
+            background-color: #e74c3c; padding: 5px 15px; border-radius: 20px;
+            font-weight: bold; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        main {
+            display: flex; flex-wrap: nowrap; flex: 1; padding: 20px; gap: 20px;
+            max-width: 1600px; margin: 0 auto; width: 100%; align-items: stretch;
+        }
+
+        /* 實驗區 */
+        #experiment-area {
+            flex: 1; min-width: 350px; position: relative;
+            display: flex; justify-content: center; align-items: flex-end;
+            background: var(--panel-bg); border-radius: 15px; padding: 40px 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); min-height: 550px;
+        }
+
+        #tank-container {
+            position: relative; width: var(--tank-width); height: var(--tank-height);
+            border: 4px solid #bdc3c7; border-top: none;
+            border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;
+            background: rgba(255,255,255,0.5); overflow: hidden;
+        }
+
+        /* 測量刻度 */
+        #tank-container::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 10px;
+            border-right: 2px dashed rgba(0,0,0,0.2); z-index: 5;
+        }
+
+        .liquid-layer {
+            position: absolute; left: 0; right: 0; bottom: 0; width: 100%;
+            transition: all 0.5s ease; display: flex; align-items: center; justify-content: center;
+            color: rgba(0,0,0,0.6); font-weight: bold; font-size: 0.9rem; text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+        }
+
+        /* 物體 */
+        .object {
+            position: absolute; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold; cursor: grab; z-index: 10;
+            box-shadow: inset -2px -2px 6px rgba(0,0,0,0.3), 2px 2px 5px rgba(0,0,0,0.3);
+            user-select: none; touch-action: none; 
+        }
+        
+        .object:active { cursor: grabbing; }
+
+        /* 面板區 */
+        #control-panel {
+            width: 750px; flex-shrink: 0; 
+            display: flex; flex-direction: row; gap: 20px;
+        }
+
+        .panel-card {
+            flex: 1; 
+            background: var(--panel-bg); border-radius: 10px; padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        @media (max-width: 1150px) {
+            main { flex-wrap: wrap; }
+            #control-panel { width: 100%; }
+        }
+        @media (max-width: 800px) {
+            #control-panel { flex-direction: column; }
+            #experiment-area { min-height: 450px; }
+            :root { --tank-width: 260px; }
+        }
+
+        .panel-card h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 2px solid var(--bg); padding-bottom: 10px; }
+
+        .control-group { margin-bottom: 15px; padding: 10px; background: var(--bg); border-radius: 8px; transition: 0.3s; }
+        .control-group.disabled { opacity: 0.5; filter: grayscale(1); }
+        .control-group.disabled .row:not(:first-child) { pointer-events: none; }
+        
+        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .row label { font-weight: bold; }
+        
+        input[type="range"] { width: 100%; cursor: pointer; }
+        
+        .toggle-switch {
+            position: relative; display: inline-block; width: 50px; height: 24px;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc; transition: .4s; border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--accent); }
+        input:checked + .slider:before { transform: translateX(26px); }
+
+        .badge { background: #34495e; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; }
+        
+        footer {
+            text-align: center; padding: 20px; margin-top: auto;
+            color: #7f8c8d; font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🔬 密度與浮沉虛擬實驗室</h1>
+        <div class="author-badge">小粘製作</div>
+    </header>
+
+    <main>
+        <div id="experiment-area">
+            <div id="tank-container">
+                </div>
+        </div>
+
+        <div id="control-panel">
+            <div class="panel-card">
+                <h2>💧 液體控制系統</h2>
+                <div class="control-group" id="liq1-ctrl">
+                    <div class="row">
+                        <label>液體一 (基準液)</label>
+                        <span class="badge">預設開啟</span>
+                    </div>
+                    <div class="row">
+                        <span>密度 (D):</span>
+                        <input type="range" id="liq1-d" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateLiquids()">
+                        <span id="liq1-d-display">1.0</span>
+                    </div>
+                </div>
+                <div class="control-group" id="liq2-ctrl">
+                    <div class="row">
+                        <label>加入液體二</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="liq2-active" onchange="updateLiquids()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="row">
+                        <span>密度 (D):</span>
+                        <input type="range" id="liq2-d" min="0.5" max="2.0" step="0.1" value="0.8" oninput="updateLiquids()">
+                        <span id="liq2-d-display">0.8</span>
+                    </div>
+                    <div class="row">
+                        <span>與基準互溶:</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="liq2-soluble" onchange="updateLiquids()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="control-group" id="liq3-ctrl">
+                    <div class="row">
+                        <label>加入液體三</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="liq3-active" onchange="updateLiquids()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="row">
+                        <span>密度 (D):</span>
+                        <input type="range" id="liq3-d" min="0.5" max="2.0" step="0.1" value="1.2" oninput="updateLiquids()">
+                        <span id="liq3-d-display">1.2</span>
+                    </div>
+                    <div class="row">
+                        <span>與基準互溶:</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="liq3-soluble" onchange="updateLiquids()" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <h2>📦 物體控制系統</h2>
+                <div id="objects-controls-container">
+                    </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        &copy; 2026 國中理化互動教材 - <strong>小粘製作</strong> 版權所有
+    </footer>
+
+    <script>
+        const state = {
+            liquids: [
+                { id: 'liq1', name: '液體一', active: true, density: 1.0, soluble: true, color: [52, 152, 219, 0.6] },
+                { id: 'liq2', name: '液體二', active: false, density: 0.8, soluble: false, color: [241, 196, 15, 0.6] },
+                { id: 'liq3', name: '液體三', active: false, density: 1.2, soluble: true, color: [155, 89, 182, 0.6] }
+            ],
+            objects: [
+                { id: 'obj1', name: '物一', active: true, m: 20, v: 20, color: '#e74c3c', x: 20, y: 50 },
+                { id: 'obj2', name: '物二', active: false, m: 40, v: 20, color: '#2ecc71', x: 120, y: 50 },
+                { id: 'obj3', name: '物三', active: false, m: 10, v: 20, color: '#e67e22', x: 220, y: 50 }
+            ],
+            computedLayers: [], 
+            dragState: { active: null, offsetX: 0, offsetY: 0, isDragging: false }
+        };
+
+        const tankEl = document.getElementById('tank-container');
+        const expAreaEl = document.getElementById('experiment-area');
+
+        function init() {
+            renderObjectControls();
+            updateLiquids();
+            updateObjectsState();
+            setupDragEvents();
+            
+            window.addEventListener('resize', () => {
+                state.objects.forEach(obj => {
+                    if(obj.active) resolvePhysics(obj.id, true);
+                });
+            });
+        }
+
+        function updateLiquids() {
+            // 更新液體一 (新增的邏輯)
+            state.liquids[0].density = parseFloat(document.getElementById('liq1-d').value);
+            document.getElementById('liq1-d-display').innerText = state.liquids[0].density.toFixed(1);
+
+            // 更新液體二
+            state.liquids[1].active = document.getElementById('liq2-active').checked;
+            state.liquids[1].density = parseFloat(document.getElementById('liq2-d').value);
+            state.liquids[1].soluble = document.getElementById('liq2-soluble').checked;
+            document.getElementById('liq2-d-display').innerText = state.liquids[1].density.toFixed(1);
+            document.getElementById('liq2-ctrl').classList.toggle('disabled', !state.liquids[1].active);
+
+            // 更新液體三
+            state.liquids[2].active = document.getElementById('liq3-active').checked;
+            state.liquids[2].density = parseFloat(document.getElementById('liq3-d').value);
+            state.liquids[2].soluble = document.getElementById('liq3-soluble').checked;
+            document.getElementById('liq3-d-display').innerText = state.liquids[2].density.toFixed(1);
+            document.getElementById('liq3-ctrl').classList.toggle('disabled', !state.liquids[2].active);
+
+            const activeLiqs = state.liquids.filter(l => l.active);
+            const solubleLiqs = activeLiqs.filter(l => l.soluble);
+            const insolubleLiqs = activeLiqs.filter(l => !l.soluble);
+            
+            let layers = [];
+
+            if (solubleLiqs.length > 0) {
+                let totalDensity = solubleLiqs.reduce((sum, l) => sum + l.density, 0);
+                let avgDensity = totalDensity / solubleLiqs.length;
+                
+                let mixedColor = [0, 0, 0, 0.6];
+                solubleLiqs.forEach(l => {
+                    mixedColor[0] += l.color[0]; mixedColor[1] += l.color[1]; mixedColor[2] += l.color[2];
+                });
+                mixedColor = mixedColor.map((c, i) => i < 3 ? Math.round(c / solubleLiqs.length) : c);
+
+                layers.push({
+                    name: solubleLiqs.length > 1 ? '混合溶液' : solubleLiqs[0].name,
+                    density: avgDensity,
+                    proportion: solubleLiqs.length / activeLiqs.length,
+                    color: `rgba(${mixedColor.join(',')})`
+                });
+            }
+
+            insolubleLiqs.forEach(l => {
+                layers.push({
+                    name: l.name,
+                    density: l.density,
+                    proportion: 1 / activeLiqs.length,
+                    color: `rgba(${l.color.join(',')})`
+                });
+            });
+
+            layers.sort((a, b) => a.density - b.density);
+
+            let currentTop = 0;
+            layers.forEach(layer => {
+                layer.topPct = currentTop;
+                layer.heightPct = layer.proportion * 100;
+                currentTop += layer.heightPct;
+            });
+
+            state.computedLayers = layers;
+
+            tankEl.innerHTML = '';
+            layers.forEach(layer => {
+                const div = document.createElement('div');
+                div.className = 'liquid-layer';
+                div.style.top = `${layer.topPct}%`;
+                div.style.height = `${layer.heightPct}%`;
+                div.style.backgroundColor = layer.color;
+                div.innerHTML = `${layer.name}<br>D=${layer.density.toFixed(2)}`;
+                tankEl.appendChild(div);
+            });
+
+            state.objects.forEach(obj => {
+                if(obj.active && !state.dragState.isDragging) resolvePhysics(obj.id, false);
+            });
+        }
+
+        function renderObjectControls() {
+            const container = document.getElementById('objects-controls-container');
+            container.innerHTML = '';
+            
+            state.objects.forEach((obj, index) => {
+                const group = document.createElement('div');
+                group.className = `control-group ${obj.active ? '' : 'disabled'}`;
+                group.id = `${obj.id}-ctrl`;
+                
+                group.innerHTML = `
+                    <div class="row">
+                        <label style="color:${obj.color}">${obj.name}</label>
+                        ${index > 0 ? `<label class="toggle-switch">
+                            <input type="checkbox" ${obj.active ? 'checked' : ''} onchange="toggleObject('${obj.id}', this.checked)">
+                            <span class="slider"></span>
+                        </label>` : '<span class="badge">預設開啟</span>'}
+                    </div>
+                    <div class="row">
+                        <span>質量 M(g): <span id="${obj.id}-m-val">${obj.m}</span></span>
+                        <input type="range" style="width:130px" min="5" max="100" value="${obj.m}" oninput="updateObjProps('${obj.id}', 'm', this.value)">
+                    </div>
+                    <div class="row">
+                        <span>體積 V(cm³): <span id="${obj.id}-v-val">${obj.v}</span></span>
+                        <input type="range" style="width:130px" min="10" max="60" value="${obj.v}" oninput="updateObjProps('${obj.id}', 'v', this.value)">
+                    </div>
+                    <div class="row" style="margin-top:10px; padding-top:10px; border-top:1px dashed #ccc">
+                        <strong>密度 D = M/V : </strong>
+                        <span class="badge" style="background:${obj.color}; font-size:1rem;" id="${obj.id}-d-val">${(obj.m/obj.v).toFixed(2)}</span>
+                    </div>
+                `;
+                container.appendChild(group);
+            });
+        }
+
+        function toggleObject(id, isActive) {
+            const obj = state.objects.find(o => o.id === id);
+            obj.active = isActive;
+            document.getElementById(`${id}-ctrl`).classList.toggle('disabled', !isActive);
+            updateObjectsState();
+        }
+
+        function updateObjProps(id, prop, value) {
+            const obj = state.objects.find(o => o.id === id);
+            obj[prop] = parseFloat(value);
+            document.getElementById(`${id}-${prop}-val`).innerText = obj[prop];
+            const density = obj.m / obj.v;
+            document.getElementById(`${id}-d-val`).innerText = density.toFixed(2);
+            updateObjectsState();
+            
+            if(!state.dragState.isDragging) resolvePhysics(id, false);
+        }
+
+        function updateObjectsState() {
+            state.objects.forEach(obj => {
+                let el = document.getElementById(obj.id);
+                if (obj.active) {
+                    if (!el) {
+                        el = document.createElement('div');
+                        el.id = obj.id;
+                        el.className = 'object';
+                        expAreaEl.appendChild(el);
+                    }
+                    const size = 30 + (obj.v * 1.2); 
+                    el.style.width = `${size}px`;
+                    el.style.height = `${size}px`;
+                    el.style.backgroundColor = obj.color;
+                    el.innerText = obj.name;
+                    
+                    if(!el.style.left) {
+                        el.style.left = `${obj.x}px`;
+                        el.style.top = `${obj.y}px`;
+                    }
+                } else {
+                    if (el) el.remove();
+                }
+            });
+        }
+
+        function setupDragEvents() {
+            expAreaEl.addEventListener('mousedown', dragStart);
+            document.addEventListener('mousemove', dragMove);
+            document.addEventListener('mouseup', dragEnd);
+
+            expAreaEl.addEventListener('touchstart', dragStart, {passive: false});
+            document.addEventListener('touchmove', dragMove, {passive: false});
+            document.addEventListener('touchend', dragEnd);
+        }
+
+        function dragStart(e) {
+            if (!e.target.classList.contains('object')) return;
+            if (e.type === 'touchstart') e.preventDefault();
+
+            const el = e.target;
+            state.dragState.active = el;
+            state.dragState.isDragging = true;
+            el.style.transition = 'none';
+            el.style.zIndex = '100';
+
+            const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+            
+            const elRect = el.getBoundingClientRect();
+
+            state.dragState.offsetX = clientX - elRect.left;
+            state.dragState.offsetY = clientY - elRect.top;
+        }
+
+        function dragMove(e) {
+            if (!state.dragState.isDragging || !state.dragState.active) return;
+            if (e.type === 'touchmove') e.preventDefault();
+
+            const el = state.dragState.active;
+            const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+            
+            const areaRect = expAreaEl.getBoundingClientRect();
+            
+            let newX = clientX - areaRect.left - state.dragState.offsetX;
+            let newY = clientY - areaRect.top - state.dragState.offsetY;
+
+            newX = Math.max(-50, Math.min(newX, areaRect.width - 20));
+            newY = Math.max(-50, Math.min(newY, areaRect.height - 20));
+
+            el.style.left = `${newX}px`;
+            el.style.top = `${newY}px`;
+        }
+
+        function dragEnd(e) {
+            if (!state.dragState.isDragging || !state.dragState.active) return;
+            
+            const el = state.dragState.active;
+            state.dragState.isDragging = false;
+            state.dragState.active = null;
+            
+            el.style.transition = 'top 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), left 0.8s ease';
+            el.style.zIndex = '10';
+
+            resolvePhysics(el.id, false);
+        }
+
+        function resolvePhysics(objId, isInstant) {
+            const objData = state.objects.find(o => o.id === objId);
+            const el = document.getElementById(objId);
+            if (!el || !objData) return;
+
+            if (isInstant) el.style.transition = 'none';
+            else el.style.transition = 'top 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), left 0.8s ease';
+
+            const tankRect = tankEl.getBoundingClientRect();
+            const elRect = el.getBoundingClientRect();
+            const areaRect = expAreaEl.getBoundingClientRect();
+
+            const objCenterX = elRect.left + elRect.width / 2;
+            const objCenterY = elRect.top + elRect.height / 2;
+            
+            const inTankX = objCenterX >= tankRect.left && objCenterX <= tankRect.right;
+            const inTankY = objCenterY >= tankRect.top - 200 && objCenterY <= tankRect.bottom + 100;
+
+            if (inTankX && inTankY) {
+                const objDensity = objData.m / objData.v;
+                const layers = state.computedLayers;
+                
+                let targetY_RelativeToTank = 0;
+                let resolved = false;
+
+                let previousDensity = 0; 
+
+                for (let i = 0; i < layers.length; i++) {
+                    const layer = layers[i];
+                    const layerTopPx = (layer.topPct / 100) * tankRect.height;
+                    const layerBottomPx = ((layer.topPct + layer.heightPct) / 100) * tankRect.height;
+
+                    if (objDensity < layer.density) {
+                        let densityDiff = layer.density - previousDensity;
+                        let r = densityDiff === 0 ? 1 : (objDensity - previousDensity) / densityDiff;
+                        r = Math.max(0, Math.min(1, r));
+
+                        targetY_RelativeToTank = layerTopPx - (elRect.height * (1 - r));
+                        resolved = true;
+                        break;
+                    } else if (Math.abs(objDensity - layer.density) < 0.05) {
+                        const currentYInTank = objCenterY - tankRect.top;
+                        if (currentYInTank >= layerTopPx && currentYInTank <= layerBottomPx) {
+                            targetY_RelativeToTank = currentYInTank - (elRect.height / 2);
+                        } else {
+                            targetY_RelativeToTank = layerTopPx + ((layerBottomPx - layerTopPx) / 2) - (elRect.height / 2);
+                        }
+
+                        if (targetY_RelativeToTank < layerTopPx) {
+                            targetY_RelativeToTank = layerTopPx; 
+                        }
+                        if (targetY_RelativeToTank + elRect.height > layerBottomPx) {
+                            targetY_RelativeToTank = layerBottomPx - elRect.height; 
+                        }
+
+                        resolved = true;
+                        break;
+                    }
+                    previousDensity = layer.density;
+                }
+
+                const borderWidth = 4;
+
+                if (!resolved) {
+                    targetY_RelativeToTank = tankRect.height - elRect.height - borderWidth;
+                } else {
+                    if (targetY_RelativeToTank > tankRect.height - elRect.height - borderWidth) {
+                        targetY_RelativeToTank = tankRect.height - elRect.height - borderWidth;
+                    }
+                }
+
+                const finalY = (tankRect.top - areaRect.top) + targetY_RelativeToTank;
+                
+                let currentRelativeX = parseFloat(el.style.left);
+                const tankLeftRelative = tankRect.left - areaRect.left;
+                const minLeft = tankLeftRelative + borderWidth;
+                const maxLeft = tankLeftRelative + tankRect.width - elRect.width - borderWidth;
+                
+                if (currentRelativeX > maxLeft) currentRelativeX = maxLeft;
+                if (currentRelativeX < minLeft) currentRelativeX = minLeft;
+
+                el.style.left = `${currentRelativeX}px`;
+                el.style.top = `${finalY}px`;
+
+            } else {
+                const currentRelativeX = parseFloat(el.style.left) || 0;
+                const floorY = areaRect.height - elRect.height - 20; 
+                el.style.top = `${floorY}px`;
+            }
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
