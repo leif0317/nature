@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高爐煉鐵全流程模擬 - 小粘製作</title>
+    <style>
+        :root {
+            --bg-color: #f4f6f8;
+            --panel-bg: #ffffff;
+            --primary-color: #27ae60;
+            --step-active: #e67e22;
+            --text-color: #2c3e50;
+            --author-badge: #e74c3c;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", "Segoe UI", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 25px;
+            background: var(--panel-bg);
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            border: 2px solid #eaeded;
+            border-radius: 8px;
+            background: #fff;
+        }
+        
+        canvas {
+            display: block;
+            background: linear-gradient(to bottom, #fdfbfb 0%, #ebedee 100%);
+        }
+
+        .sidebar {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* 標題與署名樣式 */
+        .header-container {
+            border-bottom: 3px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 5px;
+        }
+
+        h2 { 
+            margin: 0; 
+            color: var(--text-color); 
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .author-badge {
+            background-color: var(--author-badge);
+            color: white;
+            font-size: 0.6em;
+            padding: 4px 10px;
+            border-radius: 20px;
+            vertical-align: middle;
+            box-shadow: 0 2px 5px rgba(231, 76, 60, 0.4);
+            transform: translateY(-2px);
+            white-space: nowrap;
+        }
+
+        /* 步驟指示器 */
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            background: #f1f2f6;
+            padding: 8px;
+            border-radius: 30px;
+        }
+
+        .step-dot {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #bdc3c7;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .step-dot.active { background: var(--step-active); transform: scale(1.15); box-shadow: 0 0 10px rgba(230, 126, 34, 0.4); }
+        .step-dot.passed { background: var(--primary-color); }
+
+        /* 資訊卡片 */
+        .info-card {
+            background: #fffbf2;
+            border-left: 5px solid #f1c40f;
+            padding: 20px;
+            border-radius: 6px;
+            min-height: 160px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .info-card h3 { margin-top: 0; color: #d35400; }
+
+        .chem-box {
+            background: rgba(0,0,0,0.03);
+            border: 1px dashed #bdc3c7;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .chem-eq {
+            font-family: "Courier New", monospace;
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #2c3e50;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .chem-desc {
+            font-size: 0.85em;
+            color: #7f8c8d;
+        }
+
+        /* 圖例 */
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            font-size: 0.9em;
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+        .legend-item { display: flex; align-items: center; gap: 8px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block;}
+        .ring { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #555; display: inline-block;}
+
+        /* 按鈕 */
+        .btn-group { margin-top: auto; display: flex; gap: 10px; }
+        button {
+            padding: 12px; border: none; border-radius: 6px; cursor: pointer;
+            font-size: 1em; font-weight: bold; transition: 0.2s;
+        }
+        #nextBtn { flex: 2; background-color: var(--primary-color); color: white; }
+        #nextBtn:hover { background-color: #219150; }
+        #resetBtn { flex: 1; background-color: #95a5a6; color: white; }
+        #resetBtn:hover { background-color: #7f8c8d; }
+
+        /* Tooltip */
+        #tooltip {
+            position: absolute; background: rgba(0,0,0,0.85); color: white;
+            padding: 6px 12px; border-radius: 4px; pointer-events: none;
+            display: none; font-size: 0.85em; z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <div class="canvas-wrapper">
+        <canvas id="furnaceCanvas" width="450" height="600"></canvas>
+        <div id="tooltip"></div>
+    </div>
+
+    <div class="sidebar">
+        <div class="header-container">
+            <h2>
+                高爐煉鐵原理模擬 
+                <span class="author-badge">小粘製作</span>
+            </h2>
+        </div>
+        
+        <div class="step-indicator">
+            <div class="step-dot active" id="dot1">1</div>
+            <div class="step-dot" id="dot2">2</div>
+            <div class="step-dot" id="dot3">3</div>
+            <div class="step-dot" id="dot4">4</div>
+            <div class="step-dot" id="dot5">5</div>
+        </div>
+
+        <div class="info-card" id="infoPanel">
+            </div>
+
+        <div class="legend-grid">
+            <div class="legend-item"><span class="dot" style="background:#8B0000"></span> 鐵礦 (Fe₂O₃)</div>
+            <div class="legend-item"><span class="dot" style="background:#000"></span> 焦炭 (C)</div>
+            <div class="legend-item"><span class="dot" style="background:#ecf0f1; border:1px solid #bdc3c7"></span> 石灰石 (Flux)</div>
+            <div class="legend-item"><span class="dot" style="background:#f1c40f"></span> 熔渣 (Slag)</div>
+            <div class="legend-item"><span class="dot" style="background:#3498db; opacity:0.6"></span> CO 氣體</div>
+            <div class="legend-item"><span class="dot" style="background:#7f8c8d; opacity:0.6"></span> CO₂ 廢氣</div>
+            <div class="legend-item"><span class="ring" style="background:#bdc3c7"></span> 還原鐵 (Fe)</div>
+            <div class="legend-item"><span class="dot" style="background:red"></span> 鐵水 / <span class="dot" style="background:gold"></span> 液態渣</div>
+        </div>
+
+        <div class="btn-group">
+            <button id="resetBtn">重置系統</button>
+            <button id="nextBtn">下一步</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 高爐煉鐵模擬 - 5步驟版 (含熔渣反應)
+ * 作者：小粘
+ * 1. 進料 (Fe2O3, C, CaCO3)
+ * 2. 燃燒造氣 (C -> CO)
+ * 3. 氧化還原 (Fe2O3 -> Fe)
+ * 4. 熔渣形成 (CaCO3 -> CaO -> CaSiO3)
+ * 5. 產物分離 (出鐵/出渣)
+ */
+
+const canvas = document.getElementById('furnaceCanvas');
+const ctx = canvas.getContext('2d');
+const infoPanel = document.getElementById('infoPanel');
+const nextBtn = document.getElementById('nextBtn');
+const resetBtn = document.getElementById('resetBtn');
+const dots = Array.from(document.getElementsByClassName('step-dot'));
+const tooltip = document.getElementById('tooltip');
+
+// --- 參數 ---
+let currentStep = 1;
+const furnace = { x: 100, y: 80, topW: 120, bottomW: 200, height: 400, wall: 12 };
+const tuyereY = furnace.y + furnace.height - 70; 
+
+// 粒子系統
+let particles = [];
+let liquidIronLevel = 0; // 0-100
+let liquidSlagLevel = 0; // 0-100
+
+// 步驟定義
+const STEPS = {
+    1: {
+        title: "步驟 1：原料投入 (Charge)",
+        desc: "將鐵礦、焦炭與<b>灰石 (熔劑)</b> 從爐頂分批加入。",
+        eqs: [
+            { eq: "原料：Fe₂O₃ + C + CaCO₃", desc: "固體原料受重力堆積" }
+        ],
+        btn: "下一步：燃燒造氣"
+    },
+    2: {
+        title: "步驟 2：燃燒與造氣",
+        desc: "底部吹入熱風，焦炭燃燒產生高溫與還原劑 CO。",
+        eqs: [
+            { eq: "C + O₂ → CO₂", desc: "燃燒放熱" },
+            { eq: "CO₂ + C → 2CO", desc: "生成還原劑" }
+        ],
+        btn: "下一步：氧化還原"
+    },
+    3: {
+        title: "步驟 3：氧化還原 (核心反應)",
+        desc: "上升的 CO 氣體奪取鐵礦中的氧，生成鐵與二氧化碳。",
+        eqs: [
+            { eq: "Fe₂O₃ + 3CO → 2Fe + 3CO₂", desc: "鐵礦變金屬鐵" }
+        ],
+        btn: "下一步：熔渣形成"
+    },
+    4: {
+        title: "步驟 4：熔渣形成 (Slagging)",
+        desc: "灰石受熱分解出 CaO，與礦石中的泥沙 (SiO₂) 結合，形成熔點較低的熔渣。",
+        eqs: [
+            { eq: "CaCO₃ → CaO + CO₂", desc: "吸熱分解" },
+            { eq: "CaO + SiO₂ → CaSiO₃", desc: "結合雜質形成熔渣" }
+        ],
+        btn: "下一步：產物分離"
+    },
+    5: {
+        title: "步驟 5：產物分離與排出",
+        desc: "利用密度差異分離。鐵水密度大沉底，熔渣密度小浮在上方。",
+        eqs: [
+            { eq: "密度：鐵水 (7.8) > 熔渣 (2.5)", desc: "熔渣從上口出，鐵水從下口出" }
+        ],
+        btn: "重置演示"
+    }
+};
+
+// 粒子類型
+const Type = {
+    ORE: 'ore', COKE: 'coke', IRON: 'iron', 
+    LIME: 'lime', SLAG: 'slag_particle', // 新增石灰石與固態渣
+    CO: 'co', CO2: 'co2'
+};
+
+class Particle {
+    constructor(type, x, y) {
+        this.type = type;
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 0.5;
+        this.vy = 0;
+        this.radius = (type === Type.CO || type === Type.CO2) ? 4 : 5;
+        this.active = true;
+    }
+
+    update() {
+        // --- 運動物理 ---
+        if ([Type.ORE, Type.COKE, Type.IRON, Type.LIME, Type.SLAG].includes(this.type)) {
+            // 固體下落
+            if (this.y < tuyereY + 30) {
+                // 模擬堆積阻力，越下面越慢
+                this.vy = (this.y > tuyereY - 120 && currentStep < 5) ? 0.3 : 1.2;
+            } else {
+                this.vy = 0.1; // 底部緩慢
+            }
+            this.x += (Math.random() - 0.5) * 0.2;
+        } else {
+            // 氣體上升
+            this.vy = -1.8;
+            this.x += (Math.random() - 0.5) * 2;
+            
+            // CO2 導向
+            if (this.type === Type.CO2 && this.y < furnace.y + 40) {
+                if(this.x < furnace.x + furnace.bottomW/2) this.vx -= 0.15;
+                else this.vx += 0.15;
+                this.x += this.vx;
+            }
+        }
+
+        this.y += this.vy;
+
+        // --- 邊界與銷毀 ---
+        if (this.y < furnace.y - 20) this.active = false; // 氣體飛走
+
+        // 固體落入熔池 (Step 5)
+        if (this.y > furnace.y + furnace.height - 20) {
+            if (currentStep === 5) {
+                if(this.type === Type.IRON || this.type === Type.ORE) liquidIronLevel = Math.min(liquidIronLevel+1.5, 100);
+                if(this.type === Type.SLAG || this.type === Type.LIME) liquidSlagLevel = Math.min(liquidSlagLevel+1.5, 100);
+            }
+            this.active = false;
+        }
+
+        // --- 化學反應邏輯 (依步驟) ---
+
+        // Step 2: 造氣
+        if (currentStep >= 2) {
+            if (this.type === Type.COKE && Math.abs(this.y - tuyereY) < 30) {
+                this.active = false; 
+                for(let k=0; k<3; k++) particles.push(new Particle(Type.CO, this.x+(Math.random()-0.5)*10, this.y));
+            }
+        }
+
+        // Step 3: 還原
+        if (currentStep >= 3) {
+            if (this.type === Type.CO) {
+                let hit = particles.find(p => p.type === Type.ORE && p.active && Math.hypot(p.x-this.x, p.y-this.y) < 15);
+                if (hit && Math.random() < 0.2) {
+                    hit.type = Type.IRON; 
+                    this.type = Type.CO2;
+                }
+            }
+        }
+
+        // Step 4: 造渣 (新增邏輯)
+        if (currentStep >= 4) {
+            // 石灰石 (White) -> 遇到高溫/雜質 -> 熔渣 (Yellow)
+            if (this.type === Type.LIME && this.y > tuyereY - 150) {
+                if (Math.random() < 0.05) { // 隨機轉化
+                    this.type = Type.SLAG;
+                }
+            }
+        }
+    }
+
+    draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        switch (this.type) {
+            case Type.ORE: ctx.fillStyle = '#8B0000'; break;
+            case Type.COKE: ctx.fillStyle = '#222'; break;
+            case Type.LIME: ctx.fillStyle = '#ecf0f1'; ctx.strokeStyle='#bdc3c7'; ctx.stroke(); break; // 白
+            case Type.SLAG: ctx.fillStyle = '#f1c40f'; break; // 黃
+            case Type.IRON: ctx.fillStyle = '#bdc3c7'; ctx.strokeStyle='#7f8c8d'; ctx.stroke(); break;
+            case Type.CO: ctx.fillStyle = 'rgba(52, 152, 219, 0.6)'; break;
+            case Type.CO2: ctx.fillStyle = 'rgba(127, 140, 141, 0.5)'; break;
+        }
+        ctx.fill();
+    }
+}
+
+// --- 渲染函數 ---
+
+function drawFurnace() {
+    const {x, y, topW, bottomW, height, wall} = furnace;
+    
+    // 1. 熱風特效 (Step 2+)
+    if (currentStep >= 2) {
+        const time = Date.now() * 0.005;
+        const blastY = tuyereY;
+        
+        ctx.save();
+        ctx.beginPath();
+        // Clip area inside furnace
+        const tl = {x: x+(bottomW-topW)/2, y: y};
+        const tr = {x: x+bottomW-(bottomW-topW)/2, y: y};
+        ctx.moveTo(tl.x, tl.y); ctx.lineTo(x, y+height); ctx.lineTo(x+bottomW, y+height); ctx.lineTo(tr.x, tr.y);
+        ctx.clip();
+
+        // Draw Heat
+        const g = ctx.createRadialGradient(x, blastY, 10, x+100, blastY-50, 120);
+        g.addColorStop(0, 'rgba(231, 76, 60, 0.8)'); g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g;
+        ctx.fillRect(x, blastY-100, bottomW, 150);
+        
+        // Simple waves
+        ctx.strokeStyle = 'rgba(255, 165, 0, 0.3)';
+        ctx.lineWidth = 2;
+        for(let i=0; i<5; i++) {
+            ctx.beginPath();
+            ctx.moveTo(x, blastY - i*10);
+            for(let j=0; j<bottomW; j+=10) ctx.lineTo(x+j, blastY - i*10 + Math.sin(time + j*0.05)*5);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    // 2. 結構繪製
+    ctx.lineJoin = 'round'; ctx.lineWidth = wall; ctx.strokeStyle = '#34495e';
+    
+    const tl = {x: x+(bottomW-topW)/2, y: y};
+    const tr = {x: x+bottomW-(bottomW-topW)/2, y: y};
+    const bl = {x: x, y: y+height};
+    const br = {x: x+bottomW, y: y+height};
+
+    ctx.beginPath();
+    ctx.moveTo(tl.x, tl.y); ctx.lineTo(bl.x, bl.y); ctx.lineTo(br.x, br.y); ctx.lineTo(tr.x, tr.y);
+    ctx.stroke();
+
+    // 排氣管
+    ctx.fillStyle = '#bdc3c7';
+    ctx.fillRect(tl.x-35, tl.y+5, 35, 15); ctx.fillRect(tr.x, tr.y+5, 35, 15);
+    // 進料口
+    ctx.fillStyle = '#2c3e50';
+    ctx.beginPath(); ctx.moveTo(tl.x, tl.y-30); ctx.lineTo(tl.x+15, tl.y); ctx.lineTo(tr.x-15, tl.y); ctx.lineTo(tr.x, tl.y-30); ctx.fill();
+
+    // 出渣口 (高位)
+    const slagNotchY = bl.y - 70;
+    ctx.fillStyle = '#f39c12'; 
+    ctx.fillRect(x-25, slagNotchY, 25, 14);
+    ctx.fillStyle = '#333'; ctx.font = "12px Arial"; ctx.fillText("出渣口", x-65, slagNotchY+12);
+
+    // 出鐵口 (低位)
+    const ironTapY = br.y - 25;
+    ctx.fillStyle = '#c0392b';
+    ctx.fillRect(br.x, ironTapY, 25, 14);
+    ctx.fillText("出鐵口", br.x+30, ironTapY+12);
+}
+
+function drawLiquids() {
+    const bottomY = furnace.y + furnace.height;
+    const startX = furnace.x + furnace.wall/2;
+    const w = furnace.bottomW - furnace.wall;
+    
+    let hIron = liquidIronLevel * 0.5; // max ~50px
+    let hSlag = liquidSlagLevel * 0.5; // max ~50px
+
+    if (hIron > 0) {
+        ctx.fillStyle = 'rgba(192, 57, 43, 0.9)';
+        ctx.fillRect(startX, bottomY - hIron, w, hIron);
+    }
+    if (hSlag > 0) {
+        ctx.fillStyle = 'rgba(241, 196, 15, 0.8)';
+        ctx.fillRect(startX, bottomY - hIron - hSlag, w, hSlag);
+    }
+
+    // Step 5 Animation
+    if (currentStep === 5) {
+        // Slag Flow
+        if (hSlag > 0) {
+            ctx.strokeStyle = 'rgba(241, 196, 15, 0.8)'; ctx.lineWidth = 8;
+            ctx.beginPath(); ctx.moveTo(furnace.x, bottomY-70+7); 
+            ctx.quadraticCurveTo(furnace.x-30, bottomY-70, furnace.x-40, bottomY+20); ctx.stroke();
+        }
+        // Iron Flow
+        if (hIron > 0) {
+            ctx.strokeStyle = 'rgba(192, 57, 43, 0.9)'; ctx.lineWidth = 8;
+            ctx.beginPath(); ctx.moveTo(furnace.x+furnace.bottomW, bottomY-25+7); 
+            ctx.quadraticCurveTo(furnace.x+furnace.bottomW+30, bottomY-25, furnace.x+furnace.bottomW+40, bottomY+40); ctx.stroke();
+        }
+    }
+}
+
+// --- 主循環 ---
+
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawFurnace();
+
+    // 粒子邏輯
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw();
+        if(!particles[i].active) particles.splice(i, 1);
+    }
+
+    drawLiquids();
+
+    // 生成
+    if (currentStep < 5 && Math.random() < 0.1) {
+        const cx = furnace.x + furnace.bottomW/2;
+        const r = Math.random();
+        let type = Type.ORE;
+        if (r < 0.4) type = Type.ORE;
+        else if (r < 0.7) type = Type.COKE;
+        else type = Type.LIME; // 30% 機率生成灰石
+
+        particles.push(new Particle(type, cx + (Math.random()-0.5)*40, furnace.y - 10));
+    }
+
+    // 液面強制增加演示 (Step 5)
+    if (currentStep === 5) {
+        if(liquidIronLevel < 60) liquidIronLevel += 0.3;
+        if(liquidSlagLevel < 50) liquidSlagLevel += 0.2;
+    }
+
+    requestAnimationFrame(loop);
+}
+
+// --- UI控制 ---
+
+function updateUI() {
+    // Dots
+    dots.forEach((d, i) => {
+        d.className = 'step-dot';
+        if (i + 1 === currentStep) d.classList.add('active');
+        if (i + 1 < currentStep) d.classList.add('passed');
+    });
+
+    // Content
+    const data = STEPS[currentStep];
+    let html = `<h3>${data.title}</h3><p>${data.desc}</p>`;
+    data.eqs.forEach(item => {
+        html += `<div class="chem-box">
+                    <span class="chem-eq">${item.eq}</span>
+                    <span class="chem-desc">${item.desc}</span>
+                 </div>`;
+    });
+    infoPanel.innerHTML = html;
+
+    // Btn
+    nextBtn.textContent = (currentStep === 5) ? "演示結束 (點擊重置)" : data.btn;
+}
+
+nextBtn.addEventListener('click', () => {
+    if (currentStep < 5) {
+        currentStep++;
+        updateUI();
+    } else {
+        currentStep = 1; particles = []; liquidIronLevel=0; liquidSlagLevel=0;
+        updateUI();
+    }
+});
+
+resetBtn.addEventListener('click', () => {
+    currentStep = 1; particles = []; liquidIronLevel=0; liquidSlagLevel=0;
+    updateUI();
+});
+
+// Tooltip
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // 粗略判斷
+    if (x > furnace.x && x < furnace.x + furnace.bottomW && y > furnace.y && y < furnace.y + furnace.height) {
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.pageX + 10) + 'px';
+        tooltip.style.top = (e.pageY + 10) + 'px';
+        
+        if (y > tuyereY - 20) tooltip.textContent = "燃燒區 (C -> CO)";
+        else if (y > tuyereY - 120) tooltip.textContent = "造渣區 (CaO + SiO2)";
+        else if (y < furnace.y + 100) tooltip.textContent = "預熱與進料";
+        else tooltip.textContent = "還原區";
+    } else {
+        tooltip.style.display = 'none';
+    }
+});
+
+// Init
+updateUI();
+loop();
+
+</script>
+</body>
+</html>

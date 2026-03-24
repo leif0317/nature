@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>理化實驗：酸鹼中和的粒子模擬 - 小粘製作</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <style>
+        :root { --acid-h: #ff4d4f; --base-oh: #1890ff; --heat: #fa8c16; }
+        * { box-sizing: border-box; }
+        body { margin: 0; display: flex; height: 100vh; width: 100vw; font-family: sans-serif; background: #f0f2f5; overflow: hidden; }
+        
+        #controls { 
+            width: 360px; min-width: 360px; background: white; padding: 20px; 
+            box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; 
+            gap: 12px; z-index: 10; height: 100%; overflow-y: auto; 
+        }
+        h1 { font-size: 1.1rem; margin: 0; text-align: center; color: #333; }
+        .author { font-size: 0.8rem; color: #aaa; text-align: center; margin-bottom: 10px; }
+
+        .experiment-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .column { display: flex; flex-direction: column; gap: 8px; border-radius: 8px; background: #fdfdfd; padding: 10px; border: 1px solid #eee; }
+        
+        .molecule-preview {
+            height: 75px; background: #fff; border: 1px solid #eee; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center; margin-bottom: 5px;
+        }
+        .mol-ball {
+            width: 18px; height: 18px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; font-size: 0.4rem; color: white;
+            font-weight: bold; border: 1px solid rgba(0,0,0,0.05);
+        }
+        .mol-line { width: 4px; height: 2px; background: #ddd; }
+
+        button { padding: 10px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
+        .btn-acid { background: var(--acid-h); }
+        .btn-base { background: var(--base-oh); }
+        #heat-btn { background: var(--heat); margin-top: 5px; }
+        #heat-btn.active { background: #d46b08; animation: pulse 1s infinite; }
+
+        #stats { background: #2c3e50; color: #fff; padding: 12px; border-radius: 8px; font-size: 0.85rem; margin-top: auto; }
+        #status-msg { color: #ffeb3b; font-size: 0.75rem; margin-top: 5px; font-weight: bold; }
+        
+        #canvas-outer { flex-grow: 1; height: 100%; position: relative; background: #e0e4e8; }
+        #canvas-container { width: 100%; height: 100%; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <h1>酸鹼中和的粒子模擬器</h1>
+    <div class="author">小粘製作</div>
+
+    <div class="experiment-grid">
+        <div class="column" style="border-top: 4px solid var(--acid-h);">
+            <div style="font-size:0.75rem; font-weight:bold;">酸 (Acid)</div>
+            <select id="acid-select">
+                <option value="HCl">鹽酸 HCl</option>
+                <option value="H2SO4">硫酸 H₂SO₄</option>
+                <option value="HNO3">硝酸 HNO₃</option>
+                <option value="CH3COOH">醋酸 CH₃COOH</option>
+            </select>
+            <div id="acid-mol-view" class="molecule-preview"></div>
+            <button class="btn-acid" onclick="addPacket('acid')">加入一包</button>
+        </div>
+
+        <div class="column" style="border-top: 4px solid var(--base-oh);">
+            <div style="font-size:0.75rem; font-weight:bold;">鹼 (Base)</div>
+            <select id="base-select">
+                <option value="NaOH">氫氧化鈉 NaOH</option>
+                <option value="CaOH2">氫氧化鈣 Ca(OH)₂</option>
+                <option value="MgOH2">氫氧化鎂 Mg(OH)₂</option>
+            </select>
+            <div id="base-mol-view" class="molecule-preview"></div>
+            <button class="btn-base" onclick="addPacket('base')">加入一包</button>
+        </div>
+    </div>
+
+    <button id="heat-btn">🔥 開始加熱 (蒸發結晶)</button>
+    <button onclick="location.reload()" style="background:#95a5a6; margin-top:5px;">♻️ 重置實驗</button>
+
+    <div id="stats">
+        <div>🔴 H⁺ : <span id="s-h">0</span> | 🔵 OH⁻ : <span id="s-oh">0</span></div>
+        <div>🧪 pH 值: <span id="s-ph">7.0</span> | 💧 水量: <span id="s-water">100%</span></div>
+        <div id="status-msg">狀態：待機中</div>
+    </div>
+</div>
+
+<div id="canvas-outer">
+    <div id="canvas-container"></div>
+</div>
+
+<script>
+let particles = [];
+let weakMolecules = []; 
+let waters = [];
+let precipitates = []; 
+let waterLevel = 1.0;
+let isHeating = false;
+let tank;
+
+const COLORS = {
+    'H⁺': '#ff4d4f', 'OH⁻': '#1890ff',
+    'Cl⁻': '#888', 'SO₄²⁻': '#555', 'NO₃⁻': '#777', 'CH₃COO⁻': '#aa66cc',
+    'Na⁺': '#ccc', 'Ca²⁺': '#9ab', 'Mg²⁺': '#aab'
+};
+
+const VALENCY = {
+    'H⁺': 1, 'Na⁺': 1, 'Ca²⁺': 2, 'Mg²⁺': 2,
+    'OH⁻': -1, 'Cl⁻': -1, 'NO₃⁻': -1, 'CH₃COO⁻': -1, 'SO₄²⁻': -2
+};
+
+const DATA = {
+    'HCl':      { mol: ['H⁺', 'Cl⁻'], ions: [['H⁺', 10], ['Cl⁻', 10]], strong: true },
+    'H2SO4':    { mol: ['H⁺', 'SO₄²⁻', 'H⁺'], ions: [['H⁺', 20], ['SO₄²⁻', 10]], strong: true },
+    'HNO3':     { mol: ['H⁺', 'NO₃⁻'], ions: [['H⁺', 10], ['NO₃⁻', 10]], strong: true },
+    'CH3COOH':  { mol: ['H⁺', 'CH₃COO⁻'], ions: [['H⁺', 10], ['CH₃COO⁻', 10]], strong: false },
+    'NaOH':     { mol: ['Na⁺', 'OH⁻'], ions: [['Na⁺', 10], ['OH⁻', 10]], strong: true },
+    'CaOH2':    { mol: ['OH⁻', 'Ca²⁺', 'OH⁻'], ions: [['Ca²⁺', 10], ['OH⁻', 20]], strong: true },
+    'MgOH2':    { mol: ['OH⁻', 'Mg²⁺', 'OH⁻'], ions: [['Mg²⁺', 10], ['OH⁻', 20]], strong: true }
+};
+
+// 完整組合的化學反應式對照表
+const EQUATIONS = {
+    'HCl_NaOH': 'HCl + NaOH → NaCl + H₂O',
+    'HCl_CaOH2': '2HCl + Ca(OH)₂ → CaCl₂ + 2H₂O',
+    'HCl_MgOH2': '2HCl + Mg(OH)₂ → MgCl₂ + 2H₂O',
+    'H2SO4_NaOH': 'H₂SO₄ + 2NaOH → Na₂SO₄ + 2H₂O',
+    'H2SO4_CaOH2': 'H₂SO₄ + Ca(OH)₂ → CaSO₄↓ + 2H₂O',
+    'H2SO4_MgOH2': 'H₂SO₄ + Mg(OH)₂ → MgSO₄↓ + 2H₂O',
+    'HNO3_NaOH': 'HNO₃ + NaOH → NaNO₃ + H₂O',
+    'HNO3_CaOH2': '2HNO₃ + Ca(OH)₂ → Ca(NO₃)₂ + 2H₂O',
+    'HNO3_MgOH2': '2HNO₃ + Mg(OH)₂ → Mg(NO₃)₂ + 2H₂O',
+    'CH3COOH_NaOH': 'CH₃COOH + NaOH → CH₃COONa + H₂O',
+    'CH3COOH_CaOH2': '2CH₃COOH + Ca(OH)₂ → (CH₃COO)₂Ca + 2H₂O',
+    'CH3COOH_MgOH2': '2CH₃COOH + Mg(OH)₂ → (CH₃COO)₂Mg + 2H₂O'
+};
+
+function setup() {
+    let container = document.getElementById('canvas-container');
+    let canvas = createCanvas(container.offsetWidth, container.offsetHeight);
+    canvas.parent('canvas-container');
+    updateTank();
+    document.getElementById('acid-select').onchange = updatePreviews;
+    document.getElementById('base-select').onchange = updatePreviews;
+    document.getElementById('heat-btn').onclick = function() {
+        isHeating = !isHeating;
+        this.classList.toggle('active', isHeating);
+        this.innerText = isHeating ? "暫停加熱" : "🔥 開始加熱 (蒸發結晶)";
+    };
+    updatePreviews();
+}
+
+function updateTank() {
+    let tw = min(width * 0.8, 450);
+    let th = height * 0.55;
+    tank = { x: width/2 - tw/2, y: height/2 - th/2 + 50, w: tw, h: th };
+}
+
+function windowResized() {
+    let container = document.getElementById('canvas-container');
+    resizeCanvas(container.offsetWidth, container.offsetHeight);
+    updateTank();
+}
+
+function updatePreviews() {
+    render('acid-select', 'acid-mol-view');
+    render('base-select', 'base-mol-view');
+}
+
+function render(sid, vid) {
+    const val = document.getElementById(sid).value;
+    const info = DATA[val];
+    const box = document.getElementById(vid);
+    box.innerHTML = '';
+    info.mol.forEach((name, i) => {
+        let b = document.createElement('div');
+        b.className = 'mol-ball'; b.style.background = COLORS[name]; b.innerText = name;
+        box.appendChild(b);
+        if(i < info.mol.length-1) { let l = document.createElement('div'); l.className = 'mol-line'; box.appendChild(l); }
+    });
+}
+
+function addPacket(type) {
+    if (waterLevel <= 0.01) return;
+    const val = document.getElementById(type + '-select').value;
+    const info = DATA[val];
+    const sx = tank.x + tank.w/2, sy = tank.y + tank.h * (1 - waterLevel) + 20;
+
+    if (info.strong) {
+        info.ions.forEach(group => {
+            for(let i=0; i < group[1]; i++) particles.push(new Particle(sx, sy, group[0], COLORS[group[0]]));
+        });
+    } else {
+        info.ions.forEach(group => particles.push(new Particle(sx, sy, group[0], COLORS[group[0]])));
+        for(let j=0; j<9; j++) weakMolecules.push(new WeakMolecule(sx, sy, val, info.mol.join(''), info.ions));
+    }
+}
+
+function draw() {
+    background(isHeating ? '#fff8f0' : '#f0f4f8');
+    if (isHeating && waterLevel > 0) { 
+        waterLevel -= 0.0015; 
+        if (waterLevel < 0) waterLevel = 0;
+        drawFire(); 
+    }
+    drawTank();
+    handleChemistry();
+    
+    particles.forEach(p => { p.update(); p.display(); });
+    weakMolecules.forEach(m => { m.update(); m.display(); });
+    waters.forEach((w, i) => { w.update(); w.display(); if(w.dead) waters.splice(i,1); });
+    precipitates.forEach(s => { s.update(); s.display(); });
+    
+    drawEquation();
+    updateUI();
+}
+
+function drawTank() {
+    stroke(100); strokeWeight(5); fill(255, 250);
+    rect(tank.x, tank.y, tank.w, tank.h, 0, 0, 30, 30);
+    if (waterLevel > 0) {
+        noStroke(); 
+        fill(100, 200, 255, map(waterLevel,0,1,40,100));
+        let ch = tank.h * waterLevel;
+        rect(tank.x+5, tank.y + tank.h - ch, tank.w-10, ch-5, 0, 0, 25, 25);
+    }
+}
+
+function drawFire() {
+    for(let i=0; i<8; i++) {
+        fill(255, random(50, 150), 0, 180); noStroke();
+        ellipse(tank.x + tank.w/2 + random(-80, 80), tank.y + tank.h + 10, random(30,60), random(50,110));
+    }
+}
+
+function drawEquation() {
+    const acidKey = document.getElementById('acid-select').value;
+    const baseKey = document.getElementById('base-select').value;
+    // 動態獲取組合反應式
+    let eq = EQUATIONS[`${acidKey}_${baseKey}`] || "反應進行中...";
+    
+    textAlign(CENTER); textSize(24); textStyle(BOLD); fill(80);
+    text(eq, width/2, 60);
+}
+
+function handleChemistry() {
+    let hs = particles.filter(p => p.name === 'H⁺' && !p.dead);
+    let ohs = particles.filter(p => p.name === 'OH⁻' && !p.dead);
+    let msgBox = document.getElementById('status-msg');
+    
+    // 1. 中和反應 (H + OH)
+    hs.forEach(h => {
+        ohs.forEach(oh => {
+            if(!h.dead && !oh.dead && dist(h.pos.x, h.pos.y, oh.pos.x, oh.pos.y) < 25) {
+                h.dead = oh.dead = true; waters.push(new WaterAnim(h.pos.x, h.pos.y));
+                if (particles.filter(p => p.name === 'H⁺' && !p.dead).length === 0 && weakMolecules.length > 0) {
+                    let m = weakMolecules.shift(); m.dissolve();
+                }
+            }
+        });
+    });
+
+    // 2. 特殊反應：2A 族與硫酸根直接沉澱 (最高優先級，無關水量)
+    let group2A = particles.filter(p => ['Ca²⁺', 'Mg²⁺'].includes(p.name) && !p.dead);
+    let sulfates = particles.filter(p => p.name === 'SO₄²⁻' && !p.dead);
+    let instantPrecipitateHappened = false;
+
+    group2A.forEach(m => {
+        sulfates.forEach(s => {
+            if(!m.dead && !s.dead && dist(m.pos.x, m.pos.y, s.pos.x, s.pos.y) < 35) {
+                m.dead = s.dead = true; // 兩者都是 2 價，1:1 直接結合
+                precipitates.push(new Precipitate((m.pos.x + s.pos.x)/2, (m.pos.y + s.pos.y)/2, '#f0f0f0', "沉澱"));
+                instantPrecipitateHappened = true;
+            }
+        });
+    });
+
+    // 3. 一般蒸發結晶邏輯 (考慮價數平衡)
+    if (waterLevel < 0.5 || waterLevel <= 0) {
+        msgBox.innerText = waterLevel <= 0 ? "狀態：完全燒乾" : (instantPrecipitateHappened ? "狀態：產生沉澱物！" : "狀態：依電中性原理結晶中");
+        
+        let cations = particles.filter(p => VALENCY[p.name] > 0 && !p.dead && p.name !== 'H⁺');
+        let anions = particles.filter(p => VALENCY[p.name] < 0 && !p.dead && p.name !== 'OH⁻');
+
+        for (let c of cations) {
+            if (c.dead) continue;
+            let chargeNeeded = VALENCY[c.name]; 
+            let searchRange = (waterLevel <= 0) ? 2000 : map(waterLevel, 0, 0.5, 100, 30);
+            
+            if (chargeNeeded === 1) {
+                // +1 找一個 -1
+                let foundA = anions.find(a => !a.dead && VALENCY[a.name] === -1 && dist(c.pos.x, c.pos.y, a.pos.x, a.pos.y) < searchRange);
+                if (foundA) {
+                    c.dead = foundA.dead = true;
+                    precipitates.push(new Precipitate(c.pos.x, c.pos.y, '#ccc', "晶體"));
+                }
+            } 
+            else if (chargeNeeded === 2) {
+                // +2 先找一個 -2
+                let foundA2 = anions.find(a => !a.dead && VALENCY[a.name] === -2 && dist(c.pos.x, c.pos.y, a.pos.x, a.pos.y) < searchRange);
+                if (foundA2) {
+                    c.dead = foundA2.dead = true;
+                    precipitates.push(new Precipitate(c.pos.x, c.pos.y, '#ccc', "晶體"));
+                } else {
+                    // 找不到 -2，改找兩個 -1
+                    let nearMinusOnes = anions.filter(a => !a.dead && VALENCY[a.name] === -1 && dist(c.pos.x, c.pos.y, a.pos.x, a.pos.y) < searchRange);
+                    if (nearMinusOnes.length >= 2) {
+                        c.dead = true;
+                        nearMinusOnes[0].dead = nearMinusOnes[1].dead = true;
+                        precipitates.push(new Precipitate(c.pos.x, c.pos.y, '#ccc', "晶體"));
+                    }
+                }
+            }
+        }
+    } else {
+        msgBox.innerText = instantPrecipitateHappened ? "狀態：產生沉澱物！" : "狀態：溶解中";
+    }
+
+    particles = particles.filter(p => !p.dead);
+}
+
+class Particle {
+    constructor(x, y, name, col) {
+        this.pos = createVector(x + random(-30, 30), y + random(-10, 10));
+        this.vel = p5.Vector.random2D().mult(random(2, 4));
+        this.name = name; this.col = col; this.dead = false; this.size = 28;
+    }
+    update() {
+        if (waterLevel <= 0) return;
+        let v = isHeating ? this.vel.copy().mult(1.4) : this.vel;
+        this.pos.add(v);
+        let waterTop = tank.y + tank.h * (1 - waterLevel), r = this.size/2;
+        if (this.pos.x < tank.x+r || this.pos.x > tank.x+tank.w-r) this.vel.x *= -1;
+        if (this.pos.y < waterTop+r || this.pos.y > tank.y+tank.h-r) this.vel.y *= -1;
+        this.pos.x = constrain(this.pos.x, tank.x+r, tank.x+tank.w-r);
+        this.pos.y = constrain(this.pos.y, waterTop+r, tank.y+tank.h-r);
+    }
+    display() {
+        stroke(0, 50); fill(this.col); ellipse(this.pos.x, this.pos.y, this.size);
+        fill(255); noStroke(); textAlign(CENTER, CENTER); textSize(9); text(this.name, this.pos.x, this.pos.y);
+    }
+}
+
+class WeakMolecule {
+    constructor(x, y, type, name, ions) {
+        this.pos = createVector(x + random(-40, 40), y + random(-10, 10));
+        this.vel = p5.Vector.random2D().mult(random(1, 2.5));
+        this.type = type; this.name = name; this.ions = ions; this.w = 56; this.h = 24;
+    }
+    update() {
+        if (waterLevel <= 0) return;
+        let v = isHeating ? this.vel.copy().mult(1.2) : this.vel;
+        this.pos.add(v);
+        let waterTop = tank.y + tank.h * (1 - waterLevel);
+        if (this.pos.x < tank.x+this.w/2 || this.pos.x > tank.x+tank.w-this.w/2) this.vel.x *= -1;
+        if (this.pos.y < waterTop+this.h/2 || this.pos.y > tank.y+tank.h-this.h/2) this.vel.y *= -1;
+        this.pos.x = constrain(this.pos.x, tank.x+this.w/2, tank.x+tank.w-this.w/2);
+        this.pos.y = constrain(this.pos.y, waterTop+this.h/2, tank.y+tank.h-this.h/2);
+    }
+    display() {
+        fill(220, 220, 220, 180); stroke(150);
+        rect(this.pos.x - this.w/2, this.pos.y - this.h/2, this.w, this.h, 5);
+        fill(50); noStroke(); textAlign(CENTER, CENTER); textSize(9); text(this.name.replace(/3/g,'₃'), this.pos.x, this.pos.y);
+    }
+    dissolve() {
+        this.ions.forEach(group => {
+            for(let i=0; i<group[1]/10; i++) particles.push(new Particle(this.pos.x, this.pos.y, group[0], COLORS[group[0]]));
+        });
+    }
+}
+
+class Precipitate {
+    constructor(x, y, col, typeText="晶體") {
+        this.pos = createVector(x, y); this.col = col; this.typeText = typeText;
+        this.targetY = tank.y + tank.h - 15 - random(0, 15);
+        this.grounded = false;
+    }
+    update() { 
+        if(!this.grounded) { 
+            this.pos.y += 2.5; 
+            if(this.pos.y >= this.targetY) { this.pos.y = this.targetY; this.grounded = true; } 
+        } 
+    }
+    display() { 
+        stroke(100); fill(this.col); rect(this.pos.x-10, this.pos.y-10, 20, 20, 2); 
+    }
+}
+
+class WaterAnim {
+    constructor(x, y) { this.pos = createVector(x, y); this.life = 255; }
+    update() { this.life -= 5; this.pos.y -= 1; }
+    display() { noStroke(); fill(150, 220, 255, this.life); ellipse(this.pos.x, this.pos.y, 40); fill(255, this.life); textSize(10); text("H₂O", this.pos.x, this.pos.y+5); if(this.life <= 0) this.dead = true; }
+}
+
+function updateUI() {
+    let h = particles.filter(p => p.name === 'H⁺').length;
+    let oh = particles.filter(p => p.name === 'OH⁻').length;
+    document.getElementById('s-h').innerText = h;
+    document.getElementById('s-oh').innerText = oh;
+    document.getElementById('s-ph').innerText = (7 + (oh - h) * 0.15).toFixed(1);
+    document.getElementById('s-water').innerText = Math.max(0, floor(waterLevel * 100)) + "%";
+}
+</script>
+</body>
+</html>
