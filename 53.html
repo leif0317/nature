@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>可逆反應與移動平衡 - 動態熱力學版 (小粘製作)</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --bg-color: #ecf0f1;
+            --panel-bg: #ffffff;
+            --blue-water: #e1f5fe;
+            --accent-blue: #3498db;
+            /* 粒子顏色定義 */
+            --col-no2: #d35400;   /* 紅棕色 */
+            --col-n2o4: #2ecc71;  /* 綠色 (代表無色) */
+            --col-br2: #ff0000;   /* 鮮紅色 */
+            --col-hplus: #9b59b6; /* 紫色 (代表無色) */
+            --col-brminus: #3498db;/* 藍色 (代表無色) */
+            --col-hobr: #f1c40f;  /* 黃色 (代表無色) */
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary-color);
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center;
+        }
+        .app-container {
+            max-width: 1000px; width: 100%;
+            background: var(--panel-bg); border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            padding: 25px; box-sizing: border-box;
+        }
+        
+        /* 標題與署名樣式 (新增) */
+        .main-title { text-align: center; font-size: 26px; margin-top: 0; margin-bottom: 5px; }
+        .attribution {
+            text-align: center;
+            font-size: 16px;
+            color: var(--accent-blue);
+            font-weight: bold;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        /* 系統切換與介面 */
+        .system-header {
+            text-align: center; margin-bottom: 20px; padding: 15px;
+            background: #fdfdfd; border: 2px solid #3498db; border-radius: 8px;
+        }
+        select {
+            font-size: 18px; padding: 8px; border-radius: 6px;
+            border: 1px solid #bdc3c7; outline: none; cursor: pointer;
+            font-weight: bold; color: #2980b9;
+        }
+        .equation {
+            font-size: 20px; font-weight: bold; margin-top: 15px;
+            color: #d35400; letter-spacing: 1px;
+        }
+
+        .main-grid { display: grid; grid-template-columns: 1fr 340px; gap: 25px; }
+        @media (max-width: 850px) { .main-grid { grid-template-columns: 1fr; } }
+        
+        /* 視覺與統計區 */
+        .visual-area {
+            display: flex; flex-direction: column;
+            background: #fafafa; border: 2px dashed #bdc3c7;
+            border-radius: 12px; padding: 10px;
+        }
+        .canvas-container {
+            width: 100%; height: 350px; position: relative;
+            background-color: #fff; border: 3px solid #7f8c8d;
+            border-radius: 10px; overflow: hidden; transition: background-color 0.5s;
+        }
+        canvas { display: block; width: 100%; height: 100%; }
+        
+        /* 溫度顯示浮窗 */
+        #temp-overlay {
+            position: absolute; top: 15px; right: 15px;
+            background: rgba(255, 255, 255, 0.95); padding: 8px 15px;
+            border-radius: 8px; font-weight: bold; font-size: 18px;
+            border: 2px solid #bdc3c7; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: color 0.3s ease; z-index: 10;
+            font-family: monospace; letter-spacing: 1px;
+        }
+        /* 溫度變化的動畫提示 */
+        @keyframes tempDrop { 0% { color: #e74c3c; transform: translateY(0); } 50% { transform: translateY(3px); } 100% { color: #2980b9; transform: translateY(0); } }
+        @keyframes tempRise { 0% { color: #3498db; transform: translateY(0); } 50% { transform: translateY(-3px); } 100% { color: #e74c3c; transform: translateY(0); } }
+        .temp-dropping { animation: tempDrop 0.5s ease-out; }
+        .temp-rising { animation: tempRise 0.5s ease-out; }
+
+        /* 統計面板 */
+        .stats-panel {
+            margin-top: 10px; padding: 15px; background: #fff;
+            border-radius: 8px; border: 1px solid #e0e0e0;
+        }
+        .total-counter {
+            font-size: 18px; font-weight: bold; color: #2c3e50;
+            text-align: center; padding-bottom: 10px; margin-bottom: 10px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 5px 10px; background: #f8f9fa; border-radius: 4px;
+            font-size: 14px; font-weight: bold;
+        }
+        .color-dot {
+            width: 12px; height: 12px; border-radius: 50%;
+            display: inline-block; margin-right: 8px; border: 1px solid rgba(0,0,0,0.2);
+        }
+
+        /* 控制面板 */
+        .control-panel { display: flex; flex-direction: column; gap: 15px; }
+        .control-group { background: #f9f9f9; border: 1px solid #e0e0e0; padding: 15px; border-radius: 8px; }
+        .control-group h3 { margin: 0 0 10px 0; font-size: 16px; color: #34495e; }
+        .btn-group { display: flex; flex-direction: column; gap: 8px; } 
+        button {
+            width: 100%; padding: 10px; border: none; border-radius: 6px;
+            background: #3498db; color: white; font-size: 15px; cursor: pointer; font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover { background: #2980b9; }
+        button.danger { background: #e74c3c; }
+        button.danger:hover { background: #c0392b; }
+        button.warn { background: #f39c12; }
+        button.warn:hover { background: #d35400; }
+        
+        input[type=range] { width: 100%; cursor: pointer; }
+        .slider-labels { display: flex; justify-content: space-between; font-size: 12px; color: #7f8c8d; margin-top: 5px; }
+        
+        /* 回饋區 */
+        .feedback-area {
+            margin-top: 20px; padding: 15px; background: #e8f8f5;
+            border-left: 6px solid #1abc9c; border-radius: 8px;
+        }
+        .shift-arrow { font-size: 26px; font-weight: bold; color: #16a085; text-align: center; margin: 5px 0; }
+        .explanation { line-height: 1.6; font-size: 15px; color: #2c3e50; margin-top: 5px;}
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <h1 class="main-title">🔬 可逆反應與移動平衡 - 動態熱力學版</h1>
+    <div class="attribution">
+        <span>🛠️</span>
+        <span>小粘製作</span>
+    </div>
+    
+    <div class="system-header">
+        <label for="sys-select" style="font-size: 16px; font-weight: bold;">選擇實驗系統：</label>
+        <select id="sys-select" onchange="switchSystem()">
+            <option value="gas">氣體系統 (2NO₂ ⇌ N₂O₄ + 熱)</option>
+            <option value="liquid">溴水系統 (Br₂ + H₂O ⇌ H⁺ + Br⁻ + HOBr)</option>
+        </select>
+        <div class="equation" id="eq-display"></div>
+    </div>
+
+    <div class="main-grid">
+        <div class="visual-area">
+            <div class="canvas-container" id="canvas-container">
+                <canvas id="simCanvas"></canvas>
+                <div id="temp-overlay">🌡️ 系統溫度: 50.0°C</div>
+            </div>
+            
+            <div class="stats-panel">
+                <div class="total-counter">容器內粒子總數: <span id="stat-total">0</span></div>
+                <div class="stats-grid" id="stats-detailed"></div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div id="panel-gas">
+                <div class="control-group">
+                    <h3>1. 濃度變因</h3>
+                    <div class="btn-group">
+                        <button onclick="triggerAction('add_no2')">➕ 加入 10 個 NO₂ (紅棕色)</button>
+                        <button class="danger" onclick="triggerAction('remove_n2o4')">➖ 移除 10 個 N₂O₄ (綠色)</button>
+                    </div>
+                </div>
+                <div class="control-group" style="margin-top: 15px;">
+                    <h3>2. 溫度變因 (加入或移除環境熱量)</h3>
+                    <input type="range" id="temp-slider" min="20" max="100" value="50" onchange="triggerAction('gas_temp')">
+                    <div class="slider-labels"><span>低溫(冰水)</span><span>室溫</span><span>高溫(熱水)</span></div>
+                </div>
+                <div class="control-group" style="margin-top: 15px;">
+                    <h3>3. 壓力變因 (改變容器體積)</h3>
+                    <input type="range" id="pressure-slider" min="30" max="100" value="80" onchange="triggerAction('gas_pressure')">
+                    <div class="slider-labels"><span>體積小 (高壓)</span><span>體積大 (低壓)</span></div>
+                </div>
+            </div>
+
+            <div id="panel-liquid" class="hidden">
+                <div class="control-group">
+                    <h3>濃度變因 (酸鹼中和)</h3>
+                    <div class="btn-group">
+                        <button class="warn" onclick="triggerAction('add_acid')">➕ 滴入酸液 (增加 10 個 H⁺)</button>
+                        <button class="danger" onclick="triggerAction('add_base')">➖ 滴入鹼液 (中和 10 個 H⁺)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="feedback-area">
+        <div class="shift-arrow" id="shift-arrow">⇌ (系統達成平衡)</div>
+        <div class="explanation" id="explanation"></div>
+    </div>
+</div>
+
+<script>
+    // --- Canvas 與物理引擎 ---
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvas-container');
+    let width = 100, height = 100;
+    
+    // 物理狀態
+    let currentSys = 'gas';
+    let particles = [];
+    let gasState = { 
+        volPercent: 80, 
+        envTemp: 50,      
+        internalTemp: 50, 
+        targetRatio: 0.6 
+    }; 
+    let liqState = { targetBr2Ratio: 0.5 }; 
+
+    const particleDefs = {
+        'NO2':   { col: '#d35400', r: 6, name: 'NO₂ (紅棕色)' },
+        'N2O4':  { col: '#2ecc71', r: 10, name: 'N₂O₄ (綠代表)' }, 
+        'Br2':   { col: '#ff0000', r: 8, name: 'Br₂ (鮮紅色)' },
+        'Hplus': { col: '#9b59b6', r: 4, name: 'H⁺ (紫代表)' },   
+        'Brminus': { col: '#3498db', r: 5, name: 'Br⁻ (藍代表)' }, 
+        'HOBr':  { col: '#f1c40f', r: 7, name: 'HOBr (黃代表)' }  
+    };
+
+    function resizeCanvas() {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        width = canvas.width;
+        height = canvas.height;
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    class Particle {
+        constructor(type, x, y) {
+            this.type = type; 
+            let def = particleDefs[type];
+            this.r = def.r; this.col = def.col;
+            
+            let cw = currentSys === 'gas' ? width * (gasState.volPercent/100) : width;
+            let safeX = Math.max(this.r * 2, cw - this.r * 3);
+            let safeY = Math.max(this.r * 2, height - this.r * 3);
+            
+            this.x = x || Math.random() * safeX + this.r;
+            this.y = y || Math.random() * safeY + this.r;
+            
+            let angle = Math.random() * Math.PI * 2;
+            let speedBase = currentSys === 'gas' ? (gasState.internalTemp/50)*1.8 : 1.3;
+            this.vx = Math.cos(angle) * speedBase;
+            this.vy = Math.sin(angle) * speedBase;
+        }
+
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+            ctx.fillStyle = this.col; ctx.fill();
+            if (this.type === 'N2O4') {
+                ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.stroke();
+            }
+        }
+
+        update() {
+            let speedMult = currentSys === 'gas' ? (gasState.internalTemp/50) : 1;
+            this.x += this.vx * speedMult;
+            this.y += this.vy * speedMult;
+
+            let cw = currentSys === 'gas' ? width * (gasState.volPercent / 100) : width;
+            if (this.x - this.r < 0) { this.x = this.r; this.vx *= -1; }
+            if (this.x + this.r > cw) { this.x = cw - this.r; this.vx *= -1; }
+            if (this.y - this.r < 0) { this.y = this.r; this.vy *= -1; }
+            if (this.y + this.r > height) { this.y = height - this.r; this.vy *= -1; }
+        }
+    }
+
+    function updateStats() {
+        const detailedPanel = document.getElementById('stats-detailed');
+        detailedPanel.innerHTML = ''; 
+        document.getElementById('stat-total').innerText = particles.length;
+
+        let counts = {};
+        particles.forEach(p => { counts[p.type] = (counts[p.type] || 0) + 1; });
+        let typesToShow = currentSys === 'gas' ? ['NO2', 'N2O4'] : ['Br2', 'Hplus', 'Brminus', 'HOBr'];
+        
+        typesToShow.forEach(type => {
+            let def = particleDefs[type];
+            let count = counts[type] || 0;
+            let item = document.createElement('div');
+            item.className = 'stat-item';
+            item.innerHTML = `<div><span class="color-dot" style="background-color: ${def.col}"></span>${def.name}</div><div>${count}</div>`;
+            detailedPanel.appendChild(item);
+        });
+    }
+
+    function switchSystem() {
+        currentSys = document.getElementById('sys-select').value;
+        particles = [];
+        const panelGas = document.getElementById('panel-gas'), panelLiq = document.getElementById('panel-liquid');
+        const eqDisplay = document.getElementById('eq-display'), expEl = document.getElementById('explanation');
+        const tempOverlay = document.getElementById('temp-overlay');
+
+        if (currentSys === 'gas') {
+            container.style.backgroundColor = '#fff';
+            panelGas.classList.remove('hidden'); panelLiq.classList.add('hidden');
+            tempOverlay.style.display = 'block'; 
+            eqDisplay.innerHTML = "2NO₂ (紅棕色) ⇌ N₂O₄ (綠代表) + 熱量";
+            expEl.textContent = "已切換至氣體系統。請嘗試加熱。觀察吸熱反應如何讓系統溫度「微幅下降」以達到新平衡。";
+            
+            gasState = { volPercent: 80, envTemp: 50, internalTemp: 50, targetRatio: 0.6 };
+            document.getElementById('temp-slider').value = 50;
+            updateTempOverlay();
+            
+            for(let i=0; i<35; i++) particles.push(new Particle('NO2'));
+            for(let i=0; i<25; i++) particles.push(new Particle('N2O4'));
+
+        } else {
+            container.style.backgroundColor = 'var(--blue-water)';
+            panelGas.classList.add('hidden'); panelLiq.classList.remove('hidden');
+            tempOverlay.style.display = 'none'; 
+            eqDisplay.innerHTML = "Br₂ (鮮紅) + H₂O ⇌ H⁺ (紫代) + Br⁻ (藍代) + HOBr (黃代)";
+            expEl.textContent = "已切換至溴水系統。請滴入酸或鹼，觀察鮮紅色的溴分子數量變化。";
+            
+            liqState = { targetBr2Ratio: 0.45 };
+            for(let i=0; i<25; i++) particles.push(new Particle('Br2'));
+            for(let i=0; i<30; i++) {
+                let x = Math.random()*(width-40)+20, y = Math.random()*(height-40)+20;
+                particles.push(new Particle('Hplus', x, y));
+                particles.push(new Particle('Brminus', x+5, y+5));
+                particles.push(new Particle('HOBr', x-5, y-5));
+            }
+        }
+        updateStats();
+    }
+
+    function updateTempOverlay() {
+        const overlay = document.getElementById('temp-overlay');
+        overlay.innerText = `🌡️ 系統溫度: ${gasState.internalTemp.toFixed(1)}°C`;
+        
+        if(gasState.internalTemp > 65) overlay.style.color = '#e74c3c';
+        else if(gasState.internalTemp < 35) overlay.style.color = '#3498db';
+        else overlay.style.color = '#2c3e50';
+    }
+
+    function triggerTempAnimation(type) {
+        const overlay = document.getElementById('temp-overlay');
+        overlay.classList.remove('temp-dropping', 'temp-rising');
+        void overlay.offsetWidth; 
+        overlay.classList.add(type === 'drop' ? 'temp-dropping' : 'temp-rising');
+    }
+
+    function processReactions() {
+        if (currentSys === 'gas') {
+            let counts = {}; particles.forEach(p => { counts[p.type] = (counts[p.type] || 0) + 1; });
+            let no2 = counts['NO2'] || 0, n2o4 = counts['N2O4'] || 0;
+            let totalN = no2 + n2o4*2;
+            let curRatio = totalN === 0 ? 0 : no2 / totalN;
+
+            if (curRatio > gasState.targetRatio + 0.04 && no2 >= 2) {
+                let idxs = []; particles.forEach((p,i) => { if(p.type === 'NO2' && idxs.length < 2) idxs.push(i); });
+                if(idxs.length === 2) {
+                    let p1 = particles[idxs[0]];
+                    particles.splice(idxs[1], 1); particles.splice(idxs[0], 1);
+                    particles.push(new Particle('N2O4', p1.x, p1.y));
+                    gasState.internalTemp = Math.min(gasState.internalTemp + 0.4, gasState.envTemp + 8);
+                    updateTempOverlay();
+                }
+            } 
+            else if (curRatio < gasState.targetRatio - 0.04 && n2o4 >= 1) {
+                let idx = particles.findIndex(p => p.type === 'N2O4');
+                if(idx > -1) {
+                    let p1 = particles[idx]; particles.splice(idx, 1);
+                    particles.push(new Particle('NO2', p1.x - 4, p1.y));
+                    particles.push(new Particle('NO2', p1.x + 4, p1.y));
+                    gasState.internalTemp = Math.max(gasState.internalTemp - 0.4, gasState.envTemp - 8);
+                    updateTempOverlay();
+                }
+            }
+        } 
+        else {
+            let counts = {}; particles.forEach(p => { counts[p.type] = (counts[p.type] || 0) + 1; });
+            let br2 = counts['Br2'] || 0, hplus = counts['Hplus'] || 0, brminus = counts['Brminus'] || 0, hobr = counts['HOBr'] || 0;
+            let totalBrBr = br2 + (brminus + hobr)/2;
+            let curRatioBr2 = totalBrBr === 0 ? 0 : br2 / totalBrBr;
+
+            if (curRatioBr2 > liqState.targetBr2Ratio + 0.05 && br2 >= 1) {
+                let idx = particles.findIndex(p => p.type === 'Br2');
+                if(idx > -1) {
+                    let p1 = particles[idx]; particles.splice(idx, 1);
+                    particles.push(new Particle('Hplus', p1.x, p1.y));
+                    particles.push(new Particle('Brminus', p1.x+5, p1.y));
+                    particles.push(new Particle('HOBr', p1.x-5, p1.y));
+                }
+            } else if (curRatioBr2 < liqState.targetBr2Ratio - 0.05 && hplus>=1 && brminus>=1 && hobr>=1) {
+                let idxH = particles.findIndex(p => p.type === 'Hplus'), idxBr = particles.findIndex(p => p.type === 'Brminus'), idxHO = particles.findIndex(p => p.type === 'HOBr');
+                if(idxH > -1 && idxBr > -1 && idxHO > -1) {
+                    let p1 = particles[idxH], sidxs = [idxH, idxBr, idxHO].sort((a,b)=>b-a);
+                    sidxs.forEach(i => particles.splice(i, 1));
+                    particles.push(new Particle('Br2', p1.x, p1.y));
+                }
+            }
+        }
+    }
+
+    let frameCount = 0;
+    function animate() {
+        ctx.clearRect(0, 0, width, height);
+        
+        if(currentSys === 'gas') {
+            let cw = width * (gasState.volPercent / 100);
+            ctx.fillStyle = 'rgba(230, 230, 230, 0.2)'; ctx.fillRect(0, 0, cw, height);
+            ctx.beginPath(); ctx.moveTo(cw, 0); ctx.lineTo(cw, height);
+            ctx.strokeStyle = '#34495e'; ctx.lineWidth = 4; ctx.stroke();
+        }
+
+        particles.forEach(p => { p.update(); p.draw(); });
+
+        if (frameCount % 6 === 0) {
+            processReactions(); updateStats();
+        }
+        frameCount++; requestAnimationFrame(animate);
+    }
+    
+    resizeCanvas(); switchSystem(); animate();
+
+    let resetTimer;
+    function showFeedback(arrow, text) {
+        const arrowEl = document.getElementById('shift-arrow'), expEl = document.getElementById('explanation');
+        arrowEl.textContent = arrow; arrowEl.style.color = "#d35400"; expEl.innerHTML = text;
+        clearTimeout(resetTimer);
+        resetTimer = setTimeout(() => { arrowEl.textContent = "⇌ (重新達成平衡)"; arrowEl.style.color = "#16a085"; }, 5000);
+    }
+
+    function triggerAction(action) {
+        if (action === 'add_no2') {
+            for(let i=0; i<10; i++) particles.push(new Particle('NO2'));
+            showFeedback("向右移動 →", "<b>【濃度影響】</b>加入了 NO₂！系統向右移動。放熱反應會讓系統溫度微幅上升。");
+        } 
+        else if (action === 'remove_n2o4') {
+            let removed = 0;
+            for(let i = particles.length - 1; i >= 0 && removed < 10; i--) { if(particles[i].type === 'N2O4') { particles.splice(i, 1); removed++; } }
+            showFeedback("向右移動 →", `<b>【濃度影響】</b>移為了 ${removed} 個 N₂O₄！系統向右移動。`);
+        }
+        else if (action === 'gas_temp') {
+            let targetEnvTemp = parseInt(document.getElementById('temp-slider').value);
+            gasState.envTemp = targetEnvTemp;
+            gasState.internalTemp = targetEnvTemp;
+            updateTempOverlay();
+            
+            gasState.targetRatio = 0.25 + (targetEnvTemp / 100) * 0.65; 
+            if(targetEnvTemp > 50) {
+                triggerTempAnimation('drop'); 
+                showFeedback("← 向左移動", "<b>【熱力學回饋】</b>加熱！系統向吸熱方向移動。達到平衡時，系統溫度計的數值會稍微下降一點點。");
+            } else {
+                triggerTempAnimation('rise'); 
+                showFeedback("向右移動 →", "<b>【熱力學回饋】</b>降溫！系統向放熱方向移動。達到平衡時，系統溫度計的數值會稍微回升一點點。");
+            }
+        }
+        else if (action === 'gas_pressure') {
+            let newVol = parseInt(document.getElementById('pressure-slider').value);
+            gasState.volPercent = newVol; gasState.targetRatio = (newVol / 100) * 0.85; 
+            if (newVol < 80) showFeedback("向右移動 →", "<b>【壓力影響】</b>體積縮小，壓力變大！系統向分子數較少移動。");
+            else showFeedback("← 向左移動", "<b>【壓力影響】</b>體積變大，壓力變小！系統向分子數較多移動。");
+        }
+        else if (action === 'add_acid') {
+            for(let i=0; i<10; i++) particles.push(new Particle('Hplus'));
+            liqState.targetBr2Ratio = Math.min(liqState.targetBr2Ratio + 0.18, 0.9);
+            showFeedback("← 向左移動", "<b>【濃度影響】</b>滴入酸(增加 H⁺)！系統消耗 H⁺，平衡向左移動，產生鮮紅色的 Br₂。");
+        }
+        else if (action === 'add_base') {
+            let removed = 0;
+            for(let i = particles.length - 1; i >= 0 && removed < 10; i--) { if(particles[i].type === 'Hplus') { particles.splice(i, 1); removed++; } }
+            liqState.targetBr2Ratio = Math.max(liqState.targetBr2Ratio - 0.18, 0.1);
+            showFeedback("向右移動 →", `<b>【濃度影響】</b>滴入鹼，中和了 ${removed} 個 H⁺！系統補充 H⁺，鮮紅色 Br₂ 分解。`);
+        }
+    }
+</script>
+
+</body>
+</html>
