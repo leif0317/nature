@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物理實驗室：壓力綜合模擬</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --secondary: #ff6b35;
+            --bg: #eef2f5;
+            --sidebar-width: 350px;
+        }
+        body {
+            font-family: "Microsoft JhengHei", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- 標題與專屬署名樣式 --- */
+        h2 { 
+            margin-top: 0; 
+            color: #333; 
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px; /* 標題與署名的間距 */
+        }
+        
+        .author-badge {
+            background: linear-gradient(135deg, #ff4081, #e91e63);
+            color: white;
+            font-size: 0.45em;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: 0 3px 6px rgba(233, 30, 99, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .subtitle { color: #666; font-size: 0.9em; margin-bottom: 20px; text-align: center;}
+        
+        /* 提示動畫 */
+        .hint-text {
+            color: #d81b60; font-weight: bold; text-align: center; margin-bottom: 15px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        /* --- 主佈局容器 --- */
+        .main-wrapper {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            max-height: calc(100vh - 100px);
+        }
+
+        /* --- 左側畫布區 --- */
+        .canvas-area {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            min-height: 500px;
+        }
+
+        .canvas-box {
+            display: none;
+            width: 100%;
+            height: 100%;
+            flex-direction: column;
+            align-items: center;
+            animation: fadeIn 0.3s ease-in;
+        }
+        .canvas-box.active { display: flex; }
+
+        canvas {
+            background-color: #fff;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.02);
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        #liquidCanvas { outline: none; }
+
+        /* --- 右側側邊欄區 --- */
+        .sidebar-area {
+            width: var(--sidebar-width);
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        /* --- 分頁導航 --- */
+        .tabs {
+            display: flex;
+            background: white;
+            border-radius: 30px;
+            padding: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .tab-btn {
+            flex: 1;
+            border: none;
+            background: none;
+            padding: 10px;
+            font-size: 1em;
+            font-weight: bold;
+            color: #777;
+            cursor: pointer;
+            border-radius: 25px;
+            transition: 0.3s;
+            text-align: center;
+        }
+        .tab-btn.active { background-color: var(--primary); color: white; }
+
+        /* --- 控制面板通用樣式 --- */
+        .controls-box {
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+            animation: fadeInRight 0.3s ease-in;
+        }
+        .controls-box.active { display: flex; }
+
+        .control-panel {
+            padding: 15px;
+            border-radius: 12px;
+            background: white;
+            border: 1px solid #eee;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        }
+        
+        .panel-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px; pointer-events: auto !important;}
+        .panel-solid-1 { border-left: 5px solid var(--primary); }
+        .panel-solid-2 { border-left: 5px solid var(--secondary); opacity: 0.6; pointer-events: none; }
+        .panel-solid-2.active { opacity: 1; pointer-events: auto; }
+
+        .liquid-info { background: #2c3e50; color: #ecf0f1; }
+        .liquid-val { color: #f1c40f; font-weight: bold; margin-left: 5px;}
+        .arrow-legend { font-weight: bold; font-family: monospace; margin-top: 5px; display: flex; align-items: center;}
+        .legend-icon { display: inline-block; width: 12px; height: 12px; margin-right: 8px; border-radius: 50%;}
+        .data-display { background: #f8f9fa; padding: 10px; border-radius: 8px; font-family: monospace; margin-bottom: 10px; font-size: 0.9em; }
+        label { display: block; font-weight: bold; margin: 10px 0 5px; color: #555; font-size: 0.9em; }
+        input[type=range], select { width: 100%; cursor: pointer; padding: 5px;}
+        
+        /* 開關樣式 */
+        .toggle-switch {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #fff; padding: 10px 12px; border-radius: 8px;
+            border: 2px solid #e91e63; margin-bottom: 10px; cursor: pointer; color: #e91e63;
+            transition: 0.2s;
+        }
+        .toggle-switch:hover { background: #fff0f5; }
+        .toggle-switch input { margin: 0; cursor: pointer; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+    </style>
+</head>
+<body>
+
+    <div class="main-wrapper">
+        <div class="canvas-area">
+            <div id="solid-canvas-box" class="canvas-box active">
+                <h2>固體壓力：海綿形變實驗 <span class="author-badge">小粘製作</span></h2>
+                <p class="subtitle">比較壓力 P = F / A。觀察海綿凹陷程度、物體厚度與箭頭變化。</p>
+                <canvas id="solidCanvas" width="800" height="400"></canvas>
+            </div>
+
+            <div id="liquid-canvas-box" class="canvas-box">
+                <h2>液體壓力：微觀質點與不規則物體 <span class="author-badge">小粘製作</span></h2>
+                <div class="hint-text">💡 提示：請用滑鼠「上下拖曳」物體，觀察箭頭長度變化！</div>
+                <canvas id="liquidCanvas" width="600" height="550"></canvas>
+            </div>
+        </div>
+
+        <div class="sidebar-area">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('solid')">固體壓力</button>
+                <button class="tab-btn" onclick="switchTab('liquid')">液體壓力</button>
+            </div>
+
+            <div id="solid-controls" class="controls-box active">
+                <div class="control-panel panel-solid-1">
+                    <div class="panel-header"><span style="color:var(--primary)">物體 1 (藍色)</span></div>
+                    <div class="data-display">
+                        <div>F = <span id="s_f1"></span> N</div>
+                        <div>A = <span id="s_a1"></span> cm²</div>
+                        <div style="color:var(--primary); font-weight:bold;">P = <span id="s_p1"></span></div>
+                    </div>
+                    <label>作用力 (Force)</label>
+                    <input type="range" id="in_f1" min="20" max="500" value="150">
+                    <label>接觸面積 (Area)</label>
+                    <input type="range" id="in_a1" min="30" max="250" value="80">
+                </div>
+
+                <div class="control-panel panel-solid-2" id="solidPanel2">
+                    <div class="panel-header">
+                        <span style="color:var(--secondary)">物體 2 (橘色)</span>
+                        <label style="display:inline; margin:0; cursor:pointer; font-size:0.9em;">
+                            <input type="checkbox" id="toggleSolid2"> 啟用
+                        </label>
+                    </div>
+                    <div class="data-display">
+                        <div>F = <span id="s_f2"></span> N</div>
+                        <div>A = <span id="s_a2"></span> cm²</div>
+                        <div style="color:var(--secondary); font-weight:bold;">P = <span id="s_p2"></span></div>
+                    </div>
+                    <label>作用力 (Force)</label>
+                    <input type="range" id="in_f2" min="20" max="500" value="400">
+                    <label>接觸面積 (Area)</label>
+                    <input type="range" id="in_a2" min="30" max="250" value="200">
+                </div>
+            </div>
+
+            <div id="liquid-controls" class="controls-box">
+                <label class="toggle-switch">
+                    <span style="font-weight:bold;">★ 顯示海星 (不規則物體受力)</span>
+                    <input type="checkbox" id="toggleStarfish">
+                </label>
+
+                <div class="control-panel liquid-info">
+                    <div style="margin-bottom:10px;">液體密度 (d): <span id="l_density" class="liquid-val">1.0</span></div>
+                    <div style="border-top:1px solid rgba(255,255,255,0.2); padding-top:10px; margin-bottom:5px; color:#bbb; font-size:0.85em;">● 圓球/質點數據:</div>
+                    <div>頂部深度: <span id="l_h_top" class="liquid-val">0</span> cm</div>
+                    <div>底部深度: <span id="l_h_bot" class="liquid-val">0</span> cm</div>
+                    <div style="border-top:1px solid rgba(255,255,255,0.2); padding-top:10px; margin-top:10px;">
+                        <div class="arrow-legend"><span class="legend-icon" style="background:#42a5f5;"></span>上壓力: <span id="l_p_top" style="margin-left:5px;">0</span></div>
+                        <div class="arrow-legend"><span class="legend-icon" style="background:#ef5350;"></span>下壓力: <span id="l_p_bot" style="margin-left:5px;">0</span></div>
+                        <div class="arrow-legend"><span class="legend-icon" style="background:#66bb6a;"></span>側壓力: <span id="l_p_side" style="margin-left:5px;">0</span></div>
+                    </div>
+                </div>
+
+                <div class="control-panel">
+                    <label>液體種類 (影響壓力倍率)</label>
+                    <select id="l_select_liquid">
+                        <option value="1.0" color="rgba(52, 152, 219, 0.3)">純水 (d=1.0)</option>
+                        <option value="0.8" color="rgba(241, 196, 15, 0.3)">油 (d=0.8)</option>
+                        <option value="1.2" color="rgba(46, 204, 113, 0.3)">食鹽水 (d=1.2)</option>
+                        <option value="13.6" color="rgba(149, 165, 166, 0.4)">水銀 (d=13.6)</option>
+                    </select>
+                    <label>圓球大小 (拉至最左端變為「質點」)</label>
+                    <input type="range" id="l_radius" min="0" max="60" value="30">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(mode) {
+            document.querySelectorAll('.canvas-box').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.controls-box').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(mode + '-canvas-box').classList.add('active');
+            document.getElementById(mode + '-controls').classList.add('active');
+            if(mode === 'solid') document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+            else document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+        }
+
+        /* ================= 固體壓力邏輯 ================= */
+        (function initSolidSimulation() {
+            const canvas = document.getElementById('solidCanvas');
+            const ctx = canvas.getContext('2d');
+            const ui = {
+                toggle2: document.getElementById('toggleSolid2'),
+                panel2: document.getElementById('solidPanel2'),
+                o1: { f: document.getElementById('in_f1'), a: document.getElementById('in_a1'), df: document.getElementById('s_f1'), da: document.getElementById('s_a1'), dp: document.getElementById('s_p1') },
+                o2: { f: document.getElementById('in_f2'), a: document.getElementById('in_a2'), df: document.getElementById('s_f2'), da: document.getElementById('s_a2'), dp: document.getElementById('s_p2') }
+            };
+            const spongeBaseY = 300; const numPoints = 180; let simPoints = [];
+            let state = { o1: { f: 150, a: 80, p: 0, x: canvas.width * 0.3 }, o2: { f: 400, a: 200, p: 0, x: canvas.width * 0.7, active: false } };
+            
+            for(let i=0; i<=numPoints; i++) simPoints.push({ x: (canvas.width/numPoints)*i, y: spongeBaseY });
+            ui.toggle2.addEventListener('change', (e) => { state.o2.active = e.target.checked; if(state.o2.active) ui.panel2.classList.add('active'); else ui.panel2.classList.remove('active'); });
+
+            function updatePhysics() {
+                state.o1.f = parseInt(ui.o1.f.value); state.o1.a = parseInt(ui.o1.a.value); state.o1.p = state.o1.f / state.o1.a;
+                state.o2.f = parseInt(ui.o2.f.value); state.o2.a = parseInt(ui.o2.a.value); state.o2.p = state.o2.f / state.o2.a;
+                ui.o1.df.innerText = state.o1.f; ui.o1.da.innerText = state.o1.a; ui.o1.dp.innerText = state.o1.p.toFixed(2);
+                ui.o2.df.innerText = state.o2.f; ui.o2.da.innerText = state.o2.a; ui.o2.dp.innerText = state.o2.p.toFixed(2);
+                
+                for(let i=0; i<simPoints.length; i++) {
+                    let p = simPoints[i];
+                    let t1 = calcDepression(p.x, state.o1, true);
+                    let t2 = calcDepression(p.x, state.o2, state.o2.active);
+                    p.y += (Math.max(t1, t2) - p.y) * 0.2;
+                }
+            }
+            function calcDepression(px, obj, isActive) {
+                if(!isActive) return spongeBaseY;
+                let hw = obj.a/2, dist = Math.abs(px - obj.x), depth = obj.p * 40;
+                if(dist < hw) return spongeBaseY + depth;
+                else return spongeBaseY + depth * Math.exp(-0.001 * Math.pow(dist - hw, 2));
+            }
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.beginPath(); ctx.moveTo(0, canvas.height); ctx.lineTo(0, simPoints[0].y);
+                for(let i=0; i<simPoints.length-1; i++) ctx.quadraticCurveTo(simPoints[i].x, simPoints[i].y, (simPoints[i].x+simPoints[i+1].x)/2, (simPoints[i].y+simPoints[i+1].y)/2);
+                ctx.lineTo(canvas.width, simPoints[numPoints].y); ctx.lineTo(canvas.width, canvas.height);
+                let grd = ctx.createLinearGradient(0, spongeBaseY, 0, canvas.height); grd.addColorStop(0, "#ffe066"); grd.addColorStop(1, "#ff9f43"); ctx.fillStyle = grd; ctx.fill();
+                drawObj(state.o1, '#0056b3', '#007bff');
+                if(state.o2.active) drawObj(state.o2, '#c44d1f', '#ff6b35');
+                else { ctx.globalAlpha=0.2; drawObj(state.o2, '#c44d1f', '#ff6b35'); ctx.globalAlpha=1; }
+            }
+            function drawObj(o, cDark, cMain) {
+                let idx = Math.floor((o.x/canvas.width)*numPoints), h = 40 + o.f*0.3, ty = simPoints[idx].y - h;
+                ctx.fillStyle = cMain; ctx.strokeStyle = cDark; ctx.lineWidth=2; ctx.fillRect(o.x-o.a/2, ty, o.a, h); ctx.strokeRect(o.x-o.a/2, ty, o.a, h);
+                drawArrow(ctx, o.x, ty-(40+o.f*0.5)-10, o.x, ty-5, cMain);
+                ctx.fillStyle = cMain; ctx.font = "bold 14px Arial"; ctx.textAlign="center"; ctx.fillText(`F=${o.f}`, o.x, ty-(40+o.f*0.5)-15);
+            }
+            function drawArrow(c, x1, y1, x2, y2, color) {
+                let head = 12; c.beginPath(); c.strokeStyle = color; c.lineWidth = 4; c.lineCap='round'; c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+                c.beginPath(); c.moveTo(x2-head, y2-head); c.lineTo(x2, y2); c.lineTo(x2+head, y2-head); c.stroke();
+            }
+            function loop() { updatePhysics(); draw(); requestAnimationFrame(loop); }
+            loop();
+        })();
+
+        /* ================= 液體壓力邏輯 ================= */
+        (function initLiquidSimulation() {
+            const canvas = document.getElementById('liquidCanvas');
+            const ctx = canvas.getContext('2d');
+
+            const ui = {
+                sel: document.getElementById('l_select_liquid'),
+                rad: document.getElementById('l_radius'),
+                toggleStarfish: document.getElementById('toggleStarfish'),
+                d_den: document.getElementById('l_density'),
+                d_ht: document.getElementById('l_h_top'),
+                d_hb: document.getElementById('l_h_bot'),
+                d_pt: document.getElementById('l_p_top'),
+                d_pb: document.getElementById('l_p_bot'),
+                d_ps: document.getElementById('l_p_side')
+            };
+
+            const starPoints = [];
+            const pressurePoints = [];
+            const R = 65; 
+            const r = 30; 
+            const numArms = 5;
+
+            for(let i=0; i < numArms * 2; i++) {
+                let radius = (i % 2 === 0) ? R : r;
+                let angle = -Math.PI / 2 + (i * Math.PI / numArms);
+                starPoints.push({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
+            }
+
+            for(let i=0; i < starPoints.length; i++) {
+                let p1 = starPoints[i];
+                let p2 = starPoints[(i + 1) % starPoints.length];
+                let midX = (p1.x + p2.x) / 2;
+                let midY = (p1.y + p2.y) / 2;
+                let dx = p2.x - p1.x; let dy = p2.y - p1.y;
+                let len = Math.sqrt(dx*dx + dy*dy);
+                pressurePoints.push({ x: midX, y: midY, nx: dy / len, ny: -dx / len });
+            }
+
+            let state = {
+                density: 1.0, color: 'rgba(52, 152, 219, 0.3)', waterY: 60,
+                ball: { x: 150, y: 150, r: 30, dragging: false },
+                starfish: { x: 400, y: 250, dragging: false, active: false, points: starPoints, pressurePoints: pressurePoints },
+                dragOffset: { x: 0, y: 0 }
+            };
+
+            function drawStarfishShape(sx, sy, isDragging) {
+                ctx.save();
+                ctx.translate(sx, sy);
+                
+                if(isDragging) {
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                    ctx.shadowBlur = 15;
+                    ctx.shadowOffsetY = 10;
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(starPoints[0].x, starPoints[0].y);
+                for(let i=1; i < starPoints.length; i++) ctx.lineTo(starPoints[i].x, starPoints[i].y);
+                ctx.closePath();
+                
+                ctx.fillStyle = '#ff9800'; ctx.fill();
+                ctx.strokeStyle = '#e65100'; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.stroke();
+
+                ctx.shadowColor = 'transparent';
+
+                ctx.fillStyle = '#e65100';
+                ctx.beginPath(); ctx.arc(0, -25, 3, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(-18, 12, 2.5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(18, 12, 2.5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(-25, -5, 2, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(25, -5, 2, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(0, 30, 3, 0, Math.PI*2); ctx.fill();
+
+                ctx.beginPath(); ctx.arc(-10, -5, 7, 0, Math.PI*2);
+                ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5; ctx.stroke();
+                ctx.beginPath(); ctx.arc(-10, -5, 3, 0, Math.PI*2); ctx.fillStyle = 'black'; ctx.fill();
+
+                ctx.beginPath(); ctx.arc(10, -5, 7, 0, Math.PI*2);
+                ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5; ctx.stroke();
+                ctx.beginPath(); ctx.arc(10, -5, 3, 0, Math.PI*2); ctx.fillStyle = 'black'; ctx.fill();
+
+                ctx.beginPath(); ctx.arc(0, 5, 8, 0.2, Math.PI - 0.2);
+                ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke();
+
+                ctx.restore();
+            }
+
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left; const my = e.clientY - rect.top;
+
+                if(!state.ball.dragging && !state.starfish.dragging) {
+                    let isHovering = false;
+                    if(Math.hypot(mx - state.ball.x, my - state.ball.y) < Math.max(state.ball.r, 20)) isHovering = true;
+                    if(state.starfish.active && Math.hypot(mx - state.starfish.x, my - state.starfish.y) < R + 10) isHovering = true;
+                    canvas.style.cursor = isHovering ? 'grab' : 'default';
+                } else {
+                    canvas.style.cursor = 'grabbing';
+                }
+
+                if (state.ball.dragging) {
+                    state.ball.x = Math.max(20, Math.min(canvas.width-20, mx - state.dragOffset.x));
+                    state.ball.y = Math.max(20, Math.min(canvas.height-20, my - state.dragOffset.y));
+                }
+                if (state.starfish.dragging) {
+                    state.starfish.x = Math.max(R, Math.min(canvas.width-R, mx - state.dragOffset.x));
+                    state.starfish.y = Math.max(R, Math.min(canvas.height-R, my - state.dragOffset.y));
+                }
+            });
+
+            canvas.addEventListener('mousedown', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left; const my = e.clientY - rect.top;
+
+                if (Math.hypot(mx - state.ball.x, my - state.ball.y) < Math.max(state.ball.r, 20)) {
+                    state.ball.dragging = true;
+                    state.dragOffset.x = mx - state.ball.x; state.dragOffset.y = my - state.ball.y;
+                    return;
+                }
+                if (state.starfish.active && Math.hypot(mx - state.starfish.x, my - state.starfish.y) < R + 10) {
+                    state.starfish.dragging = true;
+                    state.dragOffset.x = mx - state.starfish.x; state.dragOffset.y = my - state.starfish.y;
+                }
+            });
+            window.addEventListener('mouseup', () => { state.ball.dragging = false; state.starfish.dragging = false; canvas.style.cursor = 'default';});
+            canvas.addEventListener('mouseleave', () => { state.ball.dragging = false; state.starfish.dragging = false; canvas.style.cursor = 'default';});
+
+            ui.sel.addEventListener('change', (e) => { state.density = parseFloat(e.target.value); state.color = e.target.options[e.target.selectedIndex].getAttribute('color'); });
+            ui.rad.addEventListener('input', (e) => state.ball.r = parseInt(e.target.value));
+            ui.toggleStarfish.addEventListener('change', (e) => state.starfish.active = e.target.checked);
+
+            function update() {
+                ui.d_den.innerText = state.density;
+                const b = state.ball; const isPoint = b.r < 3;
+                let hCen = Math.max(0, (b.y - state.waterY)/10);
+                let hTop = isPoint ? hCen : Math.max(0, (b.y - b.r - state.waterY)/10);
+                let hBot = isPoint ? hCen : Math.max(0, (b.y + b.r - state.waterY)/10);
+                ui.d_ht.innerText = hTop.toFixed(1); ui.d_hb.innerText = hBot.toFixed(1);
+                ui.d_pt.innerText = (hTop * state.density).toFixed(2);
+                ui.d_pb.innerText = (hBot * state.density).toFixed(2);
+                ui.d_ps.innerText = (hCen * state.density).toFixed(2);
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = state.color; ctx.fillRect(0, state.waterY, canvas.width, canvas.height - state.waterY);
+                ctx.beginPath(); ctx.moveTo(0, state.waterY); ctx.lineTo(canvas.width, state.waterY);
+                ctx.strokeStyle = '#3498db'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.fillStyle = '#999'; ctx.font = "10px Arial";
+                for(let y=state.waterY; y<canvas.height; y+=50) { ctx.fillRect(0, y, 8, 1); ctx.fillText((y-state.waterY)/10, 10, y+3); }
+                
+                drawBall();
+                if (state.starfish.active) drawStarfishPhysics();
+            }
+
+            function getArrowScale() { return (state.density > 2) ? 1.5 : 10; }
+
+            function drawBall() {
+                const b = state.ball; const isPoint = b.r < 3;
+                ctx.save();
+                if(b.dragging) {
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 15; ctx.shadowOffsetY = 10;
+                }
+                ctx.beginPath();
+                if (isPoint) ctx.arc(b.x, b.y, 4, 0, Math.PI*2); else ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+                ctx.fillStyle = '#ffca28'; ctx.fill(); ctx.strokeStyle = '#f57c00'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.restore();
+
+                if (!isPoint) { ctx.beginPath(); ctx.arc(b.x, b.y, 2, 0, Math.PI*2); ctx.fillStyle='red'; ctx.fill(); }
+
+                let hCen = Math.max(0, (b.y - state.waterY)/10);
+                let hTop = isPoint ? hCen : Math.max(0, (b.y - b.r - state.waterY)/10);
+                let hBot = isPoint ? hCen : Math.max(0, (b.y + b.r - state.waterY)/10);
+                let pTop = hTop * state.density, pBot = hBot * state.density, pSide = hCen * state.density;
+                
+                let scale = getArrowScale();
+
+                if (hTop > 0) drawArrow(b.x, (isPoint?b.y:b.y-b.r) - pTop*scale, b.x, isPoint?b.y:b.y-b.r, '#42a5f5', pTop, isPoint);
+                if (hBot > 0) drawArrow(b.x, (isPoint?b.y:b.y+b.r) + pBot*scale, b.x, isPoint?b.y:b.y+b.r, '#ef5350', pBot, isPoint);
+                if (hCen > 0) drawArrow((isPoint?b.x:b.x-b.r) - pSide*scale, b.y, isPoint?b.x:b.x-b.r, b.y, '#66bb6a', pSide, isPoint);
+                if (hCen > 0) drawArrow((isPoint?b.x:b.x+b.r) + pSide*scale, b.y, isPoint?b.x:b.x+b.r, b.y, '#66bb6a', pSide, isPoint);
+            }
+
+            function drawStarfishPhysics() {
+                const s = state.starfish;
+                drawStarfishShape(s.x, s.y, s.dragging);
+
+                let scale = getArrowScale();
+                
+                s.pressurePoints.forEach(pt => {
+                    const absX = s.x + pt.x; const absY = s.y + pt.y;
+                    const depth = (absY - state.waterY) / 10;
+                    if(depth <= 0) return;
+
+                    const pressure = depth * state.density;
+                    const arrowLen = pressure * scale;
+
+                    const fromX = absX + pt.nx * arrowLen;
+                    const fromY = absY + pt.ny * arrowLen;
+                    drawStrictArrow(fromX, fromY, absX, absY, '#8e24aa', pressure, false, true);
+                });
+            }
+
+            function drawArrow(x1, y1, x2, y2, color, val, isPointMode) { drawStrictArrow(x1, y1, x2, y2, color, val, isPointMode, false); }
+            function drawStrictArrow(x1, y1, x2, y2, color, val, isPointMode, noText) {
+                if(val < 0.1) return;
+                let head = isPointMode ? 4 : 8;
+                let angle = Math.atan2(y2-y1, x2-x1);
+                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                ctx.strokeStyle = color; ctx.lineWidth = isPointMode ? 1.5 : 2.5; ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x2, y2);
+                ctx.lineTo(x2 - head * Math.cos(angle - Math.PI/6), y2 - head * Math.sin(angle - Math.PI/6));
+                ctx.lineTo(x2 - head * Math.cos(angle + Math.PI/6), y2 - head * Math.sin(angle + Math.PI/6));
+                ctx.fillStyle = color; ctx.fill();
+                if (noText) return;
+                ctx.fillStyle = '#333'; ctx.font = "bold 11px Arial";
+                let tx = x1, ty = y1;
+                if(Math.abs(x1-x2) < 1) { tx += (isPointMode ? 10 : 5); ty = (y1 + y2) / 2; } else { ty -= (isPointMode ? 10 : 5); tx = (x1 + x2) / 2; }
+                ctx.fillText(val.toFixed(1), tx, ty);
+            }
+
+            function loop() { update(); draw(); requestAnimationFrame(loop); }
+            loop();
+        })();
+    </script>
+</body>
+</html>
