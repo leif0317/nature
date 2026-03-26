@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>摩擦力互動模擬器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .block-obj { transition: width 0.3s ease; }
+        .arrow-line { transition: width 0.1s ease-out; }
+        .surface { background: repeating-linear-gradient( 45deg, #e5e7eb, #e5e7eb 10px, #d1d5db 10px, #d1d5db 20px ); }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col p-4 font-sans text-gray-800">
+
+    <header class="text-center mb-4">
+        <div class="flex items-baseline justify-center gap-4">
+            <h1 class="text-3xl font-bold text-gray-800">摩擦力互動模擬器</h1>
+            <span class="text-gray-500 font-medium bg-gray-200 px-3 py-1 rounded-full text-sm">小粘製作</span>
+        </div>
+        <p class="text-gray-500 mt-3">觀察靜摩擦力、最大靜摩擦力、動摩擦力和外力的關係</p>
+    </header>
+
+    <div class="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden">
+        
+        <div class="w-full md:w-[30%] bg-white rounded-xl shadow-md p-4 flex flex-col justify-around border-2 border-gray-200" id="simulation-area">
+            
+            <div class="relative h-24 border-b-4 border-gray-400 surface flex items-end">
+                <div id="block-1" class="block-obj absolute bottom-0 left-8 h-12 bg-red-400 flex items-center justify-center text-white font-bold rounded-t-sm shadow-lg z-20" style="width: 60px;">
+                    <span class="z-30 text-shadow text-xs">物體 1</span>
+                    <div class="absolute top-1/2 left-full -translate-y-1/2 flex items-center h-4 z-10 w-0 arrow-line" id="force-arrow-1">
+                        <div class="h-[3px] bg-red-600 w-full"></div>
+                        <div class="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-l-[8px] border-l-red-600"></div>
+                    </div>
+                    <div class="absolute top-1/2 right-full -translate-y-1/2 flex items-center flex-row-reverse h-4 z-10 w-0 arrow-line" id="fric-arrow-1">
+                        <div class="h-[3px] bg-purple-700 w-full"></div>
+                        <div class="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[8px] border-r-purple-700"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative h-24 border-b-4 border-gray-400 surface flex items-end">
+                <div id="block-2" class="block-obj absolute bottom-0 left-8 h-12 bg-blue-400 flex items-center justify-center text-white font-bold rounded-t-sm shadow-lg z-20" style="width: 60px;">
+                    <span class="z-30 text-shadow text-xs">物體 2</span>
+                    <div class="absolute top-1/2 left-full -translate-y-1/2 flex items-center h-4 z-10 w-0 arrow-line" id="force-arrow-2">
+                        <div class="h-[3px] bg-red-600 w-full"></div>
+                        <div class="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-l-[8px] border-l-red-600"></div>
+                    </div>
+                    <div class="absolute top-1/2 right-full -translate-y-1/2 flex items-center flex-row-reverse h-4 z-10 w-0 arrow-line" id="fric-arrow-2">
+                        <div class="h-[3px] bg-purple-700 w-full"></div>
+                        <div class="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[8px] border-r-purple-700"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative h-24 border-b-4 border-gray-400 surface flex items-end">
+                <div id="block-3" class="block-obj absolute bottom-0 left-8 h-12 bg-green-500 flex items-center justify-center text-white font-bold rounded-t-sm shadow-lg z-20" style="width: 60px;">
+                    <span class="z-30 text-shadow text-xs">物體 3</span>
+                    <div class="absolute top-1/2 left-full -translate-y-1/2 flex items-center h-4 z-10 w-0 arrow-line" id="force-arrow-3">
+                        <div class="h-[3px] bg-red-600 w-full"></div>
+                        <div class="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-l-[8px] border-l-red-600"></div>
+                    </div>
+                    <div class="absolute top-1/2 right-full -translate-y-1/2 flex items-center flex-row-reverse h-4 z-10 w-0 arrow-line" id="fric-arrow-3">
+                        <div class="h-[3px] bg-purple-700 w-full"></div>
+                        <div class="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[8px] border-r-purple-700"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-sm text-gray-500 text-center mt-2 font-bold">
+                <span class="text-red-600">➔ 拉力</span> | <span class="text-purple-700">⬅ 摩擦力</span>
+            </div>
+        </div>
+
+        <div class="w-full md:w-[40%] bg-white rounded-xl shadow-md p-4 border-2 border-gray-200 flex flex-col relative">
+            <h2 class="text-xl font-bold mb-2 text-center">摩擦力與外力關係圖</h2>
+            <div class="flex-1 relative w-full h-full">
+                <canvas id="frictionChart"></canvas>
+            </div>
+        </div>
+
+        <div class="w-full md:w-[30%] bg-white rounded-xl shadow-md p-4 border-2 border-gray-200 overflow-y-auto">
+            <h2 class="text-xl font-bold mb-4 border-b pb-2">控制面板</h2>
+            
+            <div id="controls-container" class="space-y-6"></div>
+
+            <div class="mt-8 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-200">
+                <label class="block text-lg font-bold text-yellow-800 mb-2">拉動物體的外力 (N)：<span id="force-val" class="text-2xl text-red-600">0</span></label>
+                <input type="range" id="applied-force" min="0" max="150" value="0" step="1" class="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                <button id="reset-btn" class="mt-4 w-full bg-gray-800 text-white py-2 rounded hover:bg-gray-700 transition">重置位置與外力</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const materials = {
+            glass: { name: '玻璃', us: 0.4, uk: 0.3 },
+            wood: { name: '木桌', us: 0.6, uk: 0.4 },
+            sandpaper: { name: '砂紙', us: 0.8, uk: 0.6 }
+        };
+
+        const areas = { small: { width: 40 }, medium: { width: 60 }, large: { width: 80 } };
+
+        let objects = [
+            { id: 1, weight: 50, material: 'glass', area: 'medium', pos: 32, color: 'rgb(239, 68, 68)', label: '物體 1 (紅)' },
+            { id: 2, weight: 50, material: 'wood', area: 'medium', pos: 32, color: 'rgb(59, 130, 246)', label: '物體 2 (藍)' },
+            { id: 3, weight: 50, material: 'sandpaper', area: 'medium', pos: 32, color: 'rgb(16, 185, 129)', label: '物體 3 (綠)' }
+        ];
+
+        let currentForce = 0;
+        let chartInstance = null;
+        let animationId = null;
+        const ARROW_SCALE = 0.8; 
+
+        function initUI() {
+            const container = document.getElementById('controls-container');
+            container.innerHTML = ''; 
+            objects.forEach((obj, index) => {
+                const html = `
+                    <div class="p-3 border rounded-md shadow-sm" style="border-left: 4px solid ${obj.color}">
+                        <h3 class="font-bold mb-2">${obj.label}</h3>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                                <label class="block text-gray-600 mb-1">材質</label>
+                                <select class="w-full p-1 border rounded" onchange="updateObj(${index}, 'material', this.value)">
+                                    <option value="glass" ${obj.material === 'glass' ? 'selected' : ''}>玻璃 (光滑)</option>
+                                    <option value="wood" ${obj.material === 'wood' ? 'selected' : ''}>木桌 (一般)</option>
+                                    <option value="sandpaper" ${obj.material === 'sandpaper' ? 'selected' : ''}>砂紙 (粗糙)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-600 mb-1">重量 (N)</label>
+                                <input type="number" min="10" max="150" value="${obj.weight}" class="w-full p-1 border rounded" onchange="updateObj(${index}, 'weight', Number(this.value))">
+                            </div>
+                        </div>
+                        <div class="mt-2 text-xs text-right text-gray-500" id="stats-${index}"></div>
+                    </div>
+                `;
+                container.innerHTML += html;
+            });
+
+            document.getElementById('applied-force').addEventListener('input', (e) => {
+                currentForce = Number(e.target.value);
+                document.getElementById('force-val').innerText = currentForce;
+                updateSimulation();
+            });
+
+            document.getElementById('reset-btn').addEventListener('click', () => {
+                currentForce = 0;
+                document.getElementById('applied-force').value = 0;
+                document.getElementById('force-val').innerText = 0;
+                objects.forEach(o => o.pos = 32); 
+                updateSimulation();
+            });
+
+            if (!chartInstance) initChart();
+            updateSimulation();
+        }
+
+        window.updateObj = function(index, key, value) {
+            objects[index][key] = value;
+            updateSimulation();
+        }
+
+        function calculatePhysics() {
+            let datasets = [];
+            
+            // 重要：修正粗細疊加的層級關係
+            // Red (i=0) 最粗=8px -> 最底層 (drawing order 最後畫 -> 最底下)
+            // Blue (i=1) 中等=5px -> 中間層
+            // Green (i=2) 最細=2px -> 最上層 (drawing order 先畫 -> 最醒目蕊心)
+            const lineWidths = [8, 5, 2]; 
+
+            objects.forEach((obj, i) => {
+                const mat = materials[obj.material];
+                const fs_max = mat.us * obj.weight; 
+                const fk = mat.uk * obj.weight;     
+                
+                document.getElementById(`stats-${i}`).innerText = `最大靜摩擦: ${fs_max.toFixed(1)}N | 動摩擦: ${fk.toFixed(1)}N`;
+
+                let dataPoints = [];
+                for(let f = 0; f <= currentForce; f+=2) {
+                    if (f <= fs_max) dataPoints.push({x: f, y: f});
+                    else dataPoints.push({x: f, y: fk}); 
+                }
+                
+                if (currentForce > 0 && currentForce % 2 !== 0) {
+                    if (currentForce <= fs_max) dataPoints.push({x: currentForce, y: currentForce});
+                    else dataPoints.push({x: currentForce, y: fk});
+                }
+
+                datasets.push({
+                    label: obj.label,
+                    data: dataPoints,
+                    borderColor: obj.color,
+                    borderWidth: lineWidths[i], // 動態指派粗細
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    // 修正關鍵：Chart.js v3+ 中，order 越小越晚畫（畫在越上層）
+                    // 所以：Red order=2 (最底下), Blue order=1 (中間), Green order=0 (最上面)
+                    order: 2 - i 
+                });
+
+                if (currentForce >= fs_max) {
+                    datasets.push({
+                        label: `${obj.label} 頂點`,
+                        data: [{x: fs_max, y: fs_max}],
+                        backgroundColor: obj.color,
+                        borderColor: '#000',
+                        borderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        showLine: false,
+                        order: -1 // 頂點永遠畫在最上層
+                    });
+                }
+            });
+            return datasets;
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('frictionChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: [] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 0 },
+                    scales: {
+                        x: { type: 'linear', min: 0, max: 150, title: { display: true, text: '拉動外力 F (N)', font:{size:14, weight:'bold'} } },
+                        y: { type: 'linear', min: 0, max: 150, title: { display: true, text: '摩擦力 f (N)', font:{size:14, weight:'bold'} } }
+                    },
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } }
+                }
+            });
+        }
+
+        function updateSimulation() {
+            chartInstance.data.datasets = calculatePhysics();
+            chartInstance.update();
+
+            if(animationId) cancelAnimationFrame(animationId);
+            
+            function animate() {
+                let moving = false;
+                objects.forEach((obj, i) => {
+                    const fs_max = materials[obj.material].us * obj.weight;
+                    const fk = materials[obj.material].uk * obj.weight;
+                    const el = document.getElementById(`block-${i+1}`);
+                    const forceArrow = document.getElementById(`force-arrow-${i+1}`);
+                    const fricArrow = document.getElementById(`fric-arrow-${i+1}`);
+                    
+                    let currentFriction = 0;
+
+                    if (currentForce > fs_max) {
+                        currentFriction = fk; 
+                        obj.pos += (currentForce - fk) * 0.05; 
+                        
+                        const maxPos = document.getElementById('simulation-area').clientWidth - 150;
+                        if (obj.pos > maxPos) obj.pos = maxPos; 
+                        else moving = true; 
+                        
+                    } else {
+                        if (currentForce === 0) obj.pos = 32; 
+                        currentFriction = currentForce; 
+                    }
+                    
+                    el.style.transform = `translateX(${obj.pos - 32}px)`;
+
+                    if (currentForce === 0) {
+                        forceArrow.style.opacity = 0;
+                        fricArrow.style.opacity = 0;
+                    } else {
+                        forceArrow.style.opacity = 1;
+                        fricArrow.style.opacity = 1;
+                        forceArrow.style.width = `${currentForce * ARROW_SCALE}px`;
+                        fricArrow.style.width = `${currentFriction * ARROW_SCALE}px`;
+                    }
+                });
+                
+                if(moving) animationId = requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        window.onload = initUI;
+    </script>
+</body>
+</html>
