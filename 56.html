@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>大氣壓力教學模組 - 小粘製作</title>
+    <style>
+        /* === 全局與導覽列樣式 === */
+        body { margin: 0; overflow: hidden; font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; background: #ffffff; color: #333; }
+        
+        #top-nav {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95); padding: 6px; border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 100; display: flex; gap: 5px;
+            border: 1px solid #ddd; backdrop-filter: blur(5px);
+        }
+        .tab-btn {
+            background: transparent; border: none; padding: 10px 24px; font-size: 1.05em; font-weight: bold;
+            border-radius: 25px; cursor: pointer; color: #666; transition: all 0.3s;
+        }
+        .tab-btn:hover { color: #2196F3; background: #f0f8ff; }
+        .tab-btn.active { background: #2196F3; color: white; box-shadow: 0 2px 8px rgba(33, 150, 243, 0.4); }
+
+        .view-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; }
+        .view-container.active { display: block; }
+
+        /* 作者標籤 */
+        .author-sig {
+            position: absolute; bottom: 15px; right: 20px;
+            font-size: 0.85em; color: #777; font-weight: 600; background: rgba(238, 238, 238, 0.8);
+            padding: 6px 15px; border-radius: 20px; border: 1px solid #ccc; z-index: 100; pointer-events: none;
+        }
+
+        /* === 托里切利實驗 (3D) 樣式 === */
+        #ui-panel-torri {
+            position: absolute; top: 80px; left: 20px; width: 300px;
+            background: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 12px;
+            border: 1px solid #ddd; box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 10;
+        }
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: block; font-size: 0.9em; font-weight: bold; margin-bottom: 5px; color: #555; cursor: pointer; }
+        input[type="range"] { width: 100%; cursor: pointer; accent-color: #2196F3; }
+        input[type="checkbox"] { margin-right: 8px; cursor: pointer; }
+        .value-display { float: right; color: #2196F3; }
+        .checkbox-group { background: #f9f9f9; padding: 10px; border-radius: 8px; margin-top: 15px; }
+        
+        #data-display-torri {
+            position: absolute; top: 80px; right: 20px;
+            background: white; padding: 15px; border-radius: 12px;
+            border: 2px solid #eee; box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: none; z-index: 10;
+        }
+        .p-indicator { font-size: 1.1em; font-weight: bold; margin: 8px 0; display: flex; align-items: center; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 10px; }
+        
+        .floating-label {
+            position: absolute; color: #e91e63; font-weight: bold; font-size: 0.9em;
+            pointer-events: none; text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+            transform: translate(15px, -50%); z-index: 5;
+        }
+        #label-height { color: #2196F3; font-size: 1.05em; transform: translate(-110%, -50%); }
+
+        /* === 小雞飲水器 (2D) 樣式 === */
+        #chick-wrapper {
+            display: flex; justify-content: center; align-items: center;
+            height: 100%; background: #f0f4f8; padding-top: 50px; box-sizing: border-box;
+        }
+        #chick-app-container {
+            background: #fff; padding: 30px; border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: flex; gap: 30px;
+        }
+        #ui-panel-chick { width: 260px; display: flex; flex-direction: column; gap: 15px; }
+        #ui-panel-chick h2 { margin-top: 0; color: #2c3e50; font-size: 1.4em; }
+        .desc { font-size: 0.95em; color: #666; line-height: 1.6; margin-bottom: 10px; }
+        
+        .chick-btn {
+            background: #2196F3; color: white; border: none; padding: 14px;
+            border-radius: 8px; font-size: 1em; cursor: pointer; font-weight: bold; transition: background 0.2s;
+        }
+        .chick-btn:hover { background: #1976D2; }
+        .chick-btn:active { transform: scale(0.98); }
+        .btn-reset { background: #FF9800; }
+        .btn-reset:hover { background: #F57C00; }
+        .chick-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .toggle-label {
+            display: flex; align-items: center; cursor: pointer; font-size: 0.95em; font-weight: bold; color: #444;
+            background: #f9f9f9; padding: 12px; border-radius: 8px; border: 1px solid #ddd;
+        }
+        .toggle-label input { margin-right: 10px; transform: scale(1.2); cursor: pointer; }
+
+        #simCanvas { border: 2px solid #e0e0e0; border-radius: 10px; background: #fafafa; }
+        .status-box { background: #e3f2fd; border-left: 4px solid #2196F3; padding: 12px; font-size: 0.9em; border-radius: 0 8px 8px 0; margin-top: auto; font-weight: bold; color: #1565c0;}
+    </style>
+</head>
+<body>
+
+<div id="top-nav">
+    <button class="tab-btn active" data-target="view-torricelli">🧪 托里切利實驗 (理論)</button>
+    <button class="tab-btn" data-target="view-chick">🐥 小雞自動飲水器 (應用)</button>
+</div>
+
+<div class="author-sig">設計製作：小粘</div>
+
+<div id="view-torricelli" class="view-container active">
+    <div id="torri-canvas-container" style="width:100%; height:100%; position:absolute; top:0; left:0;"></div>
+
+    <div id="ui-panel-torri">
+        <h2 style="margin-top:0; margin-bottom:15px; color:#2c3e50; font-size: 1.3em;">實驗參數控制</h2>
+        <div class="control-group">
+            <label>環境大氣壓力 (cm-Hg) <span class="value-display" id="val-atm">76</span></label>
+            <input type="range" id="input-atm" min="40" max="90" value="76" step="1">
+        </div>
+        <div class="control-group">
+            <label>試管總長度 (cm) <span class="value-display" id="val-len">100</span></label>
+            <input type="range" id="input-len" min="60" max="120" value="100">
+        </div>
+        <div class="control-group">
+            <label>管子粗細 (半徑 cm) <span class="value-display" id="val-rad">1.2</span></label>
+            <input type="range" id="input-rad" min="0.6" max="3.0" value="1.2" step="0.1">
+        </div>
+        <div class="control-group">
+            <label>傾斜角度 (度) <span class="value-display" id="val-deg">0</span></label>
+            <input type="range" id="input-deg" min="0" max="70" value="0">
+        </div>
+        <div class="checkbox-group">
+            <label><input type="checkbox" id="chk-height"> 顯示垂直高度輔助線</label>
+            <label><input type="checkbox" id="chk-points"> 顯示觀測點與壓力箭頭</label>
+            <label><input type="checkbox" id="chk-tube2"> 新增對照試管 (含氣體)</label>
+        </div>
+        <div class="control-group" id="gas-control" style="display:none; margin-top:15px; padding-top:15px; border-top:1px dashed #ccc;">
+            <label style="color:#e65100;">管內氣體壓力 (cm-Hg) <span class="value-display" id="val-gas" style="color:#e65100;">20</span></label>
+            <input type="range" id="input-gas" min="0" max="50" value="20" step="1" style="accent-color: #e65100;">
+        </div>
+    </div>
+
+    <div id="data-display-torri">
+        <div class="p-indicator"><span class="dot" style="background:#ff4444;"></span>管外 A 點壓力：<span id="p-ext">76</span> cm-Hg</div>
+        <div class="p-indicator"><span class="dot" style="background:#44ff44;"></span>管內 B 點壓力：<span id="p-int">76</span> cm-Hg</div>
+    </div>
+
+    <div id="label-tube1" class="floating-label"></div>
+    <div id="label-tube2" class="floating-label" style="display:none; color:#e65100;"></div>
+    <div id="label-height" class="floating-label" style="display:none;"></div>
+</div>
+
+<div id="view-chick" class="view-container">
+    <div id="chick-wrapper">
+        <div id="chick-app-container">
+            <div id="ui-panel-chick">
+                <h2>大氣壓力生活應用</h2>
+                <div class="desc">
+                    <b>原理觀察：</b><br>
+                    1. 當底盤液面<b>高於瓶口</b>，大氣壓力托住瓶內水柱。<br>
+                    2. 當小雞喝水使液面<b>低於瓶口</b>，空氣以氣泡形式進入瓶內。<br>
+                    3. 瓶內氣壓增加，將水擠出補充底盤，直到重新封住瓶口。
+                </div>
+                
+                <button id="btn-drink" class="chick-btn">🐥 模擬小雞喝水 (降低液面)</button>
+                <button id="btn-refill" class="chick-btn btn-reset">🔄 重新裝滿水瓶</button>
+                
+                <label class="toggle-label">
+                    <input type="checkbox" id="chk-arrows-chick"> 顯示壓力與氣體向量箭頭
+                </label>
+        
+                <div class="status-box" id="status-text">
+                    狀態：液面平衡中。<br>大氣壓力正支撐著瓶內水柱。
+                </div>
+            </div>
+            <canvas id="simCanvas" width="400" height="550"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            // 切換按鈕樣式
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            
+            // 切換視圖
+            const targetId = e.target.getAttribute('data-target');
+            document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
+            document.getElementById(targetId).classList.add('active');
+        });
+    });
+</script>
+
+<script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+
+    // ==========================================
+    // 系統 1: 托里切利 3D 模擬
+    // ==========================================
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf5f5f5);
+    
+    const torriContainer = document.getElementById('torri-canvas-container');
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 55, 180); 
+    camera.lookAt(0, 48, 0); 
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    torriContainer.appendChild(renderer.domElement);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(30, 80, 50);
+    scene.add(dirLight);
+
+    const glassMat = new THREE.MeshPhongMaterial({ color: 0xeeeeff, transparent: true, opacity: 0.3, shininess: 90 });
+    const mercuryMat = new THREE.MeshPhongMaterial({ color: 0xdddddd, specular: 0xffffff, shininess: 100 });
+
+    const trough = new THREE.Mesh(new THREE.BoxGeometry(60, 8, 25), glassMat);
+    trough.position.y = 4;
+    scene.add(trough);
+    const mercuryPool = new THREE.Mesh(new THREE.BoxGeometry(59.8, 7.5, 24.8), mercuryMat);
+    mercuryPool.position.y = 3.75;
+    scene.add(mercuryPool);
+
+    const tube1Container = new THREE.Group(); 
+    const tube1Group = new THREE.Group(); tube1Group.position.set(-10, 7.5, 0); 
+    tube1Group.add(tube1Container); scene.add(tube1Group);
+
+    const tube2Container = new THREE.Group(); 
+    const tube2Group = new THREE.Group(); tube2Group.position.set(15, 7.5, 0); tube2Group.visible = false;
+    tube2Group.add(tube2Container); scene.add(tube2Group);
+
+    const pointsGroup = new THREE.Group(); pointsGroup.visible = false; scene.add(pointsGroup);
+    const dotA = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 16), new THREE.MeshBasicMaterial({color: 0xff4444}));
+    dotA.position.set(-22, 7.5, 2); pointsGroup.add(dotA);
+    pointsGroup.add(new THREE.ArrowHelper(new THREE.Vector3(0,-1,0), new THREE.Vector3(-22, 18, 2), 10, 0xff4444, 2, 2));
+    
+    const dotB = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 16), new THREE.MeshBasicMaterial({color: 0x44ff44}));
+    dotB.position.set(-10, 7.5, 2); pointsGroup.add(dotB);
+    pointsGroup.add(new THREE.ArrowHelper(new THREE.Vector3(0,-1,0), new THREE.Vector3(-10, 18, 2), 10, 0x44ff44, 2, 2));
+
+    const heightGroup = new THREE.Group(); heightGroup.visible = false; scene.add(heightGroup);
+    const hLineMat = new THREE.LineDashedMaterial({ color: 0x2196F3, dashSize: 2, gapSize: 2 });
+    const solidLineMat = new THREE.LineBasicMaterial({ color: 0x2196F3 });
+
+    let stateTorri = { atm: 76, len: 100, deg: 0, rad: 1.2, gas: 20, h1_actual: 76 };
+    const posTube1 = new THREE.Vector3(), posTube2 = new THREE.Vector3(), posHeight = new THREE.Vector3();
+
+    function updatePhysicsTorri() {
+        const radAngle = stateTorri.deg * (Math.PI / 180);
+        
+        // Tube 1
+        const v_cap1 = stateTorri.len * Math.cos(radAngle);
+        const h1 = Math.min(stateTorri.atm, v_cap1);
+        stateTorri.h1_actual = h1;
+        const L1 = h1 / Math.cos(radAngle);
+
+        tube1Container.clear();
+        const glass1 = new THREE.Mesh(new THREE.CapsuleGeometry(stateTorri.rad, stateTorri.len, 4, 16), glassMat);
+        glass1.position.y = stateTorri.len / 2; tube1Container.add(glass1);
+        const merc1 = new THREE.Mesh(new THREE.CapsuleGeometry(stateTorri.rad - 0.05, L1, 4, 16), mercuryMat);
+        merc1.position.y = L1 / 2 - 2; tube1Container.add(merc1);
+        tube1Container.rotation.z = -radAngle;
+
+        // Tube 2
+        const v_cap2 = stateTorri.len * Math.cos(radAngle);
+        const h2 = Math.max(0, Math.min(stateTorri.atm - stateTorri.gas, v_cap2));
+        const L2 = h2 / Math.cos(radAngle);
+
+        tube2Container.clear();
+        const glass2 = new THREE.Mesh(new THREE.CapsuleGeometry(stateTorri.rad, stateTorri.len, 4, 16), glassMat);
+        glass2.position.y = stateTorri.len / 2; tube2Container.add(glass2);
+        if (h2 > 0) {
+            const merc2 = new THREE.Mesh(new THREE.CapsuleGeometry(stateTorri.rad - 0.05, L2, 4, 16), mercuryMat);
+            merc2.position.y = L2 / 2 - 2; tube2Container.add(merc2);
+        }
+        tube2Container.rotation.z = -radAngle;
+
+        // Height Lines
+        heightGroup.clear();
+        const hLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-30, 7.5 + h1, 0), new THREE.Vector3(30, 7.5 + h1, 0)]), hLineMat);
+        hLine.computeLineDistances(); heightGroup.add(hLine);
+        const vLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-26, 7.5, 0), new THREE.Vector3(-26, 7.5 + h1, 0)]), hLineMat);
+        vLine.computeLineDistances(); heightGroup.add(vLine);
+        heightGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-27, 7.5 + h1, 0), new THREE.Vector3(-25, 7.5 + h1, 0)]), solidLineMat));
+        heightGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-27, 7.5, 0), new THREE.Vector3(-25, 7.5, 0)]), solidLineMat));
+
+        // UI Update
+        document.getElementById('val-atm').innerText = stateTorri.atm;
+        document.getElementById('val-len').innerText = stateTorri.len;
+        document.getElementById('val-rad').innerText = stateTorri.rad.toFixed(1);
+        document.getElementById('val-deg').innerText = stateTorri.deg;
+        document.getElementById('val-gas').innerText = stateTorri.gas;
+        document.getElementById('p-ext').innerText = stateTorri.atm;
+        document.getElementById('p-int').innerText = stateTorri.atm;
+
+        posTube1.set(0, L1 / 2, 0); document.getElementById('label-tube1').innerText = `L = ${L1.toFixed(1)} cm`;
+        posTube2.set(0, L2 / 2, 0); document.getElementById('label-tube2').innerText = `L = ${L2.toFixed(1)} cm`;
+        posHeight.set(-26, 7.5 + h1 / 2, 0); document.getElementById('label-height').innerText = `h = ${h1.toFixed(1)} cm`;
+    }
+
+    ['atm', 'len', 'rad', 'deg', 'gas'].forEach(id => {
+        document.getElementById(`input-${id}`).addEventListener('input', (e) => {
+            stateTorri[id] = parseFloat(e.target.value); updatePhysicsTorri();
+        });
+    });
+
+    document.getElementById('chk-height').addEventListener('change', (e) => {
+        heightGroup.visible = e.target.checked;
+        document.getElementById('label-height').style.display = e.target.checked ? 'block' : 'none';
+    });
+    document.getElementById('chk-points').addEventListener('change', (e) => {
+        pointsGroup.visible = e.target.checked;
+        document.getElementById('data-display-torri').style.display = e.target.checked ? 'block' : 'none';
+    });
+    document.getElementById('chk-tube2').addEventListener('change', (e) => {
+        tube2Group.visible = e.target.checked;
+        document.getElementById('gas-control').style.display = e.target.checked ? 'block' : 'none';
+        document.getElementById('label-tube2').style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    function updateLabels3D() {
+        if(document.getElementById('view-torricelli').classList.contains('active')) {
+            const updateLabelPos = (pos, obj, elId) => {
+                const v = pos.clone().applyMatrix4(obj.matrixWorld).project(camera);
+                const el = document.getElementById(elId);
+                el.style.left = `${(v.x * .5 + .5) * window.innerWidth}px`;
+                el.style.top = `${(-(v.y * .5) + .5) * window.innerHeight}px`;
+            };
+            updateLabelPos(posTube1, tube1Container, 'label-tube1');
+            if(tube2Group.visible) updateLabelPos(posTube2, tube2Container, 'label-tube2');
+            if(heightGroup.visible) {
+                const vH = posHeight.clone().project(camera);
+                const lH = document.getElementById('label-height');
+                lH.style.left = `${(vH.x * .5 + .5) * window.innerWidth}px`;
+                lH.style.top = `${(-(vH.y * .5) + .5) * window.innerHeight}px`;
+            }
+        }
+    }
+
+    // ==========================================
+    // 系統 2: 小雞飲水器 2D 模擬
+    // ==========================================
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const BOTTLE = { x: 120, y: 50, w: 160, h: 250, neckW: 60, neckH: 120 };
+    const DISH = { x: 50, y: 400, w: 300, h: 100 };
+    const LIP_Y = BOTTLE.y + BOTTLE.h + BOTTLE.neckH; // 420
+    
+    let stateChick = { dishY: 405, botY: 80, bubbles: [], showArrows: false, isDrink: false, targetY: 405 };
+
+    document.getElementById('btn-drink').addEventListener('click', () => {
+        if (stateChick.dishY < DISH.y + DISH.h - 10) {
+            stateChick.targetY += 15; stateChick.isDrink = true;
+            document.getElementById('status-text').innerHTML = "🐥 <b>小雞喝水中</b><br>底盤液面正在下降...";
+            document.getElementById('btn-drink').disabled = true;
+        }
+    });
+
+    document.getElementById('btn-refill').addEventListener('click', () => {
+        stateChick = { ...stateChick, dishY: 405, targetY: 405, botY: 80, bubbles: [], isDrink: false };
+        document.getElementById('btn-drink').disabled = false;
+        document.getElementById('status-text').innerHTML = "🔄 <b>水瓶已重新裝滿</b><br>準備就緒。";
+    });
+
+    document.getElementById('chk-arrows-chick').addEventListener('change', (e) => stateChick.showArrows = e.target.checked);
+
+    function updatePhysicsChick() {
+        if (stateChick.isDrink) {
+            if (stateChick.dishY < stateChick.targetY) stateChick.dishY += 0.5;
+            else { stateChick.isDrink = false; document.getElementById('btn-drink').disabled = false; }
+        }
+        if (!stateChick.isDrink && stateChick.dishY > LIP_Y && stateChick.botY < LIP_Y) {
+            document.getElementById('status-text').innerHTML = "⚠️ <b>液面低於瓶口！</b><br>空氣進入瓶內，大氣壓力失去平衡，水自動流出補充！";
+            if (Math.random() < 0.15) stateChick.bubbles.push({ x: BOTTLE.x + BOTTLE.w/2 + (Math.random()*40-20), y: LIP_Y, r: Math.random()*4+2, speed: Math.random()*2+1 });
+            stateChick.botY += 0.8; stateChick.dishY -= 0.3; stateChick.targetY = stateChick.dishY; 
+        } else if (!stateChick.isDrink && stateChick.dishY <= LIP_Y) {
+            if (document.getElementById('status-text').innerText.includes("補充")) {
+                document.getElementById('status-text').innerHTML = "✅ <b>重新平衡</b><br>液面封住瓶口，內外壓力重新平衡。";
+            }
+        }
+        for (let i = stateChick.bubbles.length - 1; i >= 0; i--) {
+            let b = stateChick.bubbles[i];
+            b.y -= b.speed; b.x += Math.sin(b.y / 10) * 1;
+            if (b.y < stateChick.botY) stateChick.bubbles.splice(i, 1);
+        }
+    }
+
+    function drawArrow(ctx, fromX, fromY, toX, toY, color, text) {
+        const headlen = 10, angle = Math.atan2(toY - fromY, toX - fromX);
+        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(fromX, fromY); ctx.lineTo(toX, toY); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(toX, toY);
+        ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+        ctx.fill();
+        if (text) { ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center"; ctx.fillText(text, fromX, fromY - 5); }
+    }
+
+    function renderChick() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(BOTTLE.x, BOTTLE.y, BOTTLE.w, BOTTLE.h);
+        ctx.fillRect(BOTTLE.x + (BOTTLE.w - BOTTLE.neckW)/2, BOTTLE.y + BOTTLE.h, BOTTLE.neckW, BOTTLE.neckH);
+
+        ctx.fillStyle = "rgba(33, 150, 243, 0.6)"; 
+        ctx.beginPath(); ctx.moveTo(DISH.x, stateChick.dishY); ctx.lineTo(DISH.x + DISH.w, stateChick.dishY);
+        ctx.lineTo(DISH.x + DISH.w, DISH.y + DISH.h); ctx.lineTo(DISH.x, DISH.y + DISH.h); ctx.fill();
+
+        ctx.save();
+        ctx.beginPath(); ctx.rect(BOTTLE.x, BOTTLE.y, BOTTLE.w, BOTTLE.h);
+        ctx.rect(BOTTLE.x + (BOTTLE.w - BOTTLE.neckW)/2, BOTTLE.y + BOTTLE.h, BOTTLE.neckW, BOTTLE.neckH);
+        ctx.clip();
+        ctx.fillRect(0, stateChick.botY, canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        stateChick.bubbles.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); });
+        ctx.restore();
+
+        ctx.strokeStyle = "#90A4AE"; ctx.lineWidth = 4; ctx.lineJoin = "round";
+        ctx.beginPath(); ctx.moveTo(DISH.x, DISH.y); ctx.lineTo(DISH.x, DISH.y + DISH.h);
+        ctx.lineTo(DISH.x + DISH.w, DISH.y + DISH.h); ctx.lineTo(DISH.x + DISH.w, DISH.y); ctx.stroke();
+
+        ctx.beginPath(); ctx.moveTo(BOTTLE.x, BOTTLE.y + BOTTLE.h); ctx.lineTo(BOTTLE.x, BOTTLE.y);
+        ctx.lineTo(BOTTLE.x + BOTTLE.w, BOTTLE.y); ctx.lineTo(BOTTLE.x + BOTTLE.w, BOTTLE.y + BOTTLE.h);
+        ctx.lineTo(BOTTLE.x + (BOTTLE.w + BOTTLE.neckW)/2, BOTTLE.y + BOTTLE.h);
+        ctx.lineTo(BOTTLE.x + (BOTTLE.w + BOTTLE.neckW)/2, BOTTLE.y + BOTTLE.h + BOTTLE.neckH);
+        ctx.moveTo(BOTTLE.x, BOTTLE.y + BOTTLE.h);
+        ctx.lineTo(BOTTLE.x + (BOTTLE.w - BOTTLE.neckW)/2, BOTTLE.y + BOTTLE.h);
+        ctx.lineTo(BOTTLE.x + (BOTTLE.w - BOTTLE.neckW)/2, BOTTLE.y + BOTTLE.h + BOTTLE.neckH); ctx.stroke();
+
+        ctx.strokeStyle = "rgba(255, 0, 0, 0.4)"; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.moveTo(BOTTLE.x + 10, LIP_Y); ctx.lineTo(BOTTLE.x + BOTTLE.w - 10, LIP_Y); ctx.stroke();
+        ctx.setLineDash([]); 
+
+        if (stateChick.showArrows) {
+            drawArrow(ctx, 80, stateChick.dishY - 50, 80, stateChick.dishY, "#e53935", "大氣壓力");
+            drawArrow(ctx, 320, stateChick.dishY - 50, 320, stateChick.dishY, "#e53935", "大氣壓力");
+            let intPressY = Math.max(stateChick.botY, BOTTLE.y + 20);
+            drawArrow(ctx, BOTTLE.x + BOTTLE.w/2, intPressY - 40, BOTTLE.x + BOTTLE.w/2, intPressY, "#43a047", "內部氣體壓力");
+            drawArrow(ctx, BOTTLE.x + BOTTLE.w/2 - 25, LIP_Y - 40, BOTTLE.x + BOTTLE.w/2 - 25, LIP_Y, "#1e88e5");
+            ctx.fillStyle = "#1e88e5"; ctx.fillText("水柱重力", BOTTLE.x + BOTTLE.w/2 - 25, LIP_Y - 50);
+        }
+    }
+
+    // ==========================================
+    // 總體渲染循環與視窗縮放
+    // ==========================================
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    updatePhysicsTorri();
+
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        // 根據目前顯示的頁籤，決定要更新哪個畫面以節省效能
+        if(document.getElementById('view-torricelli').classList.contains('active')) {
+            updateLabels3D();
+            renderer.render(scene, camera);
+        } else {
+            updatePhysicsChick();
+            renderChick();
+        }
+    }
+    animate();
+</script>
+</body>
+</html>
