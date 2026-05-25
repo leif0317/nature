@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>合力與分力：合成與分解 - 互動沙盒 (小粘製作)</title>
+    <style>
+        /* ==========================================
+           CSS 樣式設定
+           ========================================== */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'PingFang TC', 'Heiti TC', 'Microsoft JhengHei', sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 數據面板 - 毛玻璃質感 */
+        #data-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 12px;
+            padding: 20px;
+            width: 310px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            pointer-events: auto;
+            transition: all 0.3s ease;
+        }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 8px;
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        .signature {
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 4px 10px;
+            border-radius: 20px;
+            box-shadow: 0 2px 6px rgba(118, 75, 162, 0.4);
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+
+        #mode-toggle-btn {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 10px rgba(44, 62, 80, 0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #mode-toggle-btn:hover { background: #1a252f; transform: translateY(-1px); }
+
+        #toggle-c-btn {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-add { background-color: #f39c12; color: white; }
+        .btn-add:hover { background-color: #d68910; }
+        .btn-remove { background-color: #e2e8f0; color: #4a5568; }
+        .btn-remove:hover { background-color: #cbd5e0; }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 1rem;
+            color: #4a5568;
+            align-items: center;
+        }
+
+        .data-label {
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+        }
+
+        .color-box {
+            width: 12px;
+            height: 12px;
+            border-radius: 4px;
+            margin-right: 8px;
+            display: inline-block;
+        }
+
+        /* 雙向綁定的輸入框設計 */
+        .input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: bold;
+        }
+
+        .val-input {
+            width: 65px;
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+            background: #fff;
+            padding: 4px 6px;
+            border-radius: 6px;
+            border: 2px solid #e2e8f0;
+            text-align: right;
+            outline: none;
+            transition: all 0.2s;
+            font-size: 1rem;
+            color: #2c3e50;
+        }
+
+        .val-input:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+
+        .val-text {
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+            background: #f7fafc;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .color-a { background-color: #3498db; }
+        .color-b { background-color: #2ecc71; }
+        .color-c { background-color: #f39c12; }
+        .color-r { background-color: #e74c3c; }
+        .color-fx { background-color: #9b59b6; } 
+        .color-fy { background-color: #00bcd4; } 
+        
+        .instruction {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #4a5568;
+            line-height: 1.5;
+            background: #edf2f7;
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="canvas-container">
+    <canvas id="simCanvas"></canvas>
+    
+    <div id="data-panel">
+        <div class="header-container">
+            <h1 class="panel-title" id="mode-title">多邊形法 (合成)</h1>
+            <div class="signature">✍️ 小粘製作</div>
+        </div>
+
+        <button id="mode-toggle-btn">🔄 切換：直角分力展示</button>
+        
+        <!-- 模組 1：向量合成面板 -->
+        <div id="panel-addition">
+            <button id="toggle-c-btn" class="btn-add">➕ 新增分力 C</button>
+            <div class="data-row">
+                <div class="data-label"><span class="color-box color-a"></span>分力 A</div>
+                <div class="val-text"><span id="val-a">0.0</span> N</div>
+            </div>
+            <div class="data-row">
+                <div class="data-label"><span class="color-box color-b"></span>分力 B</div>
+                <div class="val-text"><span id="val-b">0.0</span> N</div>
+            </div>
+            <div class="data-row" id="row-c" style="display: none;">
+                <div class="data-label"><span class="color-box color-c"></span>分力 C</div>
+                <div class="val-text"><span id="val-c">0.0</span> N</div>
+            </div>
+            <div style="border-top: 2px dashed #cbd5e0; margin: 15px 0;"></div>
+            <div class="data-row" style="color: #c0392b; font-size: 1.1rem;">
+                <div class="data-label"><span class="color-box color-r"></span>合力 R</div>
+                <div class="val-text" style="background: #fdf2f2; border-color: #fadbd8;"><span id="val-r">0.0</span> N</div>
+            </div>
+            <div class="instruction">
+                <strong>合成任務：</strong><br>
+                拖曳分力端點，觀察半透明虛線箭頭，體會「頭尾相接」的幾何意義。
+            </div>
+        </div>
+
+        <!-- 模組 2：直角分解面板 (雙向輸入設計) -->
+        <div id="panel-resolution" style="display: none;">
+            <div class="data-row" style="color: #c0392b; font-size: 1.1rem; margin-bottom: 15px;">
+                <div class="data-label"><span class="color-box color-r"></span>作用力 F</div>
+                <div class="input-wrapper" style="color: #c0392b;">
+                    <input type="number" id="input-f" class="val-input" style="border-color: #fadbd8; background: #fdf2f2; color: #c0392b;" step="0.5" min="0"> N
+                </div>
+            </div>
+            <div class="data-row">
+                <div class="data-label"><span class="color-box color-fx"></span>水平分力 Fx</div>
+                <div class="input-wrapper">
+                    <input type="number" id="input-fx" class="val-input" step="0.5"> N
+                </div>
+            </div>
+            <div class="data-row">
+                <div class="data-label"><span class="color-box color-fy"></span>垂直分力 Fy</div>
+                <div class="input-wrapper">
+                    <input type="number" id="input-fy" class="val-input" step="0.5"> N
+                </div>
+            </div>
+            <div class="instruction" style="border-left-color: #9b59b6;">
+                <strong>分解任務：</strong><br>
+                可直接在框內輸入數值，或是直接用滑鼠拖曳畫布上的 <strong>F、Fx、Fy</strong> 三個端點，體會軸向聯動的變化！
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    /**
+     * ==========================================
+     * 核心互動邏輯與 Canvas 繪圖
+     * ==========================================
+     */
+    
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // UI DOM
+    const modeToggleBtn = document.getElementById('mode-toggle-btn');
+    const modeTitle = document.getElementById('mode-title');
+    const panelAddition = document.getElementById('panel-addition');
+    const panelResolution = document.getElementById('panel-resolution');
+    
+    // 合成模式 DOM
+    const uiValA = document.getElementById('val-a');
+    const uiValB = document.getElementById('val-b');
+    const uiValC = document.getElementById('val-c');
+    const uiValR = document.getElementById('val-r');
+    const rowC = document.getElementById('row-c');
+    const btnToggleC = document.getElementById('toggle-c-btn');
+
+    // 分解模式 輸入框 DOM
+    const inputF = document.getElementById('input-f');
+    const inputFx = document.getElementById('input-fx');
+    const inputFy = document.getElementById('input-fy');
+
+    let origin = { x: 0, y: 0 };
+    let currentMode = 'addition'; 
+    let isForceCActive = false; 
+    
+    let vecA = { x: 120, y: -160 }; // 主作用力
+    let vecB = { x: 160, y: 80 };
+    let vecC = { x: -140, y: 60 };
+
+    let draggedNode = null; 
+    const HIT_RADIUS = 25;  
+    const PIXEL_TO_NEWTON = 0.1; 
+
+    // --- 輸入框即時連動邏輯 ---
+    inputF.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val >= 0) {
+            const currentMag = Math.hypot(vecA.x, vecA.y);
+            if (currentMag > 0.001) {
+                const ratio = (val / PIXEL_TO_NEWTON) / currentMag;
+                vecA.x *= ratio; vecA.y *= ratio;
+            } else {
+                vecA.x = val / PIXEL_TO_NEWTON; vecA.y = 0;
+            }
+            requestAnimationFrame(draw);
+        }
+    });
+
+    inputFx.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val)) {
+            vecA.x = val / PIXEL_TO_NEWTON;
+            requestAnimationFrame(draw);
+        }
+    });
+
+    inputFy.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val)) {
+            // 物理上的向上(+Y) 等於畫布的向下(-Y)，所以加入負號轉換
+            vecA.y = -val / PIXEL_TO_NEWTON; 
+            requestAnimationFrame(draw);
+        }
+    });
+
+    // --- 模式切換邏輯 ---
+    modeToggleBtn.addEventListener('click', () => {
+        draggedNode = null; 
+        if (currentMode === 'addition') {
+            currentMode = 'resolution';
+            modeTitle.textContent = '直角分力 (分解)';
+            modeToggleBtn.innerHTML = '🔄 切換：多邊形加法展示';
+            panelAddition.style.display = 'none';
+            panelResolution.style.display = 'block';
+        } else {
+            currentMode = 'addition';
+            modeTitle.textContent = '多邊形法 (合成)';
+            modeToggleBtn.innerHTML = '🔄 切換：直角分力展示';
+            panelAddition.style.display = 'block';
+            panelResolution.style.display = 'none';
+        }
+        draw();
+    });
+
+    // --- 分力 C 切換 ---
+    btnToggleC.addEventListener('click', () => {
+        isForceCActive = !isForceCActive;
+        btnToggleC.textContent = isForceCActive ? '➖ 隱藏分力 C' : '➕ 新增分力 C';
+        btnToggleC.className = isForceCActive ? 'btn-remove' : 'btn-add';
+        rowC.style.display = isForceCActive ? 'flex' : 'none';
+        if (!isForceCActive && draggedNode === 'C') draggedNode = null; 
+        draw();
+    });
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        origin.x = canvas.width / 2;
+        origin.y = canvas.height / 2 + 50; 
+        draw();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function getMousePos(evt) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+    }
+
+    // --- 滑鼠點擊：精準判定 ---
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.target.closest('#data-panel')) return;
+
+        const mouse = getMousePos(e);
+        let points = {};
+
+        if (currentMode === 'addition') {
+            points['A'] = { x: origin.x + vecA.x, y: origin.y + vecA.y };
+            points['B'] = { x: origin.x + vecB.x, y: origin.y + vecB.y };
+            if (isForceCActive) points['C'] = { x: origin.x + vecC.x, y: origin.y + vecC.y };
+        } else if (currentMode === 'resolution') {
+            // 在分解模式中，開放 F, Fx, Fy 三個點都可以拖曳
+            points['F'] = { x: origin.x + vecA.x, y: origin.y + vecA.y };
+            points['Fx'] = { x: origin.x + vecA.x, y: origin.y };
+            points['Fy'] = { x: origin.x, y: origin.y + vecA.y };
+        }
+
+        // 依序檢查是否點中
+        for (let key in points) {
+            if (Math.hypot(mouse.x - points[key].x, mouse.y - points[key].y) < HIT_RADIUS) {
+                draggedNode = key;
+                break;
+            }
+        }
+    });
+
+    // --- 滑鼠拖曳：軸向鎖定邏輯 ---
+    window.addEventListener('mousemove', (e) => {
+        const mouse = getMousePos(e);
+
+        if (draggedNode) {
+            const newX = mouse.x - origin.x;
+            const newY = mouse.y - origin.y;
+            
+            if (draggedNode === 'A' || draggedNode === 'F') { 
+                vecA.x = newX; vecA.y = newY; 
+            }
+            if (draggedNode === 'B') { vecB.x = newX; vecB.y = newY; }
+            if (draggedNode === 'C') { vecC.x = newX; vecC.y = newY; }
+            
+            // 特殊鎖定：當拖曳分力時，鎖定只能在單一軸線上移動
+            if (draggedNode === 'Fx') { vecA.x = newX; } // Y軸不變
+            if (draggedNode === 'Fy') { vecA.y = newY; } // X軸不變
+
+            requestAnimationFrame(draw);
+        }
+
+        // Hover 游標效果
+        if (!draggedNode) {
+            let points = [];
+            if (currentMode === 'addition') {
+                points.push({ x: origin.x + vecA.x, y: origin.y + vecA.y });
+                points.push({ x: origin.x + vecB.x, y: origin.y + vecB.y });
+                if (isForceCActive) points.push({ x: origin.x + vecC.x, y: origin.y + vecC.y });
+            } else {
+                points.push({ x: origin.x + vecA.x, y: origin.y + vecA.y });
+                points.push({ x: origin.x + vecA.x, y: origin.y });
+                points.push({ x: origin.x, y: origin.y + vecA.y });
+            }
+            const isHover = points.some(p => Math.hypot(mouse.x - p.x, mouse.y - p.y) < HIT_RADIUS);
+            canvas.style.cursor = isHover ? 'grab' : 'default';
+        } else {
+            canvas.style.cursor = 'grabbing';
+        }
+    });
+
+    window.addEventListener('mouseup', () => { draggedNode = null; canvas.style.cursor = 'default'; });
+
+    /**
+     * 更新數據面板與輸入框 (防止正在打字時數值被蓋掉)
+     */
+    function updateData() {
+        if (currentMode === 'addition') {
+            const vecR = { x: vecA.x + vecB.x + (isForceCActive ? vecC.x : 0), y: vecA.y + vecB.y + (isForceCActive ? vecC.y : 0) };
+            uiValA.textContent = (Math.hypot(vecA.x, vecA.y) * PIXEL_TO_NEWTON).toFixed(1);
+            uiValB.textContent = (Math.hypot(vecB.x, vecB.y) * PIXEL_TO_NEWTON).toFixed(1);
+            if (isForceCActive) uiValC.textContent = (Math.hypot(vecC.x, vecC.y) * PIXEL_TO_NEWTON).toFixed(1);
+            uiValR.textContent = (Math.hypot(vecR.x, vecR.y) * PIXEL_TO_NEWTON).toFixed(1);
+            return vecR;
+        } else {
+            const magF = Math.hypot(vecA.x, vecA.y) * PIXEL_TO_NEWTON;
+            const magFx = vecA.x * PIXEL_TO_NEWTON; 
+            const magFy = -vecA.y * PIXEL_TO_NEWTON; // 轉換為物理直覺座標 (向上為正)
+
+            // 確保「使用者正在輸入」的那個框不會被強制覆蓋重寫，避免打字被中斷
+            if (document.activeElement !== inputF) inputF.value = magF.toFixed(1);
+            if (document.activeElement !== inputFx) inputFx.value = magFx.toFixed(1);
+            if (document.activeElement !== inputFy) inputFy.value = magFy.toFixed(1);
+            return vecA;
+        }
+    }
+
+    /**
+     * 繪製箭頭與拖曳端點
+     */
+    function drawArrow(ctx, fromX, fromY, toX, toY, color, width, label, isDashed = false, alpha = 1) {
+        const headlen = 16; 
+        const dx = toX - fromX;
+        const dy = toY - fromY;
+        const angle = Math.atan2(dy, dx);
+        const length = Math.hypot(dx, dy);
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        // 如果長度大於 5 畫出完整箭頭，過短則只畫出拖曳點 (讓使用者能從原點拉出來)
+        if (length >= 5) {
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.lineCap = 'round';
+            if (isDashed) ctx.setLineDash([8, 6]);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+
+        // 這些標籤都賦予白色的可拖曳圓點提示
+        if (['A', 'B', 'C', 'F', 'Fx', 'Fy'].includes(label)) {
+            ctx.beginPath();
+            ctx.arc(toX, toY, 8, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = color;
+            ctx.setLineDash([]);
+            ctx.stroke();
+            
+            ctx.fillStyle = color;
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // 微調文字位置避免重疊
+            if (label === 'Fx') ctx.fillText(label, toX, toY - 16);
+            else if (label === 'Fy') ctx.fillText(label, toX + 22, toY);
+            else ctx.fillText(label, toX, toY);
+        }
+
+        ctx.restore();
+    }
+
+    /**
+     * 主渲染迴圈
+     */
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // --- 背景與座標軸 ---
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const gridSize = 50;
+        for (let x = origin.x % gridSize; x < canvas.width; x += gridSize) {
+            ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+        }
+        for (let y = origin.y % gridSize; y < canvas.height; y += gridSize) {
+            ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = currentMode === 'resolution' ? '#a0aec0' : '#cbd5e0';
+        ctx.lineWidth = currentMode === 'resolution' ? 3 : 2;
+        ctx.beginPath();
+        ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, canvas.height); 
+        ctx.moveTo(0, origin.y); ctx.lineTo(canvas.width, origin.y); 
+        ctx.stroke();
+
+        if (currentMode === 'resolution') {
+            ctx.fillStyle = '#718096';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('+X 軸', canvas.width - 30, origin.y - 15);
+            ctx.fillText('+Y 軸', origin.x + 20, 30);
+        }
+
+        const calculatedVec = updateData();
+
+        // --- 繪製物理圖形 ---
+        if (currentMode === 'addition') {
+            const absA = { x: origin.x + vecA.x, y: origin.y + vecA.y };
+            const absB = { x: origin.x + vecB.x, y: origin.y + vecB.y };
+            const absC = { x: origin.x + vecC.x, y: origin.y + vecC.y };
+            const absR = { x: origin.x + calculatedVec.x, y: origin.y + calculatedVec.y };
+
+            const tipAB = { x: absA.x + vecB.x, y: absA.y + vecB.y };
+            drawArrow(ctx, absA.x, absA.y, tipAB.x, tipAB.y, '#2ecc71', 4, '', true, 0.4);
+            if (isForceCActive) drawArrow(ctx, tipAB.x, tipAB.y, absR.x, absR.y, '#f39c12', 4, '', true, 0.4);
+
+            ctx.beginPath(); ctx.arc(origin.x, origin.y, 7, 0, Math.PI * 2);
+            ctx.fillStyle = '#2d3748'; ctx.fill();
+
+            drawArrow(ctx, origin.x, origin.y, absA.x, absA.y, '#3498db', 5, 'A');
+            drawArrow(ctx, origin.x, origin.y, absB.x, absB.y, '#2ecc71', 5, 'B');
+            if (isForceCActive) drawArrow(ctx, origin.x, origin.y, absC.x, absC.y, '#f39c12', 5, 'C');
+            drawArrow(ctx, origin.x, origin.y, absR.x, absR.y, '#e74c3c', 7, 'R');
+
+        } else {
+            const absF = { x: origin.x + vecA.x, y: origin.y + vecA.y };
+            const absFx = { x: origin.x + vecA.x, y: origin.y }; 
+            const absFy = { x: origin.x, y: origin.y + vecA.y }; 
+
+            // 繪製投影矩形虛線
+            ctx.beginPath();
+            ctx.setLineDash([6, 6]);
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 2;
+            ctx.moveTo(absFx.x, absFx.y); ctx.lineTo(absF.x, absF.y);
+            ctx.moveTo(absFy.x, absFy.y); ctx.lineTo(absF.x, absF.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.beginPath(); ctx.arc(origin.x, origin.y, 7, 0, Math.PI * 2);
+            ctx.fillStyle = '#2d3748'; ctx.fill();
+
+            // 繪製三個可拖曳的力
+            drawArrow(ctx, origin.x, origin.y, absFx.x, absFx.y, '#9b59b6', 5, 'Fx');
+            drawArrow(ctx, origin.x, origin.y, absFy.x, absFy.y, '#00bcd4', 5, 'Fy');
+            drawArrow(ctx, origin.x, origin.y, absF.x, absF.y, '#e74c3c', 6, 'F');
+        }
+    }
+
+    resizeCanvas();
+</script>
+</body>
+</html>
