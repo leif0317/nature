@@ -3,36 +3,68 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>太陽系模擬｜小粘製作</title>
+<title>太陽系模擬｜3D動態光影版｜小粘製作</title>
 <style>
   html, body { margin: 0; padding: 0; background: #000; overflow: hidden; width: 100%; height: 100%; font-family: "Microsoft JhengHei", sans-serif; }
+  /* 背景星空 */
   body { background-image: url('https://upload.wikimedia.org/wikipedia/commons/8/89/HD.15.039.jpg'); background-size: cover; background-position: center; }
   
-  #hint { position: fixed; top: 15px; left: 0; width: 100%; text-align: center; color: #ccc; font-size: 14px; text-shadow: 0 2px 4px #000; pointer-events: none; z-index: 10; letter-spacing: 1px; }
-  #credits { position: fixed; bottom: 10px; right: 15px; color: rgba(255, 255, 255, 0.4); font-size: 13px; pointer-events: none; z-index: 10; text-shadow: 0 1px 2px rgba(0,0,0,0.8); font-weight: 300; }
+  /* 右下角署名 */
+  #credits {
+    position: fixed; bottom: 10px; right: 15px;
+    color: rgba(255, 255, 255, 0.4); 
+    font-size: 13px; pointer-events: none; z-index: 10;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8); font-weight: 300;
+  }
 
-  .controls { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; z-index: 20; background: rgba(0, 0, 0, 0.6); padding: 10px 20px; border-radius: 40px; border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(8px); align-items: center; }
+  /* --- 控制面板樣式 --- */
+  .controls {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 12px; z-index: 20;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 10px 20px;
+    border-radius: 40px;
+    border: 1px solid rgba(255,255,255,0.15);
+    backdrop-filter: blur(8px);
+    align-items: center; 
+  }
+  
   .btn-group { display: flex; gap: 5px; align-items: center; }
   .divider { width: 1px; height: 24px; background: rgba(255,255,255,0.3); margin: 0 5px; }
   
-  button { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 14px; cursor: pointer; transition: all 0.2s ease; outline: none; user-select: none; min-width: 40px; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+  button {
+    background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff; padding: 8px 16px; border-radius: 20px;
+    font-size: 14px; cursor: pointer; transition: all 0.2s ease; outline: none;
+    user-select: none; min-width: 40px; display: flex; align-items: center; justify-content: center;
+    white-space: nowrap; 
+  }
   button:hover { background: rgba(255, 255, 255, 0.25); transform: translateY(-2px); }
   button:active { transform: scale(0.95) translateY(0); }
   button.circle { border-radius: 50%; padding: 0; width: 36px; height: 36px; font-weight: bold; font-size: 18px; }
   button.active { background: rgba(74, 163, 255, 0.6); border-color: #4aa3ff; box-shadow: 0 0 10px rgba(74, 163, 255, 0.4); }
   #btn-reset:hover { background: rgba(255, 80, 80, 0.4); border-color: #ff5050; }
 
+  /* 滑動桿樣式 */
   .slider-container { display: flex; align-items: center; margin: 0 8px; }
-  input[type=range] { -webkit-appearance: none; appearance: none; width: 70px; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 3px; outline: none; transition: opacity .2s; }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #fff; cursor: pointer; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
-  input[type=range]::-moz-range-thumb { width: 16px; height: 16px; background: #fff; cursor: pointer; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); border: none; }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 70px; height: 6px;
+    background: rgba(255, 255, 255, 0.2); border-radius: 3px; outline: none; transition: opacity .2s;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+    background: #fff; cursor: pointer; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 16px; height: 16px; background: #fff; cursor: pointer;
+    border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); border: none;
+  }
 
   canvas { display: block; }
 </style>
 </head>
 <body>
 
-<div id="hint">正在載入行星紋理... (0/8)</div>
 <div id="credits">小粘製作</div>
 
 <div class="controls">
@@ -41,7 +73,9 @@
     <button id="btn-zoom-in" class="circle" title="放大">＋</button>
     <button id="btn-reset" title="還原初始狀態">↺ 重置</button>
   </div>
+  
   <div class="divider"></div>
+
   <div class="btn-group">
     <button id="btn-comet" class="active" title="顯示/隱藏彗星">☄️</button>
     <div class="slider-container" title="調整彗星大小">
@@ -57,8 +91,8 @@
 (function(){
   const canvas = document.getElementById('cv');
   const ctx = canvas.getContext('2d');
-  const hint = document.getElementById('hint');
   
+  // DOM 元素
   const btnComet = document.getElementById('btn-comet');
   const btnOrbit = document.getElementById('btn-orbit');
   const btnZoomIn = document.getElementById('btn-zoom-in');
@@ -68,37 +102,35 @@
 
   let w = 0, h = 0, cx = 0, cy = 0;
   
+  // 視圖控制變數
   let scale = 1.0;          
   const SCALE_STEP = 0.2;   
   const MIN_SCALE = 0.4;    
   const MAX_SCALE = 2.5;    
 
+  // 狀態控制變數
   let isCometVisible = true;
   let isOrbiting = false; 
   let cometScale = 1.0;
 
-  // 加入了 color 屬性作為圖片載入失敗時的純色備案
+  // --- 全新設計：3D 漸層行星數據 ---
+  // 不再依賴外部圖片，改用高光(light)與暗部(dark)顏色來繪製立體球體
   const planetsData = [
-    { name: '水星', color: '#aaa', size: 2.5, speed: 0.040, angle: 0, imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Mercury_in_color_-_Prockter07_centered.jpg/600px-Mercury_in_color_-_Prockter07_centered.jpg' },
-    { name: '金星', color: '#d9c27c', size: 4.0, speed: 0.025, angle: 0, imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Venus_from_Mariner_10.jpg/600px-Venus_from_Mariner_10.jpg' },
-    { name: '地球', color: '#4aa3ff', size: 4.2, speed: 0.020, angle: 0, imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/600px-The_Earth_seen_from_Apollo_17.jpg' },
-    { name: '火星', color: '#ff6a3d', size: 3.0, speed: 0.016, angle: 0, imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/OSIRIS_Mars_true_color.jpg/600px-OSIRIS_Mars_true_color.jpg' },
-    { name: '木星', color: '#e0c38c', size: 10.0, speed: 0.008, angle: 0, imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Jupiter_and_its_shrunken_Great_Red_Spot.jpg/600px-Jupiter_and_its_shrunken_Great_Red_Spot.jpg' },
-    { name: '土星', color: '#d8c27a', size: 8.5, speed: 0.006, angle: 0, imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Saturn_during_Equinox.jpg/600px-Saturn_during_Equinox.jpg' },
-    { name: '天王星', color: '#7fd6ff', size: 6.0, speed: 0.004, angle: 0, imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Uranus2.jpg/600px-Uranus2.jpg' },
-    { name: '海王星', color: '#4b6cff', size: 5.8, speed: 0.003, angle: 0, imgUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Neptune_-_Voyager_2_%2829347980845%29_flatten_crop.jpg/600px-Neptune_-_Voyager_2_%2829347980845%29_flatten_crop.jpg' }
+    { name: '水星', size: 2.5, speed: 0.040, angle: 0, light: '#b3b3b3', dark: '#333333' },
+    { name: '金星', size: 4.0, speed: 0.025, angle: 0, light: '#f2d08a', dark: '#8a6d2b' },
+    { name: '地球', size: 4.2, speed: 0.020, angle: 0, light: '#6bafff', dark: '#002b70' },
+    { name: '火星', size: 3.0, speed: 0.016, angle: 0, light: '#ff8966', dark: '#8a2200' },
+    { name: '木星', size: 10.0, speed: 0.008, angle: 0, light: '#e8cd97', dark: '#705930' },
+    { name: '土星', size: 8.5, speed: 0.006, angle: 0, light: '#e3d091', dark: '#6e5f30' },
+    { name: '天王星', size: 6.0, speed: 0.004, angle: 0, light: '#a8e7ff', dark: '#247399' },
+    { name: '海王星', size: 5.8, speed: 0.003, angle: 0, light: '#6b89ff', dark: '#162a7a' }
   ];
 
+  // 小行星帶數據
   const asteroids = [];
   const ASTEROID_COUNT = 800;
   let asteroidAngleOffset = 0; 
-  initAsteroids();
-
-  const startTheta = Math.PI * 1.8; 
-  const endTheta = Math.PI * 0.2;   
-  let theta = startTheta; 
-  const e = 0.88; 
-
+  
   function initAsteroids() {
     asteroids.length = 0;
     for(let i=0; i<ASTEROID_COUNT; i++) {
@@ -110,39 +142,15 @@
       });
     }
   }
+  initAsteroids();
 
-  let loadedCount = 0;
-  let imagesLoaded = false;
+  // 彗星軌道參數
+  const startTheta = Math.PI * 1.8; 
+  const endTheta = Math.PI * 0.2;   
+  let theta = startTheta; 
+  const e = 0.88; 
 
-  function checkProgress() {
-    loadedCount++;
-    hint.innerText = `載入紋理中... (${loadedCount}/${planetsData.length})`;
-    if (loadedCount === planetsData.length) {
-      imagesLoaded = true;
-      hint.innerText = "";
-      requestAnimationFrame(draw);
-    }
-  }
-
-  function preloadImages() {
-    planetsData.forEach((p) => {
-      const img = new Image();
-      // 移除 img.crossOrigin = "Anonymous" 避免本地執行時被瀏覽器阻擋
-      
-      img.onload = () => {
-        p.imageElement = img;
-        checkProgress();
-      };
-      
-      img.onerror = () => {
-        console.warn(`${p.name} 紋理載入失敗，將使用純色替代。`);
-        checkProgress();
-      };
-      
-      img.src = p.imgUrl;
-    });
-  }
-
+  // --- 事件綁定 ---
   btnZoomIn.addEventListener('click', () => { scale = Math.min(scale + SCALE_STEP, MAX_SCALE); });
   btnZoomOut.addEventListener('click', () => { scale = Math.max(scale - SCALE_STEP, MIN_SCALE); });
   cometSizeSlider.addEventListener('input', (e) => { cometScale = parseFloat(e.target.value); });
@@ -184,13 +192,11 @@
   }
 
   function draw() {
-    if (!imagesLoaded || w === 0 || h === 0) { 
-      if (imagesLoaded) requestAnimationFrame(draw);
-      return; 
-    }
+    if (w === 0 || h === 0) { requestAnimationFrame(draw); return; }
 
     ctx.clearRect(0, 0, w, h);
 
+    // 縮放矩陣
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(scale, scale);
@@ -214,6 +220,7 @@
     ctx.arc(cx, cy, 8, 0, Math.PI * 2);
     ctx.fill();
 
+    // 畫軌道線 & 行星
     for (let i = 0; i < planetsData.length; i++) {
       const p = planetsData[i];
       const orbitR = sunRadius + 20 + (i * gap);
@@ -246,34 +253,31 @@
         ctx.globalAlpha = 1.0;
       }
 
-      // 繪製行星本體
+      // --- 動態光影 3D 繪製行星 ---
       const planetX = cx + orbitR * Math.cos(p.angle);
       const planetY = cy + orbitR * Math.sin(p.angle);
 
-      if (p.imageElement) {
-        // 如果圖片載入成功
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(planetX, planetY, p.size, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.clip(); 
-        ctx.drawImage(p.imageElement, planetX - p.size, planetY - p.size, p.size * 2, p.size * 2);
-        ctx.restore(); 
-      } else {
-        // 圖片載入失敗，使用預設純色
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(planetX, planetY, p.size, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      // 計算從行星指向太陽的角度 (光源方向)
+      const angleToSun = Math.atan2(cy - planetY, cx - planetX);
       
-      // 添加陰影，讓星球有立體感
-      const shadowAngle = Math.atan2(planetY - cy, planetX - cx);
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      // 光暈高光點會往太陽的方向偏移
+      const highlightX = planetX + Math.cos(angleToSun) * (p.size * 0.4);
+      const highlightY = planetY + Math.sin(angleToSun) * (p.size * 0.4);
+
+      // 建立 3D 徑向漸層
+      const planetGrad = ctx.createRadialGradient(
+        highlightX, highlightY, 0,           // 亮點起點
+        planetX, planetY, p.size             // 球體邊緣暗點
+      );
+      planetGrad.addColorStop(0, p.light);   // 亮面顏色
+      planetGrad.addColorStop(1, p.dark);    // 暗面顏色
+
+      ctx.fillStyle = planetGrad;
       ctx.beginPath();
-      ctx.arc(planetX, planetY, p.size, shadowAngle + Math.PI/2, shadowAngle - Math.PI/2);
+      ctx.arc(planetX, planetY, p.size, 0, Math.PI * 2);
       ctx.fill();
 
+      // 公轉更新
       if (isOrbiting) p.angle -= p.speed;
     }
 
@@ -299,6 +303,7 @@
 
       const tx = x + (dx / safeDist) * tailLen;
       const ty = y + (dy / safeDist) * tailLen;
+      
       const grad = ctx.createLinearGradient(x, y, tx, ty);
       grad.addColorStop(0, 'rgba(200, 230, 255, 0.9)');
       grad.addColorStop(1, 'rgba(200, 230, 255, 0)');
@@ -325,9 +330,10 @@
     requestAnimationFrame(draw);
   }
 
+  // 初始化執行
   window.addEventListener('resize', resize);
   resize();
-  preloadImages();
+  requestAnimationFrame(draw);
 
 })();
 </script>
