@@ -3,21 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>專業版互動式元素週期表 (含影片功能)</title>
+    <title>可愛明亮版元素週期表 ✨ - 小粘製作</title>
     <style>
-        /* --- 1. 全域設定 --- */
+        /* --- 1. 全域可愛設定 --- */
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;800&display=swap');
+
         :root {
-            --bg-color: #121212;
-            --card-bg: #1e1e1e;
-            --text-main: #ffffff;
-            --text-muted: #b0b0b0;
-            --border: #333;
-            --highlight: #4facfe;
+            --bg-color: #f4f7f8;
+            --card-bg: #ffffff;
+            --text-main: #555555;
+            --text-muted: #888888;
+            --highlight: #ff9a9e;
+            --success: #4ade80;
+            --error: #f87171;
         }
 
         body {
-            font-family: 'Microsoft JhengHei', 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Nunito', 'Microsoft JhengHei', sans-serif;
             background-color: var(--bg-color);
+            background-image: radial-gradient(#e2eafc 1px, transparent 1px);
+            background-size: 20px 20px;
             color: var(--text-main);
             margin: 0;
             display: flex;
@@ -26,240 +31,207 @@
             min-height: 100vh;
         }
 
-        /* --- 2. 頂部導航 --- */
+        /* --- 2. 頂部導航與署名 --- */
         header {
             width: 100%;
-            padding: 15px;
-            background-color: var(--card-bg);
-            border-bottom: 1px solid var(--border);
+            padding: 15px 20px;
+            background-color: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 10px;
+            gap: 15px;
             position: sticky;
             top: 0;
             z-index: 50;
         }
 
-        h1 { margin: 0; font-size: 1.5rem; letter-spacing: 1px; }
+        .header-title { display: flex; align-items: center; gap: 15px; }
+        h1 { margin: 0; font-size: 1.8rem; color: #444; letter-spacing: 2px; }
 
-        .search-box {
-            padding: 8px 15px;
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            background: #2c2c2c;
+        /* ✨ 小粘製作 專屬署名樣式 */
+        .author-badge {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
             color: white;
-            width: 300px;
-            outline: none;
+            font-size: 0.9rem;
+            font-weight: 800;
+            padding: 6px 16px;
+            border-radius: 30px;
+            box-shadow: 0 4px 10px rgba(255, 154, 158, 0.4);
+            letter-spacing: 1px;
+            border: 2px solid #fff;
+            transform: rotate(-3deg);
             transition: 0.3s;
         }
-        .search-box:focus { border-color: var(--highlight); box-shadow: 0 0 8px rgba(79, 172, 254, 0.4); }
+        .author-badge:hover { transform: rotate(0deg) scale(1.1); }
+
+        /* 模式切換按鈕區 */
+        .mode-controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        
+        .mode-btn {
+            background: #f0f4f8; border: 2px solid transparent; padding: 8px 16px;
+            border-radius: 20px; font-size: 0.95rem; font-weight: bold; color: #555;
+            cursor: pointer; transition: 0.2s;
+        }
+        .mode-btn:hover { background: #e2eafc; }
+        .mode-btn.active {
+            background: var(--highlight); color: white;
+            box-shadow: 0 4px 10px rgba(255, 154, 158, 0.4);
+        }
 
         /* --- 3. 週期表佈局 --- */
         .table-wrapper {
-            padding: 20px;
-            overflow-x: auto;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            padding-bottom: 50px;
+            padding: 30px 20px; overflow-x: auto; width: 100%;
+            display: flex; justify-content: center; padding-bottom: 60px;
         }
 
         .periodic-table {
             display: grid;
-            grid-template-columns: repeat(18, 64px);
-            grid-template-rows: repeat(10, 64px);
-            gap: 5px;
-            position: relative; 
+            grid-template-columns: repeat(18, 66px);
+            grid-template-rows: repeat(10, 66px);
+            gap: 8px; position: relative; transition: opacity 0.3s;
         }
 
         /* --- 4. 元素方塊 --- */
         .element {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 2px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            cursor: pointer;
-            transition: all 0.2s;
-            position: relative;
-            user-select: none;
+            background-color: var(--card-bg); border-radius: 14px; padding: 4px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            cursor: pointer; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative; user-select: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.06); border: 2px solid transparent;
         }
 
-        .element:hover {
-            transform: scale(1.4);
-            z-index: 20; 
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
-            border-color: #fff;
-            outline: 2px solid rgba(255, 255, 255, 0.8);
+        /* 學習模式下的 Hover 效果 */
+        .mode-learn .element:hover {
+            transform: scale(1.25) translateY(-5px); z-index: 20; 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15); border-color: #fff;
         }
 
-        .element.dimmed { opacity: 0.1; filter: grayscale(100%); }
+        .element.dimmed { opacity: 0.2; filter: grayscale(80%); transform: scale(0.95); }
+        .el-num { font-size: 11px; color: rgba(0,0,0,0.4); padding-left: 4px; font-weight: 800; }
+        .el-sym { font-size: 22px; font-weight: 800; text-align: center; color: #333; height: 30px; display: flex; align-items: center; justify-content: center;}
+        .el-name { font-size: 12px; text-align: center; white-space: nowrap; overflow: hidden; font-weight: bold; color: #555; padding-bottom: 2px;}
 
-        .el-num { font-size: 10px; color: var(--text-muted); padding-left: 4px; }
-        .el-sym { font-size: 20px; font-weight: bold; text-align: center; color: #fff; }
-        .el-name { font-size: 11px; text-align: center; white-space: nowrap; overflow: hidden; font-weight: bold; padding-bottom: 2px; }
-
-        /* --- 5. 預覽方框 --- */
-        #preview-container {
-            grid-column: 3 / 13;
-            grid-row: 1 / 4;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            pointer-events: none; 
-            z-index: 1;
+        /* 測驗 A 輸入框 */
+        .quiz-input-a {
+            width: 80%; height: 24px; text-align: center; font-size: 16px; font-weight: bold;
+            border: 2px solid #ccc; border-radius: 6px; outline: none; text-transform: capitalize;
         }
+        .quiz-input-a:focus { border-color: #4facfe; }
+        .quiz-input-a.correct { background-color: var(--success); color: white; border-color: var(--success); }
+        .quiz-input-a.wrong { background-color: var(--error); color: white; border-color: var(--error); }
 
-        #image-preview-box {
-            width: 320px;  
-            height: 250px;
-            background-color: #1a1a1a;
-            border: 2px dashed #444;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            transition: border-color 0.3s, background-color 0.3s;
-            position: relative;
+        /* --- 5. 測驗 B 介面 --- */
+        #test-b-container {
+            display: none; flex-direction: column; align-items: center; gap: 20px;
+            width: 100%; max-width: 600px; background: white; padding: 40px;
+            border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.05); margin-top: 20px;
         }
+        .test-b-header { font-size: 1.5rem; font-weight: bold; color: #333; margin-bottom: 10px; }
+        .quiz-b-item { display: flex; align-items: center; justify-content: space-between; width: 80%; background: #f8f9fa; padding: 15px 25px; border-radius: 12px; font-size: 1.2rem; font-weight: bold; border: 2px solid #eee; }
+        .quiz-b-input { width: 80px; font-size: 1.2rem; text-align: center; padding: 5px; border: 2px solid #ccc; border-radius: 8px; outline: none; }
+        .submit-btn { background: var(--highlight); color: white; border: none; padding: 12px 30px; font-size: 1.2rem; font-weight: bold; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(255, 154, 158, 0.4); transition: 0.2s; margin-top: 15px; }
+        .submit-btn:hover { transform: scale(1.05); background: #ff758c; }
+        .score-display { font-size: 1.5rem; font-weight: bold; color: var(--highlight); display: none; }
 
-        #image-preview-box.active {
-            border-style: solid;
-            border-color: var(--highlight);
-            background-color: #000;
-        }
+        /* --- 6. 預覽方框 --- */
+        #preview-container { grid-column: 3 / 13; grid-row: 1 / 4; display: flex; justify-content: center; align-items: center; pointer-events: none; z-index: 1; }
+        #image-preview-box { width: 260px; height: 280px; background-color: #fff; border-radius: 16px; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.1); padding: 15px; border: 4px solid #fff; }
+        #preview-img-container { width: 100%; height: 180px; border-radius: 12px; background-color: #f0f0f0; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        #preview-img { width: 100%; height: 100%; object-fit: cover; display: none; }
+        #preview-emoji { font-size: 60px; display: none; }
+        #preview-text-info { margin-top: 15px; text-align: center; width: 100%; }
+        #preview-label { font-size: 20px; font-weight: 800; color: #333; margin-bottom: 4px; }
+        #preview-status { font-size: 13px; color: #888; }
+        @media (max-width: 1100px) { #preview-container { display: none; } }
 
-        #preview-img {
-            width: 100%; height: 100%; object-fit: cover; display: none; 
-        }
+        /* --- 7. 馬卡龍分類顏色 --- */
+        .cat-alkali-metal { background-color: #ffc8dd; } 
+        .cat-alkaline-earth-metal { background-color: #ffcf99; } 
+        .cat-transition-metal { background-color: #fcf6bd; } 
+        .cat-post-transition-metal { background-color: #d0f4de; } 
+        .cat-metalloid { background-color: #a9def9; } 
+        .cat-polyatomic-nonmetal, .cat-diatomic-nonmetal, .cat-nonmetal { background-color: #bde0fe; } 
+        .cat-noble-gas { background-color: #e4c1f9; } 
+        .cat-lanthanide { background-color: #fcd5ce; } 
+        .cat-actinide { background-color: #e8e8e4; } 
+        .cat-unknown { background-color: #e9ecef; }
 
-        #preview-text {
-            color: #666; font-size: 15px; text-align: center; padding: 20px; line-height: 1.6;
-        }
-
-        #preview-label {
-            position: absolute; bottom: 0; width: 100%;
-            background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0));
-            color: white; text-align: center; padding: 10px 0;
-            font-size: 18px; font-weight: bold; display: none;
-            text-shadow: 0 2px 4px rgba(0,0,0,1);
-        }
-
-        @media (max-width: 1100px) {
-            #preview-container { display: none; }
-        }
-
-        /* --- 6. 分類顏色 --- */
-        .cat-alkali-metal { background-color: #b71c1c; }
-        .cat-alkaline-earth-metal { background-color: #f57f17; color: black; }
-        .cat-transition-metal { background-color: #ffb300; color: black; }
-        .cat-post-transition-metal { background-color: #43a047; color: black; }
-        .cat-metalloid { background-color: #00838f; }
-        .cat-polyatomic-nonmetal, .cat-diatomic-nonmetal, .cat-nonmetal { background-color: #1565c0; }
-        .cat-noble-gas { background-color: #5e35b1; }
-        .cat-lanthanide { background-color: #d81b60; }
-        .cat-actinide { background-color: #880e4f; }
-        .cat-unknown { background-color: #424242; }
-
-        /* --- 7. Modal 樣式 --- */
-        .modal {
-            display: none;
-            position: fixed; z-index: 100;
-            left: 0; top: 0; width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.85);
-            justify-content: center; align-items: center;
-            opacity: 0; transition: opacity 0.3s;
-            backdrop-filter: blur(5px);
-        }
+        /* --- 8. 完整 Modal 樣式 --- */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(240, 244, 248, 0.85); justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(8px); }
         .modal.show { opacity: 1; }
-        .modal-content {
-            background-color: #252525; padding: 30px;
-            border-radius: 12px; width: 90%; max-width: 600px;
-            position: relative; border: 1px solid #555;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-        }
-        .close-btn {
-            position: absolute; top: 15px; right: 20px;
-            font-size: 28px; cursor: pointer; color: #aaa;
-            transition: color 0.2s;
-        }
-        .close-btn:hover { color: #fff; }
-
-        .modal-header {
-            display: flex; align-items: center; gap: 20px;
-            margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #444;
-        }
-        .big-symbol {
-            font-size: 60px; font-weight: bold;
-            width: 80px; height: 80px;
-            display: flex; align-items: center; justify-content: center;
-            border-radius: 8px; background: #333; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
-        }
-        .modal-title h2 { margin: 0; font-size: 2.2rem; }
-        .modal-title span { color: var(--text-muted); font-size: 1.1rem; }
-
-        .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-        .data-item { background: #333; padding: 10px; border-radius: 6px; }
-        .data-item strong { color: #ccc; font-size: 0.85rem; display: block; margin-bottom: 4px; }
-        .data-item span { font-size: 1.1rem; font-weight: bold; }
-
-        .summary-box { 
-            background: #202020; padding: 15px; 
-            border-radius: 6px; line-height: 1.6; 
-            color: #ddd; font-size: 1rem; 
-            max-height: 200px; overflow-y: auto; 
-            border-left: 4px solid var(--highlight);
-        }
+        .modal-content { background-color: #fff; padding: 35px; border-radius: 24px; width: 90%; max-width: 550px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.05); }
+        .close-btn { position: absolute; top: 15px; right: 25px; font-size: 32px; cursor: pointer; color: #ccc; transition: all 0.2s; font-weight: bold; }
+        .close-btn:hover { color: var(--highlight); transform: rotate(90deg); }
         
-        /* 連結與按鈕樣式 */
-        .links-container { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .modal-header { display: flex; align-items: center; gap: 25px; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 2px dashed #eee; }
+        .big-symbol { font-size: 65px; font-weight: 800; color: #333; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; border-radius: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+        .modal-title h2 { margin: 0; font-size: 2.2rem; color: #333; }
+        .modal-title span { color: var(--text-muted); font-size: 1.1rem; font-weight: bold;}
         
-        .wiki-link, .video-btn {
-            display: inline-flex; align-items: center;
-            padding: 8px 15px; border-radius: 20px;
-            text-decoration: none; font-size: 0.9rem;
-            transition: 0.2s;
-        }
+        .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
+        .data-item { background: #f8f9fa; padding: 12px 15px; border-radius: 12px; border: 1px solid #eee; }
+        .data-item strong { color: #888; font-size: 0.85rem; display: block; margin-bottom: 4px; }
+        .data-item span { font-size: 1.1rem; font-weight: 800; color: #444;}
         
-        .wiki-link { background: #333; color: #4facfe; }
-        .wiki-link:hover { background: #444; }
+        .summary-box { background: #fff5f5; padding: 20px; border-radius: 16px; line-height: 1.7; color: #555; font-size: 1rem; max-height: 200px; overflow-y: auto; border-left: 5px solid var(--highlight); }
+        .links-container { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .wiki-link, .video-btn { display: inline-flex; align-items: center; padding: 10px 20px; border-radius: 30px; text-decoration: none; font-size: 0.95rem; font-weight: bold; transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .wiki-link { background: #f0f4f8; color: #0077b6; }
+        .wiki-link:hover { background: #e2eafc; transform: translateY(-2px); }
+        .video-btn { background: #ff9a9e; color: white; display: none; }
+        .video-btn:hover { background: #ff758c; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(255, 117, 140, 0.3); }
 
-        /* [新增] 1A族影片按鈕樣式 */
-        .video-btn {
-            background: #d32f2f; color: white;
-            font-weight: bold;
-            display: none; /* 預設隱藏，JS控制顯示 */
-        }
-        .video-btn:hover { background: #b71c1c; transform: translateY(-2px); }
-
-        .loader { grid-column: 1 / -1; text-align: center; padding: 50px; color: #888; }
+        .loader { grid-column: 1 / -1; text-align: center; padding: 50px; color: #888; font-weight: bold; }
     </style>
 </head>
-<body>
+<body class="mode-learn">
 
     <header>
-        <h1>元素週期表</h1>
-        <input type="text" id="search" class="search-box" placeholder="搜尋 (例如: 金, Au, 79)...">
+        <div class="header-title">
+            <h1>🧪 元素週期表</h1>
+            <div class="author-badge">✨ 小粘製作</div>
+        </div>
+        
+        <div class="mode-controls">
+            <button id="btn-learn" class="mode-btn active" onclick="switchMode('LEARN')">📖 學習模式</button>
+            <button id="btn-test-a" class="mode-btn" onclick="switchMode('TEST_A')">📝 測驗 A (符號填空)</button>
+            <button id="btn-test-b" class="mode-btn" onclick="switchMode('TEST_B')">🏆 測驗 B (隨機五題)</button>
+        </div>
     </header>
 
     <div class="table-wrapper">
+        <!-- 週期表主體 -->
         <div class="periodic-table" id="periodic-table">
+            <!-- 預覽框 -->
             <div id="preview-container">
                 <div id="image-preview-box">
-                    <img id="preview-img" src="" alt="">
-                    <div id="preview-text">滑鼠移至元素上方<br>預覽圖片</div>
-                    <div id="preview-label"></div>
+                    <div id="preview-img-container">
+                        <img id="preview-img" src="" alt="">
+                        <div id="preview-emoji">✨</div>
+                    </div>
+                    <div id="preview-text-info">
+                        <div id="preview-label">把滑鼠移上來吧！</div>
+                        <div id="preview-status">探索元素的長相 👀</div>
+                    </div>
                 </div>
             </div>
-            <div class="loader">正在載入 118 個元素的中文資料...</div>
+            <div class="loader">正在呼叫元素小精靈... 🪄</div>
+        </div>
+
+        <!-- 測驗 B 介面 -->
+        <div id="test-b-container">
+            <div class="test-b-header">測驗 B：化學符號大挑戰</div>
+            <p style="color:#666; margin-top:0;">請根據下方中文名稱，填寫正確的化學符號 (注意大小寫)。</p>
+            <div id="quiz-b-list" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px;"></div>
+            <button class="submit-btn" onclick="checkTestB()">送出批改 💯</button>
+            <div id="score-b" class="score-display"></div>
+            <button id="retry-b" class="mode-btn" style="display:none; margin-top:10px;" onclick="generateTestB()">再來一局 🔄</button>
         </div>
     </div>
 
+    <!-- 完整的詳細資訊彈窗 ( Modal ) -->
     <div id="element-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>
@@ -268,28 +240,22 @@
                 <div class="modal-title">
                     <h2 id="m-name"></h2>
                     <span id="m-en-name"></span><br>
-                    <span id="m-category" style="color:#aaa; font-size:0.9rem;"></span>
+                    <span id="m-category" style="color:#888; font-size:0.95rem;"></span>
                 </div>
             </div>
             <div class="data-grid">
-                <div class="data-item"><strong>原子序</strong><span id="m-number"></span></div>
-                <div class="data-item"><strong>原子量</strong><span id="m-mass"></span></div>
-                <div class="data-item"><strong>電子組態</strong><span id="m-shell"></span></div>
-                <div class="data-item"><strong>相態 (常溫)</strong><span id="m-phase"></span></div>
+                <div class="data-item"><strong>🔢 原子序</strong><span id="m-number"></span></div>
+                <div class="data-item"><strong>⚖️ 原子量</strong><span id="m-mass"></span></div>
+                <div class="data-item"><strong>⚛️ 電子組態</strong><span id="m-shell"></span></div>
+                <div class="data-item"><strong>🌡️ 相態 (常溫)</strong><span id="m-phase"></span></div>
             </div>
             <div class="summary-box">
-                <strong style="display:block; margin-bottom:5px; color:white;">簡介：</strong>
+                <strong style="display:block; margin-bottom:5px; color:#ff758c;">📖 簡介：</strong>
                 <span id="m-summary">載入中...</span>
-                
                 <div class="links-container">
-                    <a href="#" id="m-wiki" class="wiki-link" target="_blank">📖 維基百科</a>
-                    
-                    <a href="https://zh.wikipedia.org/wiki/File:Alkali_metals_reations.webm" 
-                       id="m-video-btn" 
-                       class="video-btn" 
-                       target="_blank">
-                       🎥 觀看反應影片 (1A族)
-                    </a>
+                    <a href="#" id="m-wiki" class="wiki-link" target="_blank">🌐 維基百科</a>
+                    <!-- 1A族 專屬影片按鈕 -->
+                    <a href="https://zh.wikipedia.org/wiki/File:Alkali_metals_reations.webm" id="m-video-btn" class="video-btn" target="_blank">🎥 遇水反應影片</a>
                 </div>
             </div>
         </div>
@@ -299,6 +265,10 @@
         const API_URL = 'https://raw.githubusercontent.com/Bowserinator/Periodic-Table-JSON/master/PeriodicTableJSON.json';
         const IMG_PROXY_BASE = 'https://images.weserv.nl/?url=images-of-elements.com/';
 
+        // 快取維基百科資料
+        const wikiCache = {};
+
+        // 完整中英對照表
         const zhNames = {
             "Hydrogen": "氫", "Helium": "氦", "Lithium": "鋰", "Beryllium": "鈹", "Boron": "硼", 
             "Carbon": "碳", "Nitrogen": "氮", "Oxygen": "氧", "Fluorine": "氟", "Neon": "氖",
@@ -317,13 +287,7 @@
             "Lutetium": "鎦", "Hafnium": "鉿", "Tantalum": "鉭", "Tungsten": "鎢", "Rhenium": "錸", 
             "Osmium": "鋨", "Iridium": "銥", "Platinum": "鉑", "Gold": "金", "Mercury": "汞",
             "Thallium": "鉈", "Lead": "鉛", "Bismuth": "鉍", "Polonium": "釙", "Astatine": "砈", 
-            "Radon": "氡", "Francium": "鍅", "Radium": "鐳", "Actinium": "錒", "Thorium": "釷",
-            "Protactinium": "鏷", "Uranium": "鈾", "Neptunium": "錼", "Plutonium": "鈽", "Americium": "鋂", 
-            "Curium": "鋦", "Berkelium": "鉳", "Californium": "鉲", "Einsteinium": "鑀", "Fermium": "鐨",
-            "Mendelevium": "鍆", "Nobelium": "鍩", "Lawrencium": "鐒", "Rutherfordium": "鑪", "Dubnium": "𨧀", 
-            "Seaborgium": "𨭎", "Bohrium": "𨨏", "Hassium": "𨭆", "Meitnerium": "䥑", "Darmstadtium": "鐽",
-            "Roentgenium": "錀", "Copernicium": "鎶", "Nihonium": "鉨", "Flerovium": "鈇", "Moscovium": "鏌", 
-            "Livermorium": "鉝", "Tennessine": "鿬", "Oganesson": "鿫"
+            "Radon": "氡", "Francium": "鍅", "Radium": "鐳", "Actinium": "錒", "Thorium": "釷"
         };
 
         const categoryMap = {
@@ -335,29 +299,49 @@
 
         const phaseMap = { "Solid": "固體", "Liquid": "液體", "Gas": "氣體" };
 
+        // 常考元素名單 (測驗A與B的範圍)
+        const targetElements = [
+            "H", "Li", "Na", "K", "Be", "Mg", "Ca", "Ba", 
+            "Ti", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ag", "Au", "Pt", "Hg", "W", 
+            "B", "Al", "C", "Si", "Pb", "Sn", 
+            "N", "P", "O", "S", 
+            "F", "Cl", "Br", "I", 
+            "He", "Ne", "Ar" 
+        ];
+
+        let allElementsData = [];
+        let currentMode = 'LEARN'; 
+
         const tableContainer = document.getElementById('periodic-table');
         const modal = document.getElementById('element-modal');
-        const searchInput = document.getElementById('search');
-        
-        const previewBox = document.getElementById('image-preview-box');
         const previewImg = document.getElementById('preview-img');
-        const previewText = document.getElementById('preview-text');
+        const previewEmoji = document.getElementById('preview-emoji');
         const previewLabel = document.getElementById('preview-label');
+        const previewStatus = document.getElementById('preview-status');
 
         async function init() {
             try {
                 const res = await fetch(API_URL);
                 const data = await res.json();
+                allElementsData = data.elements;
                 document.querySelector('.loader').style.display = 'none';
-                renderTable(data.elements);
+                renderTable();
             } catch (err) {
                 console.error(err);
-                document.querySelector('.loader').innerText = "資料載入失敗，請檢查網路。";
+                document.querySelector('.loader').innerText = "載入失敗，請確認網路狀態。";
             }
         }
 
-        function renderTable(elements) {
-            elements.forEach(el => {
+        // --- 渲染週期表 ---
+        function renderTable() {
+            // 清除除了 preview-container 以外的內容
+            Array.from(tableContainer.children).forEach(child => {
+                if(child.id !== 'preview-container' && !child.classList.contains('loader')) {
+                    child.remove();
+                }
+            });
+
+            allElementsData.forEach(el => {
                 const div = document.createElement('div');
                 div.className = 'element';
                 
@@ -369,50 +353,145 @@
                 div.style.gridRow = el.ypos;
                 
                 const zhName = zhNames[el.name] || el.name;
-                div.dataset.zhName = zhName; 
-                div.dataset.enName = el.name.toLowerCase();
+                div.dataset.sym = el.symbol;
+                div.dataset.zhName = zhName;
 
-                div.innerHTML = `
-                    <span class="el-num">${el.number}</span>
-                    <span class="el-sym">${el.symbol}</span>
-                    <span class="el-name">${zhName}</span>
-                `;
+                // 根據模式決定內容
+                if (currentMode === 'TEST_A' && targetElements.includes(el.symbol)) {
+                    // 測驗 A 模式：指定元素變成輸入框
+                    div.innerHTML = `
+                        <span class="el-num">${el.number}</span>
+                        <div class="el-sym"><input type="text" class="quiz-input-a" data-ans="${el.symbol}" maxlength="2" autocomplete="off"></div>
+                        <span class="el-name">${zhName}</span>
+                    `;
+                    
+                    const input = div.querySelector('.quiz-input-a');
+                    input.addEventListener('input', function() {
+                        const val = this.value.trim().toLowerCase();
+                        const ans = this.dataset.ans.toLowerCase();
+                        if (val === ans) {
+                            this.classList.add('correct');
+                            this.classList.remove('wrong');
+                            this.disabled = true; 
+                        } else if (val.length === ans.length) {
+                            this.classList.add('wrong');
+                            this.classList.remove('correct');
+                        } else {
+                            this.classList.remove('correct', 'wrong');
+                        }
+                    });
 
-                div.addEventListener('mouseenter', () => updatePreview(el, zhName));
-                div.onclick = () => openModal(el, catClass, zhName);
+                } else {
+                    // 一般學習模式 (或未被抽中的元素)
+                    div.innerHTML = `
+                        <span class="el-num">${el.number}</span>
+                        <span class="el-sym">${el.symbol}</span>
+                        <span class="el-name">${zhName}</span>
+                    `;
+                }
+
+                // 綁定事件 (只有學習模式可以看資料和圖片預覽)
+                if (currentMode === 'LEARN') {
+                    div.addEventListener('mouseenter', () => handleHover(el, zhName));
+                    div.onclick = () => openModal(el, catClass, zhName);
+                }
+
                 tableContainer.appendChild(div);
             });
         }
 
-        function updatePreview(el, zhName) {
-            previewBox.classList.add('active');
-            previewImg.style.display = 'none';
-            previewLabel.style.display = 'none';
-            previewText.style.display = 'block';
-            previewText.innerText = '載入中...';
+        // --- 模式切換邏輯 ---
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(mode === 'LEARN' ? 'btn-learn' : mode === 'TEST_A' ? 'btn-test-a' : 'btn-test-b').classList.add('active');
 
+            const table = document.getElementById('periodic-table');
+            const testB = document.getElementById('test-b-container');
+            const preview = document.getElementById('preview-container');
+
+            document.body.className = `mode-${mode.toLowerCase()}`;
+
+            if (mode === 'LEARN') {
+                table.style.display = 'grid'; testB.style.display = 'none'; preview.style.display = 'flex';
+                renderTable();
+            } 
+            else if (mode === 'TEST_A') {
+                table.style.display = 'grid'; testB.style.display = 'none'; preview.style.display = 'none'; 
+                renderTable();
+            } 
+            else if (mode === 'TEST_B') {
+                table.style.display = 'none'; testB.style.display = 'flex';
+                generateTestB();
+            }
+        }
+
+        // --- 滑鼠預覽 (學習模式) ---
+        let currentHoverElement = null;
+        async function fetchWikiData(zhName) {
+            if (wikiCache[zhName]) return wikiCache[zhName];
+            try {
+                const wikiApi = `https://zh.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(zhName)}`;
+                const res = await fetch(wikiApi);
+                if (res.ok) {
+                    const data = await res.json();
+                    const result = {
+                        summary: data.extract || "這個元素太神祕了，維基百科還在努力補充中！✨",
+                        image: data.thumbnail ? data.thumbnail.source : null 
+                    };
+                    wikiCache[zhName] = result;
+                    return result;
+                }
+            } catch (e) { console.error(e); }
+            return { summary: "網路小精靈迷路了，無法載入資料 😢", image: null };
+        }
+
+        async function handleHover(el, zhName) {
+            currentHoverElement = zhName;
+            previewLabel.innerText = `${zhName} (${el.symbol})`;
+            previewStatus.innerText = "搜尋圖片中... 📡";
+            previewImg.style.display = 'none';
+            previewEmoji.style.display = 'block';
+            previewEmoji.innerText = "⏳";
+
+            // 優先嘗試 Weserv 圖庫
             let nameForUrl = el.name.toLowerCase();
             if (nameForUrl === 'aluminum') nameForUrl = 'aluminium';
             if (nameForUrl === 'cesium') nameForUrl = 'caesium';
-
             const imgUrl = `${IMG_PROXY_BASE}${nameForUrl}.jpg`;
-            previewImg.src = imgUrl;
 
-            previewImg.onload = () => {
-                previewImg.style.display = 'block';
-                previewLabel.style.display = 'block';
-                previewLabel.innerText = `${zhName} (${el.symbol})`;
-                previewText.style.display = 'none';
+            let img = new Image();
+            img.src = imgUrl;
+
+            img.onload = () => {
+                if (currentHoverElement === zhName) {
+                    previewImg.src = imgUrl;
+                    previewImg.style.display = 'block';
+                    previewEmoji.style.display = 'none';
+                    previewStatus.innerText = "✨ 找到真實照片了！";
+                }
             };
 
-            previewImg.onerror = () => {
-                previewImg.style.display = 'none';
-                previewLabel.style.display = 'none';
-                previewText.style.display = 'block';
-                previewText.innerHTML = `<span style="font-size:40px; color:#555;">${el.symbol}</span><br>暫無圖片`;
+            img.onerror = async () => {
+                // 如果圖庫失敗，使用維基百科抓取
+                const wikiData = await fetchWikiData(zhName);
+                if (currentHoverElement === zhName) {
+                    if (wikiData.image) {
+                        previewImg.src = wikiData.image;
+                        previewImg.style.display = 'block';
+                        previewEmoji.style.display = 'none';
+                        previewStatus.innerText = "✨ 來自維基百科的照片！";
+                    } else {
+                        previewImg.style.display = 'none';
+                        previewEmoji.style.display = 'block';
+                        previewEmoji.innerText = "🧪";
+                        previewStatus.innerText = "暫無照片，給個試管吧！";
+                    }
+                }
             };
         }
 
+        // --- 彈出視窗 (學習模式) ---
         async function openModal(el, colorClass, zhName) {
             document.getElementById('m-bg').innerText = el.symbol;
             document.getElementById('m-bg').className = `big-symbol ${colorClass}`;
@@ -425,9 +504,8 @@
             document.getElementById('m-shell').innerText = el.electron_configuration;
             document.getElementById('m-phase').innerText = phaseMap[el.phase] || el.phase;
             
-            // --- [關鍵新增] 控制 1A 族影片按鈕顯示/隱藏 ---
+            // 處理 1A 族影片按鈕
             const videoBtn = document.getElementById('m-video-btn');
-            // 判斷是否為鹼金屬 (Alkali metal)
             if (el.category.includes('alkali metal')) {
                 videoBtn.style.display = 'inline-flex';
             } else {
@@ -436,43 +514,71 @@
 
             const summaryEl = document.getElementById('m-summary');
             const wikiLink = document.getElementById('m-wiki');
-            summaryEl.innerText = "正在從維基百科獲取中文介紹...";
+            
+            summaryEl.innerText = "正在翻閱百科全書... 📖";
             wikiLink.href = `https://zh.wikipedia.org/wiki/${zhName}`;
             
             modal.style.display = 'flex';
             setTimeout(() => modal.classList.add('show'), 10);
 
-            // API 獲取簡介
-            try {
-                const wikiApi = `https://zh.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(zhName)}`;
-                const res = await fetch(wikiApi);
-                if (res.ok) {
-                    const data = await res.json();
-                    summaryEl.innerText = data.extract || "暫無摘要。";
-                } else {
-                    summaryEl.innerText = "無法載入簡介。";
-                }
-            } catch (e) {
-                summaryEl.innerText = "載入失敗。";
-            }
+            const wikiData = await fetchWikiData(zhName);
+            summaryEl.innerText = wikiData.summary;
         }
 
-        searchInput.addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            document.querySelectorAll('.element').forEach(card => {
-                const zh = card.dataset.zhName;
-                const en = card.dataset.enName;
-                const sym = card.querySelector('.el-sym').innerText.toLowerCase();
-                const num = card.querySelector('.el-num').innerText;
+        // --- 測驗 B：產生題目 ---
+        function generateTestB() {
+            const listDiv = document.getElementById('quiz-b-list');
+            listDiv.innerHTML = ''; 
+            document.getElementById('score-b').style.display = 'none';
+            document.getElementById('retry-b').style.display = 'none';
 
-                if (zh.includes(term) || en.includes(term) || sym.includes(term) || num === term) {
-                    card.classList.remove('dimmed');
-                } else {
-                    card.classList.add('dimmed');
-                }
+            let shuffled = [...targetElements].sort(() => 0.5 - Math.random());
+            let selectedSymbols = shuffled.slice(0, 5);
+
+            selectedSymbols.forEach((sym, index) => {
+                const elData = allElementsData.find(e => e.symbol === sym);
+                const zhName = zhNames[elData.name] || elData.name;
+
+                const item = document.createElement('div');
+                item.className = 'quiz-b-item';
+                item.innerHTML = `
+                    <span>Q${index+1}. ${zhName}</span>
+                    <input type="text" class="quiz-b-input" data-ans="${sym}" maxlength="2" autocomplete="off" placeholder="?">
+                `;
+                listDiv.appendChild(item);
             });
-        });
+        }
 
+        // --- 測驗 B：批改 ---
+        function checkTestB() {
+            const inputs = document.querySelectorAll('.quiz-b-input');
+            let score = 0;
+
+            inputs.forEach(input => {
+                const val = input.value.trim().toLowerCase();
+                const ans = input.dataset.ans.toLowerCase();
+
+                if (val === ans) {
+                    input.style.backgroundColor = 'var(--success)';
+                    input.style.color = 'white';
+                    input.style.borderColor = 'var(--success)';
+                    score += 20;
+                } else {
+                    input.style.backgroundColor = 'var(--error)';
+                    input.style.color = 'white';
+                    input.style.borderColor = 'var(--error)';
+                    input.value = `${input.value} (應為 ${input.dataset.ans})`;
+                }
+                input.disabled = true;
+            });
+
+            const scoreDisplay = document.getElementById('score-b');
+            scoreDisplay.style.display = 'block';
+            scoreDisplay.innerText = `你的分數：${score} 分！`;
+            document.getElementById('retry-b').style.display = 'inline-block';
+        }
+
+        // 關閉 Modal
         const closeBtn = document.querySelector('.close-btn');
         closeBtn.onclick = () => {
             modal.classList.remove('show');
