@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>等速率圓周運動互動模擬 (修正版) | 國中理化視覺化教材</title>
+    <style>
+        /* 基礎全域設定 */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, "微軟正黑體", sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* 應用程式主容器 */
+        #app-container {
+            display: flex;
+            flex-direction: row;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+            width: 900px;
+            max-width: 95vw;
+        }
+
+        /* 左側畫布區 */
+        #canvas-section {
+            position: relative;
+            background-color: #e9ecef;
+            border-right: 2px solid #dee2e6;
+        }
+        canvas {
+            display: block;
+        }
+
+        /* 右側控制面板區 */
+        #control-section {
+            padding: 30px;
+            width: 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        /* 標題與署名樣式 */
+        .title-container h1 {
+            font-size: 1.4rem;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .author-badge {
+            font-size: 0.85rem;
+            color: #fff;
+            background-color: #e74c3c;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 4px rgba(231, 76, 60, 0.3);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .control-group h2 {
+            font-size: 1.1rem;
+            color: #495057;
+        }
+
+        /* 勾選框與圖例樣式 */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            font-size: 1rem;
+            cursor: pointer;
+            user-select: none;
+            padding: 8px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        .checkbox-label:hover {
+            background-color: #f8f9fa;
+        }
+        .checkbox-label input {
+            margin-right: 12px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        /* 圖例顏色標籤 */
+        .color-box {
+            width: 24px;
+            height: 6px;
+            display: inline-block;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+
+        /* 滑桿樣式 */
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        /* 教學提示文字 */
+        .teaching-tip {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            font-size: 0.9rem;
+            color: #856404;
+            border-radius: 4px;
+            line-height: 1.5;
+        }
+
+        /* 響應式設計：小螢幕時改為上下排列 */
+        @media (max-width: 800px) {
+            #app-container {
+                flex-direction: column;
+                width: 100%;
+            }
+            #control-section {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <!-- 視覺化畫布區 -->
+    <div id="canvas-section">
+        <canvas id="simCanvas" width="550" height="550"></canvas>
+    </div>
+
+    <!-- 控制面板區 -->
+    <div id="control-section">
+        <div class="title-container">
+            <h1>等速率圓周運動 <span class="author-badge">小粘製作</span></h1>
+            <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">觀察各個物理向量的變化</p>
+        </div>
+
+        <!-- 向量顯示切換區 -->
+        <div class="control-group">
+            <h2>顯示向量切換</h2>
+            
+            <label class="checkbox-label">
+                <input type="checkbox" id="chk-direction">
+                <span class="color-box" style="background-color: #f39c12;"></span>
+                運動方向 (切線)
+            </label>
+
+            <label class="checkbox-label">
+                <input type="checkbox" id="chk-displacement">
+                <span class="color-box" style="background-color: #9b59b6;"></span>
+                瞬時位移 (切線)
+            </label>
+
+            <label class="checkbox-label">
+                <input type="checkbox" id="chk-velocity">
+                <span class="color-box" style="background-color: #e74c3c;"></span>
+                速度 (切線)
+            </label>
+            
+            <label class="checkbox-label">
+                <input type="checkbox" id="chk-acceleration">
+                <span class="color-box" style="background-color: #2ecc71;"></span>
+                加速度 (指向圓心)
+            </label>
+
+            <label class="checkbox-label">
+                <input type="checkbox" id="chk-force">
+                <span class="color-box" style="background-color: #3498db;"></span>
+                向心力 (指向圓心)
+            </label>
+        </div>
+
+        <!-- 速率調整區 -->
+        <div class="control-group">
+            <h2>運動速率調整</h2>
+            <div class="slider-container">
+                <label for="slider-speed" id="speed-display">目前速率：中等</label>
+                <!-- value 控制角速度 (rad/frame) -->
+                <input type="range" id="slider-speed" min="0.01" max="0.08" step="0.005" value="0.035">
+            </div>
+        </div>
+
+        <!-- 教學提示 -->
+        <div class="teaching-tip">
+            <strong>教師提示：</strong><br>
+            1. 觀察：當你調整速率時，速度、加速度和向心力的向量長度會隨之改變，反映物理量大小變化。<br>
+            2. 思考：瞬時位移、運動方向與速度的方向有什麼關係？<br>
+            3. 加速度和向心力始終指向哪裡？<br>
+            預設向量皆未開啟，請手動切換觀察。
+        </div>
+    </div>
+</div>
+
+<script>
+    /** 
+     * [前端與理化教學雙料專家註解]
+     * 此區塊為核心物理模擬與 Canvas 繪圖邏輯。
+     * 我們使用 requestAnimationFrame 來達到平滑的動畫效果。
+     * 所有的數學計算皆基於標準的極座標系與三角函數。
+     */
+
+    // 取得 DOM 元素
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // UI 控制元件
+    const chkDirection = document.getElementById('chk-direction');
+    const chkDisplacement = document.getElementById('chk-displacement');
+    const chkVelocity = document.getElementById('chk-velocity');
+    const chkAcceleration = document.getElementById('chk-acceleration');
+    const chkForce = document.getElementById('chk-force');
+    const sliderSpeed = document.getElementById('slider-speed');
+
+    // 物理常數與狀態變數
+    const CX = canvas.width / 2;     // 圓心 X
+    const CY = canvas.height / 2;    // 圓心 Y
+    const R = 180;                   // 圓周半徑
+    
+    let theta = 0;                   // 目前的旋轉角度 (弧度)
+    
+    // 顏色定義 (對應 UI 勾選框)
+    const COLOR_DIRECTION = '#f39c12';     // 橙
+    const COLOR_DISPLACEMENT = '#9b59b6';  // 紫
+    const COLOR_VELOCITY = '#e74c3c';      // 紅
+    const COLOR_ACCELERATION = '#2ecc71';  // 綠
+    const COLOR_FORCE = '#3498db';         // 藍
+
+    // 向量縮放因子 (與物理量大小掛鉤，以便教學觀察方向和量值變化)
+    const V_SCALE_FACTOR = 1600; // 速度與 omega 成正比
+    const A_SCALE_FACTOR = 18000; // 加速度/力與 omega^2 成正比
+    // 固定長度向量
+    const BASE_DISPLACEMENT_LENGTH = 80;
+    const BASE_DIRECTION_LENGTH = 70;
+
+    /**
+     * 繪製帶有箭頭的向量線段
+     * @param {number} fromX - 起點 X
+     * @param {number} fromY - 起點 Y
+     * @param {number} toX - 終點 X
+     * @param {number} toY - 終點 Y
+     * @param {string} color - 顏色 (HEX/RGB)
+     * @param {number} width - 線條寬度
+     * @param {boolean} dashed - 是否為虛線
+     */
+    function drawArrow(fromX, fromY, toX, toY, color, width = 3, dashed = false) {
+        const headLength = 12; // 箭頭頭部大小
+        const angle = Math.atan2(toY - fromY, toX - fromX);
+
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        
+        if (dashed) {
+            ctx.setLineDash([8, 6]);
+        } else {
+            ctx.setLineDash([]);
+        }
+
+        // 畫主幹
+        ctx.moveTo(fromX, fromY);
+        ctx.lineTo(toX, toY);
+        ctx.stroke();
+
+        // 畫箭頭 (恢復實線)
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.moveTo(toX, toY);
+        ctx.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY - headLength * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    /**
+     * 主動畫迴圈
+     */
+    function animate() {
+        // 1. 清除畫布
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 2. 取得當前角速度 (來自滑桿)
+        const omega = parseFloat(sliderSpeed.value);
+        
+        // 更新角度 (負號表示逆時針，為標準數學坐標系方向)
+        theta -= omega;
+
+        // 3. 畫出運動軌跡 (虛線圓周)
+        ctx.beginPath();
+        ctx.arc(CX, CY, R, 0, Math.PI * 2);
+        ctx.strokeStyle = '#adb5bd';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]); // 恢復實線
+
+        // 畫出圓心標記
+        ctx.beginPath();
+        ctx.arc(CX, CY, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#495057';
+        ctx.fill();
+
+        // 4. 計算物體當前位置
+        // 參數式：x = cx + R*cos(theta), y = cy + R*sin(theta)
+        const objX = CX + R * Math.cos(theta);
+        const objY = CY + R * Math.sin(theta);
+
+        // 5. 繪製各項向量 (根據 UI 勾選狀態)
+        
+        // 切線角度 (逆時針方向為 theta - PI/2)
+        const tangentAngle = theta - Math.PI / 2;
+
+        // 5-1. 運動方向 (Direction) - 切線方向
+        if (chkDirection.checked) {
+            // 教學細節：為了不讓切線方向的物理量完全重疊，
+            // 我們將運動方向稍微並列
+            const offsetDist = 6;
+            const offsetX = offsetDist * Math.cos(theta + Math.PI / 2); // 沿徑向外移
+            const offsetY = offsetDist * Math.sin(theta + Math.PI / 2);
+
+            const startX = objX + offsetX;
+            const startY = objY + offsetY;
+            
+            const drEndX = startX + BASE_DIRECTION_LENGTH * Math.cos(tangentAngle);
+            const drEndY = startY + BASE_DIRECTION_LENGTH * Math.sin(tangentAngle);
+            drawArrow(startX, startY, drEndX, drEndY, COLOR_DIRECTION, 3);
+        }
+
+        // 5-2. 瞬時位移 (Displacement) - 切線方向
+        if (chkDisplacement.checked) {
+            // 教學細節：與運動方向稍微並列
+            const offsetDist = 6;
+            const offsetX = offsetDist * Math.cos(theta - Math.PI / 2); // 沿徑向內移
+            const offsetY = offsetDist * Math.sin(theta - Math.PI / 2);
+
+            const startX = objX + offsetX;
+            const startY = objY + offsetY;
+            
+            const dEndX = startX + BASE_DISPLACEMENT_LENGTH * Math.cos(tangentAngle);
+            const dEndY = startY + BASE_DISPLACEMENT_LENGTH * Math.sin(tangentAngle);
+            drawArrow(startX, startY, dEndX, dEndY, COLOR_DISPLACEMENT, 3, true);
+        }
+
+        // 5-3. 速度 (Velocity) - 切線方向 (使用 vLen 與速率掛鉤)
+        if (chkVelocity.checked) {
+            // 速度與速率(角速度)成正比
+            const vLen = V_SCALE_FACTOR * omega;
+            const vEndX = objX + vLen * Math.cos(tangentAngle);
+            const vEndY = objY + vLen * Math.sin(tangentAngle);
+            drawArrow(objX, objY, vEndX, vEndY, COLOR_VELOCITY, 4);
+        }
+
+        // 5-4. 加速度與向心力的動態長度計算 (與 omega^2 成正比)
+        const aLen = A_SCALE_FACTOR * omega * omega;
+        const fLen = aLen + 20; // 使力比加速度略長，方便同時顯示
+
+        // 5-5. 加速度 (Acceleration) - 指向圓心 (使用 aLen 與速率掛鉤)
+        if (chkAcceleration.checked) {
+            // 方向為 theta + PI (指向圓心)
+            // 教學細節：沿著切線方向稍微平移一點
+            const offsetDist = 8;
+            const startX = objX + offsetDist * Math.cos(tangentAngle);
+            const startY = objY + offsetDist * Math.sin(tangentAngle);
+            const aEndX = startX + aLen * Math.cos(theta + Math.PI);
+            const aEndY = startY + aLen * Math.sin(theta + Math.PI);
+            
+            drawArrow(startX, startY, aEndX, aEndY, COLOR_ACCELERATION, 3);
+        }
+
+        // 5-6. 向心力 (Centripetal Force) - 指向圓心 (使用 fLen 與速率掛鉤)
+        if (chkForce.checked) {
+            // 方向為 theta + PI (指向圓心)
+            const fEndX = objX + fLen * Math.cos(theta + Math.PI);
+            const fEndY = objY + fLen * Math.sin(theta + Math.PI);
+            drawArrow(objX, objY, fEndX, fEndY, COLOR_FORCE, 4);
+        }
+
+        // 6. 繪製運動物體 (圓球)放在最上層以免被線條覆蓋
+        ctx.beginPath();
+        ctx.arc(objX, objY, 12, 0, Math.PI * 2);
+        ctx.fillStyle = '#f1c40f'; // 黃色球體
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#333';
+        ctx.stroke();
+
+        // 7. 呼叫下一幀
+        requestAnimationFrame(animate);
+    }
+
+    // 啟動動畫
+    animate();
+
+</script>
+</body>
+</html>

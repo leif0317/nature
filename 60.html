@@ -4,23 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>國中理化：直線運動關係圖 (x-t, v-t, a-t) - 小粘製作</title>
+    <!-- 載入最新版 Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; font-family: "Microsoft JhengHei", sans-serif; }
         body { margin: 0; display: flex; height: 100vh; background-color: #f4f7f6; }
         
         /* 左側控制面板 */
-        .sidebar { width: 260px; background: #2c3e50; color: white; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 10; }
-        .sidebar h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 2px solid #34495e; padding-bottom: 10px; }
+        .sidebar { width: 280px; background: #2c3e50; color: white; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 10; overflow-y: auto; }
+        .sidebar h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 2px solid #34495e; padding-bottom: 10px; margin-bottom: 5px;}
         .control-group { display: flex; flex-direction: column; gap: 5px; }
         .control-group label { font-size: 0.9rem; color: #bdc3c7; }
         .control-group input[type="number"] { padding: 8px; border: none; border-radius: 4px; outline: none; font-size: 1rem; width: 100%; background: #fff; }
         .control-group input[type="range"] { width: 100%; margin-top: 5px; cursor: pointer; }
+        
+        /* 按鈕設計 */
         .btn { padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1rem; transition: 0.2s; margin-top: 5px; }
         .btn-start { background: #27ae60; color: white; }
         .btn-start:hover { background: #2ecc71; }
         .btn-reset { background: #c0392b; color: white; }
         .btn-reset:hover { background: #e74c3c; }
+        
+        /* 手繪模式特別樣式 */
+        .draw-panel { background: #34495e; padding: 15px; border-radius: 8px; margin-top: 10px; border: 2px dashed #f39c12; }
+        .draw-panel h3 { margin: 0 0 10px 0; color: #f39c12; font-size: 1.1rem; text-align: center; }
+        .btn-draw-toggle { background: #f39c12; color: white; width: 100%; margin-bottom: 10px;}
+        .btn-draw-toggle:hover { background: #e67e22; }
+        .btn-draw-run { background: #8e44ad; color: white; width: 100%; }
+        .btn-draw-run:hover { background: #9b59b6; }
+        
         .hint { font-size: 0.85rem; color: #95a5a6; margin-top: auto; line-height: 1.6; }
 
         /* 右側主畫面 */
@@ -34,8 +46,12 @@
         .signature { font-size: 1.8rem; font-weight: bold; color: #2980b9; letter-spacing: 2px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
 
         /* 圖表區 */
-        .chart-container { flex: 1; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); position: relative; min-height: 300px; }
+        .chart-container { flex: 1; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); position: relative; min-height: 300px; cursor: default;}
+        .chart-container.drawing-mode canvas { cursor: crosshair !important; }
         
+        /* 繪製提示文字 */
+        #draw-overlay-msg { display: none; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(243, 156, 18, 0.9); color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; z-index: 10; pointer-events: none; }
+
         /* 下方汽車軌道區 */
         .track-container { height: 150px; background: white; margin-top: 15px; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: center; position: relative; overflow: hidden;}
         .track { width: 100%; height: 4px; background: #bdc3c7; position: relative; margin-top: 30px; }
@@ -52,8 +68,9 @@
 </head>
 <body>
 
+    <!-- 左側參數控制 -->
     <div class="sidebar">
-        <h2>參數設定</h2>
+        <h2>自動模式參數</h2>
         <div class="control-group">
             <label>起點位置 (x₀) [m]</label>
             <input type="number" id="input-x0" value="0" step="1" onchange="resetSimulation(false)">
@@ -67,32 +84,42 @@
             <input type="number" id="input-a" value="0" step="0.5" onchange="resetSimulation(false)">
         </div>
         
-        <div class="control-group" style="margin-top: 10px; border-top: 1px solid #34495e; padding-top: 15px;">
+        <button class="btn btn-start" id="btn-start" onclick="startAutoSimulation()">▶ 自動開始繪製</button>
+        <button class="btn btn-reset" onclick="resetSimulation(true)">🔄 重設圖表</button>
+
+        <div class="control-group" style="margin-top: 5px; border-top: 1px solid #34495e; padding-top: 10px;">
             <label>軌道邊界範圍 (±m)</label>
             <input type="number" id="input-length" value="5000" min="10" max="5000" step="10" oninput="document.getElementById('range-length').value=this.value; updateTrackLength()">
             <input type="range" id="range-length" value="5000" min="10" max="5000" step="10" oninput="document.getElementById('input-length').value=this.value; updateTrackLength()">
         </div>
 
-        <button class="btn btn-start" id="btn-start" onclick="startAutoSimulation()">▶ 自動開始繪製</button>
-        <button class="btn btn-reset" onclick="resetSimulation(true)">🔄 重設</button>
+        <!-- 手繪 v-t 模式控制區 -->
+        <div class="draw-panel">
+            <h3>✏️ 手繪 v-t 模式</h3>
+            <button class="btn btn-draw-toggle" id="btn-toggle-draw" onclick="toggleDrawMode()">開啟手繪面板</button>
+            <button class="btn btn-draw-run" id="btn-run-draw" onclick="runDrawnData()" disabled>▶ 執行手繪軌跡</button>
+        </div>
         
         <div class="hint">
-            💡 <b>操作提示：</b><br>
-            預設參數為 0 時，車子處於靜止狀態。請先輸入數值（例如：初速度設為 1000），然後點擊開始！
+            💡 <b>手繪提示：</b><br>
+            1. 畫布預設會採用上方設定的「初速度」。<br>
+            2. <b>不一定要從 0 秒開始畫</b>，畫出來的線條會自動向左右延伸補齊！
         </div>
     </div>
 
+    <!-- 右側圖表與軌道 -->
     <div class="main">
         <div class="top-bar">
             <div class="tabs">
-                <button class="tab active" id="tab-xt" onclick="switchTab('xt')">位置-時間 (x-t) 圖</button>
-                <button class="tab" id="tab-vt" onclick="switchTab('vt')">速度-時間 (v-t) 圖</button>
-                <button class="tab" id="tab-at" onclick="switchTab('at')">加速度-時間 (a-t) 圖</button>
+                <button class="tab active" id="tab-xt" onclick="if(!isDrawMode) switchTab('xt')">位置-時間 (x-t) 圖</button>
+                <button class="tab" id="tab-vt" onclick="if(!isDrawMode) switchTab('vt')">速度-時間 (v-t) 圖</button>
+                <button class="tab" id="tab-at" onclick="if(!isDrawMode) switchTab('at')">加速度-時間 (a-t) 圖</button>
             </div>
             <div class="signature">小粘製作</div>
         </div>
 
-        <div class="chart-container">
+        <div class="chart-container" id="chart-box">
+            <div id="draw-overlay-msg">👆 請直接拖曳畫出速度線 (未畫到的地方會自動延伸補齊)</div>
             <canvas id="physicsChart"></canvas>
         </div>
 
@@ -118,105 +145,73 @@
         let isRunning = false;
         let time = 0;
         const MAX_TIME = 20; 
+        const DT = 0.1; 
         let timerInterval = null;
         
-        // 物理數據記憶體 (永遠不替換陣列參照)
+        // 物理數據
         const dataX = [];
         const dataV = [];
         const dataA = [];
         let state = { x: 0, v: 0, a: 0 };
 
+        // 手繪模式專用變數
+        let isDrawMode = false;
+        let isDrawingAction = false;
+        let lastDrawIndex = -1;
+        const MAX_STEPS = Math.round(MAX_TIME / DT) + 1;
+        let customVArray = new Array(MAX_STEPS).fill(0);
+        
+        // 用來追蹤畫筆最左與最右的索引 (為了自動延伸)
+        let minDrawnIdx = MAX_STEPS;
+        let maxDrawnIdx = -1;
+
         const carEl = document.getElementById('car');
         const trackEl = document.getElementById('track');
         const timeDisplay = document.getElementById('time-display');
+        const chartBox = document.getElementById('chart-box');
 
-        let isDragging = false;
+        let isDraggingCar = false;
         let lastX = 0;
         let lastV = 0;
-        const DT = 0.1; 
 
-        // 初始化圖表設定
+        // 初始化圖表
         function initChart() {
             const ctx = document.getElementById('physicsChart').getContext('2d');
             chart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     datasets: [
-                        {
-                            label: '位置 (m)',
-                            data: dataX,
-                            borderColor: '#3498db',
-                            borderWidth: 3,
-                            pointRadius: 0,
-                            tension: 0.1,
-                            hidden: false
-                        },
-                        {
-                            label: '速度 (m/s)',
-                            data: dataV,
-                            borderColor: '#e67e22',
-                            borderWidth: 3,
-                            pointRadius: 0,
-                            tension: 0.1,
-                            hidden: true
-                        },
-                        {
-                            label: '加速度 (m/s²)',
-                            data: dataA,
-                            borderColor: '#9b59b6',
-                            borderWidth: 3,
-                            pointRadius: 0,
-                            tension: 0.1,
-                            hidden: true
-                        }
+                        { label: '位置 (m)', data: dataX, borderColor: '#3498db', borderWidth: 3, pointRadius: 0, tension: 0.1, hidden: false },
+                        { label: '速度 (m/s)', data: dataV, borderColor: '#e67e22', borderWidth: 3, pointRadius: 0, tension: 0.1, hidden: true },
+                        { label: '加速度 (m/s²)', data: dataA, borderColor: '#9b59b6', borderWidth: 3, pointRadius: 0, tension: 0.1, hidden: true }
                     ]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: false,
-                    plugins: { legend: { display: false } },
+                    responsive: true, maintainAspectRatio: false, animation: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } }, 
                     scales: {
-                        x: { 
-                            type: 'linear', 
-                            min: 0, 
-                            max: MAX_TIME, 
-                            title: { display: true, text: '時間 (s)' } 
-                        },
+                        x: { type: 'linear', min: 0, max: MAX_TIME, title: { display: true, text: '時間 (s)' } },
                         y: { 
                             title: { display: true, text: '數值' },
-                            // === 這裡設定 Y=0 軸為紅色 ===
                             grid: {
-                                color: function(context) {
-                                    if (context.tick.value === 0) {
-                                        return 'rgba(255, 0, 0, 0.8)'; // Y=0 設為明顯的紅色
-                                    }
-                                    return 'rgba(0, 0, 0, 0.1)'; // 其他網格維持淺灰色
-                                },
-                                lineWidth: function(context) {
-                                    if (context.tick.value === 0) {
-                                        return 2; // 將紅線稍微加粗
-                                    }
-                                    return 1;
-                                }
+                                color: (ctx) => ctx.tick.value === 0 ? 'rgba(255, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.1)',
+                                lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 1
                             }
                         }
                     }
                 }
             });
             updateChartConfig();
+            setupDrawingEvents();
         }
 
-        // 頁籤切換
         function switchTab(type) {
             document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
             document.getElementById('tab-' + type).classList.add('active');
-            
             currentTab = type;
             updateChartConfig();
         }
 
-        // 動態更新圖表顯示邏輯
         function updateChartConfig() {
             if (!chart) return;
             let limit = parseFloat(document.getElementById('input-length').value) || 5000;
@@ -231,8 +226,13 @@
                 chart.options.scales.y.max = limit;
             } else if (currentTab === 'vt') {
                 chart.options.scales.y.title.text = '速度 (m/s)';
-                chart.options.scales.y.min = undefined; 
-                chart.options.scales.y.max = undefined;
+                if (isDrawMode) {
+                    chart.options.scales.y.min = -50; 
+                    chart.options.scales.y.max = 50;
+                } else {
+                    chart.options.scales.y.min = undefined; 
+                    chart.options.scales.y.max = undefined;
+                }
             } else if (currentTab === 'at') {
                 chart.options.scales.y.title.text = '加速度 (m/s²)';
                 chart.options.scales.y.min = undefined; 
@@ -241,7 +241,184 @@
             chart.update();
         }
 
-        // 更新軌道顯示長度
+        // ================= 手繪模式邏輯 =================
+        function toggleDrawMode() {
+            isDrawMode = !isDrawMode;
+            const toggleBtn = document.getElementById('btn-toggle-draw');
+            const runBtn = document.getElementById('btn-run-draw');
+            const msg = document.getElementById('draw-overlay-msg');
+            
+            if (isDrawMode) {
+                stopSimulation();
+                toggleBtn.innerText = "❌ 關閉手繪面板";
+                toggleBtn.style.background = "#e74c3c";
+                runBtn.disabled = false;
+                chartBox.classList.add('drawing-mode');
+                msg.style.display = 'block';
+                
+                // 取得使用者設定好的初速度作為預設底線
+                let initialV = parseFloat(document.getElementById('input-v0').value) || 0;
+                customVArray.fill(initialV);
+                dataX.length = 0; dataA.length = 0; dataV.length = 0;
+                
+                // 初始化延伸邊界
+                minDrawnIdx = MAX_STEPS;
+                maxDrawnIdx = -1;
+
+                for(let i=0; i<MAX_STEPS; i++) {
+                    dataV.push({x: i * DT, y: initialV});
+                }
+                
+                switchTab('vt'); 
+                document.querySelectorAll('.tab').forEach(btn => btn.style.opacity = '0.5');
+                chart.update();
+            } else {
+                toggleBtn.innerText = "開啟手繪面板";
+                toggleBtn.style.background = "#f39c12";
+                runBtn.disabled = true;
+                chartBox.classList.remove('drawing-mode');
+                msg.style.display = 'none';
+                document.querySelectorAll('.tab').forEach(btn => btn.style.opacity = '1');
+                resetSimulation(false);
+            }
+        }
+
+        function setupDrawingEvents() {
+            const canvas = document.getElementById('physicsChart');
+            
+            canvas.addEventListener('mousedown', (e) => {
+                if (!isDrawMode) return;
+                isDrawingAction = true;
+                lastDrawIndex = -1;
+                handleDrawing(e);
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+                if (!isDrawMode || !isDrawingAction) return;
+                handleDrawing(e);
+            });
+            
+            window.addEventListener('mouseup', () => { isDrawingAction = false; });
+        }
+
+        function handleDrawing(e) {
+            const canvas = document.getElementById('physicsChart');
+            const rect = canvas.getBoundingClientRect();
+            const xPixel = e.clientX - rect.left;
+            const yPixel = e.clientY - rect.top;
+
+            const timeVal = chart.scales.x.getValueForPixel(xPixel);
+            let vVal = chart.scales.y.getValueForPixel(yPixel);
+
+            if (timeVal >= 0 && timeVal <= MAX_TIME) {
+                if (vVal > 50) vVal = 50;
+                if (vVal < -50) vVal = -50;
+
+                let index = Math.round(timeVal / DT);
+                if (index >= 0 && index < MAX_STEPS) {
+                    
+                    // 線性內插與記錄
+                    if (lastDrawIndex !== -1 && Math.abs(index - lastDrawIndex) > 1) {
+                        let minIdx = Math.min(index, lastDrawIndex);
+                        let maxIdx = Math.max(index, lastDrawIndex);
+                        for (let i = minIdx; i <= maxIdx; i++) {
+                            let ratio = (i - lastDrawIndex) / (index - lastDrawIndex);
+                            let interpolatedV = customVArray[lastDrawIndex] + ratio * (vVal - customVArray[lastDrawIndex]);
+                            customVArray[i] = interpolatedV;
+                            dataV[i].y = interpolatedV;
+                        }
+                        minDrawnIdx = Math.min(minDrawnIdx, minIdx);
+                        maxDrawnIdx = Math.max(maxDrawnIdx, maxIdx);
+                    } else {
+                        customVArray[index] = vVal;
+                        dataV[index].y = vVal;
+                        minDrawnIdx = Math.min(minDrawnIdx, index);
+                        maxDrawnIdx = Math.max(maxDrawnIdx, index);
+                    }
+                    
+                    // === 自動向左延伸 ===
+                    if (minDrawnIdx > 0 && minDrawnIdx < MAX_STEPS) {
+                        let firstVal = customVArray[minDrawnIdx];
+                        for (let i = 0; i < minDrawnIdx; i++) {
+                            customVArray[i] = firstVal;
+                            dataV[i].y = firstVal;
+                        }
+                    }
+                    
+                    // === 自動向右延伸 ===
+                    if (maxDrawnIdx >= 0 && maxDrawnIdx < MAX_STEPS - 1) {
+                        let lastVal = customVArray[maxDrawnIdx];
+                        for (let i = maxDrawnIdx + 1; i < MAX_STEPS; i++) {
+                            customVArray[i] = lastVal;
+                            dataV[i].y = lastVal;
+                        }
+                    }
+
+                    lastDrawIndex = index;
+                    chart.update(); 
+                }
+            }
+        }
+
+        // 執行手繪軌跡
+        function runDrawnData() {
+            if (isRunning) return;
+            dataX.length = 0; dataA.length = 0;
+            time = 0;
+            state.x = parseFloat(document.getElementById('input-x0').value) || 0;
+            state.v = customVArray[0];
+            state.a = 0;
+            
+            isRunning = true;
+            document.getElementById('btn-run-draw').disabled = true;
+            
+            document.querySelectorAll('.tab').forEach(btn => btn.style.opacity = '1');
+            switchTab('xt'); 
+            isDrawMode = false; 
+            chartBox.classList.remove('drawing-mode');
+            document.getElementById('draw-overlay-msg').style.display = 'none';
+
+            let step = 0;
+            if (timerInterval) clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                if (step >= MAX_STEPS - 1) {
+                    toggleDrawMode(); 
+                    toggleDrawMode(); 
+                    return stopSimulation();
+                }
+                
+                state.v = customVArray[step];
+                state.x += state.v * DT;
+                
+                if (step > 0) {
+                    state.a = (customVArray[step] - customVArray[step-1]) / DT;
+                }
+
+                let limit = parseFloat(document.getElementById('input-length').value) || 5000;
+                if (state.x >= limit) { state.x = limit; }
+                else if (state.x <= -limit) { state.x = -limit; }
+
+                dataX.push({x: time, y: state.x});
+                dataA.push({x: time, y: state.a});
+
+                updateCarVisual(limit);
+                
+                step++;
+                time = Math.round((step * DT) * 10) / 10;
+                timeDisplay.innerText = `時間: ${time.toFixed(1)} s`;
+                chart.update();
+            }, DT * 1000);
+        }
+
+        // ================= 常規模擬與軌道更新 =================
+        function updateCarVisual(limit) {
+            let percentPos = ((state.x + limit) / (2 * limit)) * 100; 
+            if (percentPos < 0) percentPos = 0;
+            if (percentPos > 100) percentPos = 100;
+            carEl.style.left = `${percentPos}%`;
+        }
+
         function updateTrackLength() {
             let limit = parseFloat(document.getElementById('input-length').value);
             if (isNaN(limit) || limit < 10) limit = 10;
@@ -254,17 +431,12 @@
             document.getElementById('scale-4').innerText = limit + 'm';
             
             let startX = parseFloat(document.getElementById('input-x0').value) || 0;
-            let percentPos = ((startX + limit) / (2 * limit)) * 100;
-            if (percentPos < 0) percentPos = 0;
-            if (percentPos > 100) percentPos = 100;
-            if(time === 0) carEl.style.left = `${percentPos}%`;
-
+            updateCarVisual(limit);
             updateChartConfig();
         }
 
-        // 開啟自動運算
         function startAutoSimulation() {
-            if (isRunning) return;
+            if (isRunning || isDrawMode) return;
             resetSimulation(false);
             
             state.x = parseFloat(document.getElementById('input-x0').value) || 0;
@@ -291,42 +463,32 @@
             }, DT * 1000);
         }
 
-        // 將數據推入陣列並渲染
         function recordDataAndDraw() {
             dataX.push({x: time, y: state.x});
             dataV.push({x: time, y: state.v});
             dataA.push({x: time, y: state.a});
 
             let limit = parseFloat(document.getElementById('input-length').value) || 5000;
-            let percentPos = ((state.x + limit) / (2 * limit)) * 100; 
-            if (percentPos < 0) percentPos = 0;
-            if (percentPos > 100) percentPos = 100;
-            carEl.style.left = `${percentPos}%`;
+            updateCarVisual(limit);
             
             timeDisplay.innerText = `時間: ${time.toFixed(1)} s`;
             chart.update();
         }
 
-        // 停止計時器
         function stopSimulation() {
             isRunning = false;
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
+            if (timerInterval) clearInterval(timerInterval);
             document.getElementById('btn-start').disabled = false;
+            document.getElementById('btn-run-draw').disabled = !isDrawMode;
         }
 
-        // 重置所有狀態
         function resetSimulation(clearAll = true) {
+            if(isDrawMode && clearAll) toggleDrawMode(); 
             stopSimulation();
             time = 0;
             state = { x: 0, v: 0, a: 0 };
             
-            dataX.length = 0;
-            dataV.length = 0;
-            dataA.length = 0;
-            
+            dataX.length = 0; dataV.length = 0; dataA.length = 0;
             timeDisplay.innerText = `時間: 0.0 s`;
             
             if (clearAll) {
@@ -343,40 +505,37 @@
             if (startX > limit) startX = limit;
             if (startX < -limit) startX = -limit;
 
-            let percentPos = ((startX + limit) / (2 * limit)) * 100;
-            carEl.style.left = `${percentPos}%`;
-
+            state.x = startX;
+            updateCarVisual(limit);
             updateChartConfig(); 
         }
 
-        // === 滑鼠互動控制區塊 ===
+        // ================= 車子拖曳互動區 =================
         function getPositionFromMouse(clientX) {
             const rect = trackEl.getBoundingClientRect();
             let percent = (clientX - rect.left) / rect.width;
             if (percent < 0) percent = 0;
             if (percent > 1) percent = 1;
-            
             let limit = parseFloat(document.getElementById('input-length').value) || 5000;
             return (percent * 2 * limit) - limit; 
         }
 
         carEl.addEventListener('mousedown', (e) => {
+            if (isDrawMode) return; 
             if (time >= MAX_TIME) resetSimulation(false);
-            isDragging = true;
+            isDraggingCar = true;
             stopSimulation(); 
             
-            let currentRealX = getPositionFromMouse(e.clientX);
-            state.x = currentRealX;
-            lastX = currentRealX;
+            state.x = getPositionFromMouse(e.clientX);
+            lastX = state.x;
             lastV = 0;
             
             isRunning = true;
             timerInterval = setInterval(() => {
                 if (time >= MAX_TIME) {
-                    isDragging = false;
+                    isDraggingCar = false;
                     return stopSimulation();
                 }
-                
                 time = Math.round((time + DT) * 10) / 10;
                 
                 let currentV = (state.x - lastX) / DT;
@@ -389,29 +548,23 @@
                 
                 lastX = state.x;
                 lastV = state.v;
-                
                 recordDataAndDraw();
             }, DT * 1000);
         });
 
         window.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
+            if (!isDraggingCar) return;
             state.x = getPositionFromMouse(e.clientX);
             let limit = parseFloat(document.getElementById('input-length').value) || 5000;
-            let percentPos = ((state.x + limit) / (2 * limit)) * 100;
-            carEl.style.left = `${percentPos}%`;
+            updateCarVisual(limit);
         });
 
         window.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                state.v = 0;
-                state.a = 0;
-            }
+            if (isDraggingCar) { isDraggingCar = false; state.v = 0; state.a = 0; }
         });
 
         carEl.addEventListener('touchstart', (e) => { e.preventDefault(); carEl.dispatchEvent(new MouseEvent('mousedown', {clientX: e.touches[0].clientX})); });
-        window.addEventListener('touchmove', (e) => { if(isDragging) window.dispatchEvent(new MouseEvent('mousemove', {clientX: e.touches[0].clientX})); });
+        window.addEventListener('touchmove', (e) => { if(isDraggingCar) window.dispatchEvent(new MouseEvent('mousemove', {clientX: e.touches[0].clientX})); });
         window.addEventListener('touchend', () => { window.dispatchEvent(new Event('mouseup')); });
 
         updateTrackLength();
