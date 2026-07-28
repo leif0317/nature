@@ -167,7 +167,7 @@
   }
 
   canvas { display: block; }
-  #loading { position: absolute; top:50%; left:50%; transform:translate(-50%,-50%); }
+  #loading { position: absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-weight: bold; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
 </style>
 </head>
 <body>
@@ -238,26 +238,26 @@ const vCtx = vCanvas.getContext("2d");
 let mode = "lunar";
 let w, h, cx, cy, scale;
 
-// 物理參數 (預設值依照您的要求修改)
+// 物理參數
 let p = {
   earthR: 38,
-  moonR: 14,   // 修改：14
-  orbitR: 100, // 修改：100
+  moonR: 14,   
+  orbitR: 100, 
   sunR: 55,
   angleDeg: 0,
   rawSliderVal: 0 
 };
 
-// --- 紋理加載 ---
+// --- 紋理加載修正 ---
 const earthImg = new Image();
 const moonImg = new Image();
-earthImg.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/600px-The_Earth_seen_from_Apollo_17.jpg';
-moonImg.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/FullMoon2010.jpg/600px-FullMoon2010.jpg';
+earthImg.crossOrigin = "Anonymous"; // 避免 Canvas 跨域污染
+moonImg.crossOrigin = "Anonymous";
 
 let imagesLoaded = 0;
 function onImageLoad() {
   imagesLoaded++;
-  if (imagesLoaded === 2) {
+  if (imagesLoaded >= 2) {
     document.getElementById('loading').style.display = 'none';
     resize();
     vCanvas.width = 280 * (window.devicePixelRatio || 1);
@@ -266,8 +266,15 @@ function onImageLoad() {
     setMode('lunar'); 
   }
 }
+
+// 注意：必須在設定 src 之前綁定 onload 和 onerror
 earthImg.onload = onImageLoad;
+earthImg.onerror = onImageLoad; // 即使圖片網址失效，也要強制隱藏 Loading 畫面
 moonImg.onload = onImageLoad;
+moonImg.onerror = onImageLoad;
+
+earthImg.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/600px-The_Earth_seen_from_Apollo_17.jpg';
+moonImg.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/FullMoon2010.jpg/600px-FullMoon2010.jpg';
 
 // UI 綁定
 const els = {
@@ -304,23 +311,18 @@ function updateParams() {
   requestAnimationFrame(render);
 }
 
-// 數據分析邏輯 (包含校準後的計算)
+// 數據分析邏輯
 function analyzeData() {
   if (mode === 'solar') {
-      // 太陽視角半徑 (固定)
       const viewSunR = p.sunR * 0.8; 
-      
-      // 月球視角半徑計算
-      // 您的校準條件：當 MoonR=14 且 Dist=100 時，比例為 1.0 (等大)
-      const baseDist = 100; // 基準距離
-      const calibrationScale = viewSunR / 14; // 基準半徑 (14)
+      const baseDist = 100;
+      const calibrationScale = viewSunR / 14; 
       
       const viewMoonR = (p.moonR * calibrationScale) * (baseDist / p.orbitR);
-      
       const ratio = viewMoonR / viewSunR;
       els.ratioVal.innerText = ratio.toFixed(2);
 
-      if (ratio >= 0.99) { // 給一點點誤差寬容度
+      if (ratio >= 0.99) {
           els.phenoVal.innerText = "日全食 (Total)";
           els.phenoVal.style.color = "#FFD700"; 
       } else {
@@ -433,9 +435,7 @@ function isFullEclipse(moonX, moonY, moonR, shadowData) {
     return (dy + moonR) < currentUmbraR;
 }
 
-// ----------------------------------------------------
-// 🌍 地球視角繪製邏輯 (Earth View) - 精確校正版
-// ----------------------------------------------------
+// 🌍 地球視角繪製邏輯
 function drawEarthView(moonX, moonY, moonR, shadowData) {
     const vw = 280;
     const vh = 280;
@@ -445,11 +445,9 @@ function drawEarthView(moonX, moonY, moonR, shadowData) {
     vCtx.clearRect(0, 0, vw, vh);
 
     if (mode === 'solar') {
-        // --- 日食視角 ---
         vCtx.fillStyle = "#87CEEB"; 
         vCtx.fillRect(0, 0, vw, vh);
 
-        // 1. 太陽
         const viewSunR = p.sunR * 0.8; 
         vCtx.beginPath();
         vCtx.arc(vcx, vcy, viewSunR, 0, Math.PI*2);
@@ -458,14 +456,10 @@ function drawEarthView(moonX, moonY, moonR, shadowData) {
         vCtx.fill();
         vCtx.shadowBlur = 0;
 
-        // 2. 月球
         const degDiff = p.angleDeg - 180;
         
         if (Math.abs(degDiff) < 30) {
             const viewMoonX = vcx - degDiff * 6; 
-            
-            // 校準邏輯 (您的新需求)：
-            // 基準：當 orbitR=100, moonR=14 時，視角大小相等 (ratio=1)
             const baseDist = 100;
             const calibrationScale = viewSunR / 14; 
             
@@ -484,7 +478,6 @@ function drawEarthView(moonX, moonY, moonR, shadowData) {
         }
 
     } else {
-        // --- 月食視角 ---
         vCtx.fillStyle = "#111"; 
         vCtx.fillRect(0, 0, vw, vh);
         
@@ -502,7 +495,14 @@ function drawEarthView(moonX, moonY, moonR, shadowData) {
 
         vCtx.save();
         vCtx.beginPath(); vCtx.arc(viewMoonX, vcy, viewMoonR, 0, Math.PI*2); vCtx.clip();
-        vCtx.drawImage(moonImg, viewMoonX - viewMoonR, vcy - viewMoonR, viewMoonR*2, viewMoonR*2);
+        
+        try {
+            vCtx.drawImage(moonImg, viewMoonX - viewMoonR, vcy - viewMoonR, viewMoonR*2, viewMoonR*2);
+        } catch(e) {
+            vCtx.fillStyle = "#ccc";
+            vCtx.fill();
+        }
+        
         vCtx.restore();
 
         const dist = Math.hypot(viewMoonX - vcx, 0); 
@@ -531,7 +531,6 @@ function drawEarthView(moonX, moonY, moonR, shadowData) {
 function render() {
   ctx.clearRect(0, 0, w, h);
 
-  // 縮短太陽與地球距離 (更緊湊)
   const sunX = cx - 220 * scale; 
   const sunY = cy; const sR = p.sunR * scale;
   
@@ -544,13 +543,11 @@ function render() {
   const moonX = earthX + Math.cos(-rad) * orbR;
   const moonY = earthY + Math.sin(-rad) * orbR;
 
-  // 1. 畫太陽
   ctx.beginPath(); ctx.arc(sunX, sunY, sR, 0, Math.PI*2);
   ctx.fillStyle = "#FFD700"; ctx.shadowBlur=40; ctx.shadowColor="orange"; ctx.fill(); ctx.shadowBlur=0;
 
   let shadowData;
 
-  // 2. 計算背景陰影
   if (mode === 'solar') {
       shadowData = getShadowPoly(sunX, sunY, sR, moonX, moonY, mR);
       drawRays(sunX, sunY, sR, moonX, moonY, mR);
@@ -565,24 +562,29 @@ function render() {
       ctx.restore();
   }
 
-  // 3. 畫地球
   ctx.save();
   ctx.beginPath(); ctx.arc(earthX, earthY, eR, 0, Math.PI*2); ctx.clip();
-  ctx.drawImage(earthImg, earthX - eR, earthY - eR, eR * 2, eR * 2);
+  try {
+      ctx.drawImage(earthImg, earthX - eR, earthY - eR, eR * 2, eR * 2);
+  } catch(e) {
+      ctx.fillStyle = "#2e86de";
+      ctx.fill();
+  }
   ctx.restore();
   
-  // 4. 畫月球 (上帝視角)
   drawMoon(moonX, moonY, mR, {x: earthX, y: earthY}, shadowData);
-
-  // 5. 畫地球視角
   drawEarthView(moonX, moonY, mR, shadowData);
 }
 
-// 上帝視角月球繪製
 function drawMoon(moonX, moonY, moonR, earthData, shadowPolys) {
     ctx.save();
     ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, Math.PI*2); ctx.clip();
-    ctx.drawImage(moonImg, moonX - moonR, moonY - moonR, moonR * 2, moonR * 2);
+    try {
+        ctx.drawImage(moonImg, moonX - moonR, moonY - moonR, moonR * 2, moonR * 2);
+    } catch(e) {
+        ctx.fillStyle = "#bdc3c7";
+        ctx.fill();
+    }
     ctx.restore();
 
     if (mode === 'solar') return; 
