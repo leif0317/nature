@@ -2,8 +2,8 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>進階物理：等臂天平動態模擬與測量 (點擊版)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>進階物理：天平動態模擬與測量 (精確微調版)</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -15,6 +15,7 @@
             --border: #e2e8f0;
             --success: #10b981;
             --warning: #f59e0b;
+            --danger: #ef4444;
         }
 
         * {
@@ -23,6 +24,7 @@
             padding: 0;
             font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
             user-select: none;
+            -webkit-user-select: none; 
         }
 
         body {
@@ -31,7 +33,7 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            padding: 20px;
+            padding: 15px;
         }
 
         .app-container {
@@ -49,53 +51,74 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 15px 30px;
+            padding: 12px 20px;
             background: #ffffff;
             border-bottom: 2px solid var(--border);
+            flex-wrap: wrap; 
+            gap: 10px;
         }
 
         .title-area {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 10px;
         }
 
         .header h1 { 
-            font-size: 1.25rem; 
+            font-size: 1.15rem; 
             color: var(--text-main); 
         }
 
-        /* 專屬署名徽章 */
         .author-badge {
             background: linear-gradient(135deg, #f59e0b, #ea580c);
             color: white;
-            padding: 4px 14px;
+            padding: 4px 12px;
             border-radius: 20px;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             font-weight: bold;
             box-shadow: 0 2px 4px rgba(234, 88, 12, 0.3);
             letter-spacing: 1px;
+            white-space: nowrap;
         }
 
-        .tabs { display: flex; gap: 10px; }
+        .controls-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
 
-        .tab-btn {
-            padding: 8px 20px;
-            border: 2px solid var(--primary);
+        .tabs, .balance-toggles { 
+            display: flex; 
+            gap: 5px; 
+            background: var(--bg-color);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .tab-btn, .b-btn {
+            padding: 6px 12px;
+            border: none;
             background: transparent;
-            color: var(--primary);
+            color: var(--text-muted);
             border-radius: 6px;
+            font-size: 0.9rem;
             font-weight: bold;
             cursor: pointer;
             transition: 0.2s;
         }
 
-        .tab-btn.active { background: var(--primary); color: white; }
+        .tab-btn.active, .b-btn.active { 
+            background: var(--primary); 
+            color: white; 
+            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+        }
 
         .workspace {
             position: relative;
             width: 100%;
-            height: 600px;
+            aspect-ratio: 11 / 6; 
             background: linear-gradient(135deg, #f8fafc, #e2e8f0);
             overflow: hidden;
         }
@@ -104,6 +127,7 @@
             display: block;
             width: 100%;
             height: 100%;
+            touch-action: none; 
         }
 
         .status-panel {
@@ -112,24 +136,49 @@
             left: 50%;
             transform: translateX(-50%);
             background: rgba(255, 255, 255, 0.95);
-            padding: 12px 24px;
+            padding: 8px 20px;
             border-radius: 30px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             font-weight: bold;
+            font-size: 0.95rem;
             color: var(--text-main);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             pointer-events: none;
+            z-index: 10;
         }
 
         .status-indicator {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             background: var(--warning);
         }
         .status-indicator.balanced { background: var(--success); }
+
+        .zero-warning {
+            position: absolute;
+            top: 20px;
+            left: 20px; 
+            background: rgba(254, 242, 242, 0.95);
+            border: 2px solid #fca5a5;
+            color: #991b1b;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.15);
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
 
         .ui-overlay {
             position: absolute;
@@ -143,80 +192,89 @@
         .control-group {
             position: absolute;
             pointer-events: auto;
-            background: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.85);
             border: 1px solid #cbd5e1;
-            padding: 6px;
+            padding: 4px;
             border-radius: 8px;
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transform: translate(-50%, -50%); 
+            top: 53.3%;
         }
 
-        #left-screw-ctrl { top: 210px; left: 160px; }
-        #right-screw-ctrl { top: 210px; right: 160px; }
+        #left-screw-ctrl { left: 14.5%; }
+        #right-screw-ctrl { left: 85.5%; } 
 
         .screw-btn {
-            width: 28px;
-            height: 28px;
+            width: 32px; 
+            height: 32px;
             border: 1px solid #94a3b8;
             background: white;
             border-radius: 4px;
             font-weight: bold;
+            font-size: 1.1rem;
             cursor: pointer;
             color: #334155;
             display: flex;
             justify-content: center;
             align-items: center;
         }
-        .screw-btn:hover { background: #e2e8f0; }
         .screw-btn:active { background: #cbd5e1; }
 
         .reset-btn {
             position: absolute;
-            bottom: 30px;
-            left: 30px;
+            bottom: 20px;
+            left: 20px;
             pointer-events: auto;
-            padding: 12px 24px;
+            padding: 10px 18px;
             background: var(--text-main);
             color: white;
             border: none;
             border-radius: 8px;
             font-weight: bold;
-            font-size: 1rem;
+            font-size: 0.95rem;
             cursor: pointer;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             transition: 0.2s;
         }
-        .reset-btn:hover { background: #0f172a; }
+        .reset-btn:active { transform: scale(0.95); }
 
         #measure-reset-btn {
             background: var(--primary);
-            bottom: 30px;
-            left: 30px;
+            bottom: 20px;
+            left: 20px;
             display: none;
         }
-        #measure-reset-btn:hover { background: var(--primary-hover); }
 
         .weight-box {
             position: absolute;
-            bottom: 30px;
-            right: 30px;
+            bottom: 20px;
+            right: 20px;
             pointer-events: auto;
             background: rgba(255, 255, 255, 0.95);
             border: 2px solid var(--border);
-            padding: 15px;
+            padding: 12px;
             border-radius: 12px;
             display: none;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            max-width: 200px;
         }
-        .weight-box h3 { font-size: 0.9rem; color: var(--text-muted); text-align: center; }
-        .weight-grid { display: flex; gap: 8px; }
+        .weight-box h3 { font-size: 0.85rem; color: var(--text-muted); text-align: center; }
+        
+        .weight-grid { 
+            display: flex; 
+            gap: 6px; 
+            flex-wrap: wrap; 
+            justify-content: center;
+        }
+        
         .weight-item {
-            width: 40px;
-            height: 40px;
+            width: 38px;
+            height: 38px;
             background: linear-gradient(145deg, #e2e8f0, #cbd5e1);
             border: 1px solid #94a3b8;
             border-radius: 50% 50% 10% 10%;
@@ -224,29 +282,47 @@
             justify-content: center;
             align-items: flex-end;
             padding-bottom: 5px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: bold;
             color: #1e293b;
             cursor: pointer;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             transition: transform 0.1s;
         }
-        .weight-item:hover { background: linear-gradient(145deg, #f1f5f9, #e2e8f0); }
-        .weight-item:active { transform: scale(0.9); } /* 點擊回饋縮放 */
+        
+        .weight-item.mg {
+            background: linear-gradient(145deg, #f1f5f9, #e2e8f0);
+            font-size: 0.65rem;
+        }
+
+        .weight-item:active { transform: scale(0.85); }
         
         .measure-tip {
             position: absolute;
-            bottom: 90px;
-            left: 30px;
+            bottom: 70px;
+            left: 20px;
             background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
+            padding: 10px 15px;
             border-radius: 8px;
             pointer-events: none;
             display: none;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
             color: var(--text-main);
             border: 1px solid var(--border);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            max-width: 45%;
+        }
+
+        @media (max-width: 768px) {
+            .app-container { border-radius: 8px; }
+            .header { padding: 8px 12px; }
+            .workspace { aspect-ratio: 4 / 3; }
+            .status-panel { top: 10px; font-size: 0.8rem; padding: 6px 14px; }
+            .zero-warning { top: 50px; left: 10px; font-size: 0.75rem; padding: 4px 8px; }
+            .measure-tip { display: none !important; }
+            .weight-box { bottom: 10px; right: 10px; padding: 8px; max-width: 150px; }
+            .reset-btn { bottom: 10px; left: 10px; font-size: 0.8rem; padding: 8px 12px; }
+            .control-group { transform: translate(-50%, -50%) scale(0.85); } 
         }
 
     </style>
@@ -257,12 +333,18 @@
         <!-- 頂部列 -->
         <div class="header">
             <div class="title-area">
-                <h1>國中理化：等臂天平操作模擬</h1>
+                <h1>國中理化：天平操作模擬</h1>
                 <span class="author-badge">小粘製作</span>
             </div>
-            <div class="tabs">
-                <button class="tab-btn active" id="tab-zero" onclick="switchMode('zero')">歸零練習</button>
-                <button class="tab-btn" id="tab-measure" onclick="switchMode('measure')">測量實驗</button>
+            <div class="controls-row">
+                <div class="balance-toggles">
+                    <button class="b-btn active" id="btn-equal" onclick="setBalanceType('equal-arm')">等臂天平</button>
+                    <button class="b-btn" id="btn-top" onclick="setBalanceType('top-pan')">上皿天平</button>
+                </div>
+                <div class="tabs">
+                    <button class="tab-btn active" id="tab-zero" onclick="switchMode('zero')">歸零練習</button>
+                    <button class="tab-btn" id="tab-measure" onclick="switchMode('measure')">測量實驗</button>
+                </div>
             </div>
         </div>
 
@@ -275,8 +357,11 @@
                 <span id="status-text">未平衡：請調整天平</span>
             </div>
 
+            <div id="zero-warning" class="zero-warning">
+                <span style="color: #dc2626;">⚠️ 注意：</span>校準螺絲要往「輕」的方向移動！
+            </div>
+
             <div class="ui-overlay">
-                <!-- 校準螺絲 -->
                 <div class="control-group" id="left-screw-ctrl">
                     <button class="screw-btn" onclick="adjustScrew('left', -1)">◀</button>
                     <span style="font-size:12px; font-weight:bold; color:var(--text-muted)">左螺絲</span>
@@ -288,15 +373,13 @@
                     <button class="screw-btn" onclick="adjustScrew('right', 1)">▶</button>
                 </div>
 
-                <!-- 重置按鈕 -->
                 <button class="reset-btn" id="reset-btn" onclick="initZeroMode()">🔄 打亂重新歸零</button>
                 <button class="reset-btn" id="measure-reset-btn" onclick="clearMeasure()">🔄 重新測量新物體</button>
 
                 <div class="measure-tip" id="measure-tip">
-                    <p><strong>任務：</strong>測量左盤綠色物體的質量。<br>請點擊右方砝碼放入右托盤，並拖曳橫樑騎碼直到平衡。<br><span style="color:#e63946; font-size:0.85rem;">提示：直接點擊托盤上的砝碼可以將其取下。</span></p>
+                    <p><strong>任務：</strong>測量左盤綠色物體的質量。<br>點擊下方砝碼放入右盤<span id="rider-tip-text">，並滑動騎碼</span>直到平衡。<br><span style="color:#e63946;">提示：點擊托盤上的砝碼即可取下。</span></p>
                 </div>
 
-                <!-- 點擊版砝碼盒 -->
                 <div class="weight-box" id="weight-box">
                     <h3>砝碼盒 (點擊放至右盤)</h3>
                     <div class="weight-grid">
@@ -305,6 +388,8 @@
                         <div class="weight-item" onclick="addWeight(10)">10g</div>
                         <div class="weight-item" onclick="addWeight(5)">5g</div>
                         <div class="weight-item" onclick="addWeight(1)">1g</div>
+                        <div class="weight-item mg" onclick="addWeight(0.5)">500mg</div>
+                        <div class="weight-item mg" onclick="addWeight(0.1)">100mg</div>
                     </div>
                 </div>
             </div>
@@ -315,21 +400,21 @@
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
 
-        // --- 物理與狀態變數 ---
+        // --- 系統狀態 ---
         let currentMode = 'zero'; 
+        let balanceType = 'equal-arm'; 
+
         const pivotX = 550;
-        const pivotY = 150;
+        const pivotY = 280; 
         const beamLength = 350; 
-        const pointerLength = 280; 
+        const pointerLength = 200; 
         
         let currentAngle = 0; 
         let angularVel = 0;
-        
         let leftScrewOffset = 0;   
         let rightScrewOffset = 0;  
         let riderValue = 0;        
         let intrinsicImbalance = 0;
-        
         let leftPanMass = 0;
         let rightPanWeights = []; 
         let drawnWeightsHitboxes = []; 
@@ -337,7 +422,23 @@
         let isDraggingRider = false;
         let mouseX = 0, mouseY = 0;
 
-        // --- 模式切換與初始化 ---
+        // --- 介面切換邏輯 ---
+        function setBalanceType(type) {
+            balanceType = type;
+            document.getElementById('btn-equal').classList.toggle('active', type === 'equal-arm');
+            document.getElementById('btn-top').classList.toggle('active', type === 'top-pan');
+            
+            if (type === 'top-pan') {
+                riderValue = 0;
+                document.getElementById('rider-tip-text').style.display = 'none';
+            } else {
+                document.getElementById('rider-tip-text').style.display = 'inline';
+            }
+            
+            if (currentMode === 'zero') initZeroMode();
+            else initMeasureMode();
+        }
+
         function switchMode(mode) {
             currentMode = mode;
             document.getElementById('tab-zero').classList.toggle('active', mode === 'zero');
@@ -347,6 +448,7 @@
                 document.getElementById('left-screw-ctrl').style.display = 'flex';
                 document.getElementById('right-screw-ctrl').style.display = 'flex';
                 document.getElementById('reset-btn').style.display = 'block';
+                document.getElementById('zero-warning').style.display = 'block';
                 
                 document.getElementById('measure-reset-btn').style.display = 'none';
                 document.getElementById('weight-box').style.display = 'none';
@@ -356,6 +458,7 @@
                 document.getElementById('left-screw-ctrl').style.display = 'none';
                 document.getElementById('right-screw-ctrl').style.display = 'none';
                 document.getElementById('reset-btn').style.display = 'none';
+                document.getElementById('zero-warning').style.display = 'none';
                 
                 document.getElementById('measure-reset-btn').style.display = 'block';
                 document.getElementById('weight-box').style.display = 'flex';
@@ -366,7 +469,7 @@
 
         function initZeroMode() {
             intrinsicImbalance = (Math.random() - 0.5) * 10;
-            riderValue = Math.floor(Math.random() * 80) + 10; 
+            riderValue = balanceType === 'equal-arm' ? Math.floor(Math.random() * 80) + 10 : 0; 
             leftScrewOffset = 0;
             rightScrewOffset = 0;
             leftPanMass = 0;
@@ -389,7 +492,6 @@
             leftPanMass = parseFloat((Math.random() * 73 + 12).toFixed(1));
         }
 
-        // --- 控制邏輯 ---
         function adjustScrew(side, delta) {
             if (side === 'left') {
                 leftScrewOffset = Math.max(-15, Math.min(15, leftScrewOffset + delta));
@@ -398,13 +500,33 @@
             }
         }
 
-        // 點擊新增砝碼邏輯
         function addWeight(mass) {
             rightPanWeights.push(mass);
+            // 每次新增後由大到小排序，確保重的永遠在底層
+            rightPanWeights.sort((a, b) => b - a);
         }
 
-        // --- 滑鼠互動事件 ---
-        canvas.addEventListener('mousedown', (e) => {
+        // --- 統一事件處理 ---
+        function updateMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX = mouseX, clientY = mouseY;
+            if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else if (e.clientX !== undefined) {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            mouseX = (clientX - rect.left) * scaleX;
+            mouseY = (clientY - rect.top) * scaleY;
+        }
+
+        function handlePointerDown(e) {
+            if (e.type === 'touchstart') e.preventDefault(); 
             updateMousePos(e);
             
             if (currentMode === 'measure') {
@@ -418,15 +540,17 @@
                 }
             }
 
-            if (isMouseOverRider()) {
+            if (balanceType === 'equal-arm' && isMouseOverRider()) {
                 isDraggingRider = true;
                 canvas.style.cursor = 'grabbing';
             }
-        });
+        }
 
-        window.addEventListener('mousemove', (e) => {
+        function handlePointerMove(e) {
+            if (e.type === 'touchmove' && isDraggingRider) e.preventDefault();
             updateMousePos(e);
-            if (isDraggingRider) {
+            
+            if (isDraggingRider && balanceType === 'equal-arm') {
                 let beamLeftEdge = pivotX - beamLength + 40; 
                 let beamRightEdge = pivotX + beamLength - 40;
                 let scaleWidth = beamRightEdge - beamLeftEdge;
@@ -435,30 +559,32 @@
                 riderValue = Math.max(0, Math.min(100, rawVal));
             }
             
-            if (!isDraggingRider) {
+            if (!isDraggingRider && e.type === 'mousemove') {
                 let hoverWeight = drawnWeightsHitboxes.some(box => 
                     mouseX >= box.x && mouseX <= box.x + box.w && mouseY >= box.y && mouseY <= box.y + box.h
                 );
                 if (hoverWeight) canvas.style.cursor = 'pointer'; 
-                else if (isMouseOverRider()) canvas.style.cursor = 'grab';
+                else if (balanceType === 'equal-arm' && isMouseOverRider()) canvas.style.cursor = 'grab';
                 else canvas.style.cursor = 'default';
             }
-        });
+        }
 
-        window.addEventListener('mouseup', () => {
+        function handlePointerUp(e) {
             if (isDraggingRider) {
                 isDraggingRider = false;
                 canvas.style.cursor = 'default';
             }
-        });
-
-        function updateMousePos(e) {
-            const rect = canvas.getBoundingClientRect();
-            mouseX = e.clientX - rect.left;
-            mouseY = e.clientY - rect.top;
         }
 
+        canvas.addEventListener('mousedown', handlePointerDown);
+        window.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('mouseup', handlePointerUp);
+        canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+        window.addEventListener('touchmove', handlePointerMove, { passive: false });
+        window.addEventListener('touchend', handlePointerUp);
+
         function isMouseOverRider() {
+            if (balanceType !== 'equal-arm') return false;
             let beamLeftEdge = -beamLength + 40;
             let scaleWidth = (beamLength - 40) * 2;
             let riderLocalX = beamLeftEdge + (riderValue / 100) * scaleWidth;
@@ -466,17 +592,17 @@
             let worldX = pivotX + riderLocalX * Math.cos(currentAngle) - (-10) * Math.sin(currentAngle);
             let worldY = pivotY + riderLocalX * Math.sin(currentAngle) + (-10) * Math.cos(currentAngle);
             
-            return (Math.abs(mouseX - worldX) < 20 && Math.abs(mouseY - worldY) < 30);
+            return (Math.abs(mouseX - worldX) < 35 && Math.abs(mouseY - worldY) < 45);
         }
 
         // --- 物理運算與繪圖迴圈 ---
         function animate() {
             let leftTorque = leftPanMass * 1.0 - leftScrewOffset * 0.2;
             
-            let rightMassTotal = rightPanWeights.reduce((a, b) => a + b, 0);
-            let riderEffectiveMass = riderValue * 0.1; // 100格 = 10g
-            let rightTorque = rightMassTotal * 1.0 + rightScrewOffset * 0.2 + riderEffectiveMass * 1.0 + intrinsicImbalance;
+            let rightMassTotal = Math.round(rightPanWeights.reduce((a, b) => a + b, 0) * 10) / 10;
+            let riderEffectiveMass = balanceType === 'equal-arm' ? (riderValue * 0.1) : 0; 
             
+            let rightTorque = rightMassTotal * 1.0 + rightScrewOffset * 0.2 + riderEffectiveMass * 1.0 + intrinsicImbalance;
             let netTorque = rightTorque - leftTorque;
             
             let maxAngle = 0.3; 
@@ -493,26 +619,36 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawnWeightsHitboxes = []; 
             
-            ctx.fillStyle = '#cbd5e1'; ctx.fillRect(100, 500, 900, 100);
-            ctx.fillStyle = '#94a3b8'; ctx.fillRect(100, 500, 900, 8);
+            ctx.fillStyle = '#cbd5e1'; ctx.fillRect(100, 520, 900, 80);
+            ctx.fillStyle = '#94a3b8'; ctx.fillRect(100, 520, 900, 8);
 
             ctx.fillStyle = '#475569';
             ctx.beginPath();
-            ctx.moveTo(pivotX - 60, 500); ctx.lineTo(pivotX + 60, 500);
+            ctx.moveTo(pivotX - 60, 520); ctx.lineTo(pivotX + 60, 520);
             ctx.lineTo(pivotX + 20, pivotY); ctx.lineTo(pivotX - 20, pivotY);
             ctx.fill();
 
-            drawBottomScale();
+            drawScale();
 
-            // --- 旋轉座標系開始 ---
+            // --- 旋轉座標系 ---
             ctx.save();
             ctx.translate(pivotX, pivotY);
             ctx.rotate(currentAngle);
 
             ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3;
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, pointerLength); ctx.stroke();
-            ctx.fillStyle = '#ef4444'; ctx.beginPath();
-            ctx.moveTo(-5, pointerLength - 10); ctx.lineTo(5, pointerLength - 10); ctx.lineTo(0, pointerLength + 5); ctx.fill();
+            ctx.beginPath(); 
+            ctx.moveTo(0, 0); 
+            if (balanceType === 'equal-arm') {
+                ctx.lineTo(0, pointerLength); 
+                ctx.stroke();
+                ctx.fillStyle = '#ef4444'; ctx.beginPath();
+                ctx.moveTo(-5, pointerLength - 10); ctx.lineTo(5, pointerLength - 10); ctx.lineTo(0, pointerLength + 5); ctx.fill();
+            } else {
+                ctx.lineTo(0, -pointerLength); 
+                ctx.stroke();
+                ctx.fillStyle = '#ef4444'; ctx.beginPath();
+                ctx.moveTo(-5, -pointerLength + 10); ctx.lineTo(5, -pointerLength + 10); ctx.lineTo(0, -pointerLength - 5); ctx.fill();
+            }
 
             ctx.fillStyle = '#cbd5e1'; ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2;
             ctx.fillRect(-beamLength, -12, beamLength * 2, 24);
@@ -520,22 +656,25 @@
 
             let beamLeftEdge = -beamLength + 40;
             let scaleWidth = (beamLength - 40) * 2;
-            ctx.fillStyle = '#1e293b'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-            for (let i = 0; i <= 100; i++) {
-                let x = beamLeftEdge + (i / 100) * scaleWidth;
-                let lineLen = -4; 
-                if (i % 10 === 0) lineLen = -10; 
-                else if (i % 5 === 0) lineLen = -7; 
-                ctx.beginPath(); ctx.moveTo(x, -12); ctx.lineTo(x, lineLen); ctx.stroke();
-                if (i % 10 === 0) ctx.fillText(i, x, 10);
-            }
+            
+            if (balanceType === 'equal-arm') {
+                ctx.fillStyle = '#1e293b'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+                for (let i = 0; i <= 100; i++) {
+                    let x = beamLeftEdge + (i / 100) * scaleWidth;
+                    let lineLen = -4; 
+                    if (i % 10 === 0) lineLen = -10; 
+                    else if (i % 5 === 0) lineLen = -7; 
+                    ctx.beginPath(); ctx.moveTo(x, -12); ctx.lineTo(x, lineLen); ctx.stroke();
+                    if (i % 10 === 0) ctx.fillText(i, x, 10);
+                }
 
-            let riderX = beamLeftEdge + (riderValue / 100) * scaleWidth;
-            ctx.fillStyle = isMouseOverRider() || isDraggingRider ? '#f59e0b' : '#d97706';
-            ctx.strokeStyle = '#78350f';
-            ctx.fillRect(riderX - 6, -22, 12, 26);
-            ctx.strokeRect(riderX - 6, -22, 12, 26);
-            ctx.strokeStyle = 'white'; ctx.beginPath(); ctx.moveTo(riderX, -20); ctx.lineTo(riderX, -5); ctx.stroke();
+                let riderX = beamLeftEdge + (riderValue / 100) * scaleWidth;
+                ctx.fillStyle = isMouseOverRider() || isDraggingRider ? '#f59e0b' : '#d97706';
+                ctx.strokeStyle = '#78350f';
+                ctx.fillRect(riderX - 6, -22, 12, 26);
+                ctx.strokeRect(riderX - 6, -22, 12, 26);
+                ctx.strokeStyle = 'white'; ctx.beginPath(); ctx.moveTo(riderX, -20); ctx.lineTo(riderX, -5); ctx.stroke();
+            }
 
             if (currentMode === 'zero') {
                 ctx.fillStyle = '#94a3b8'; ctx.strokeStyle = '#475569';
@@ -556,12 +695,11 @@
             drawPan(leftHookX, leftHookY, 'left');
             drawPan(rightHookX, rightHookY, 'right');
 
-            drawRiderMagnifierHUD();
+            if (balanceType === 'equal-arm') drawRiderMagnifierHUD();
 
             requestAnimationFrame(animate);
         }
 
-        // 繪製右上角騎碼放大鏡視窗
         function drawRiderMagnifierHUD() {
             ctx.save();
             const zoomX = 820, zoomY = 20, zoomW = 250, zoomH = 85;
@@ -613,9 +751,7 @@
                 ctx.lineTo(tickX, zoomCenterY + tickLen);
                 ctx.stroke();
                 
-                if (i % 5 === 0) {
-                    ctx.fillText(i, tickX, zoomCenterY - 22);
-                }
+                if (i % 5 === 0) ctx.fillText(i, tickX, zoomCenterY - 22);
             }
 
             ctx.fillStyle = 'rgba(245, 158, 11, 0.4)'; 
@@ -634,37 +770,68 @@
             ctx.restore();
         }
 
-        function drawBottomScale() {
-            let scaleY = pivotY + pointerLength;
+        function drawScale() {
             ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(pivotX, pivotY, pointerLength + 20, Math.PI * 0.35, Math.PI * 0.65);
-            ctx.arc(pivotX, pivotY, pointerLength - 10, Math.PI * 0.65, Math.PI * 0.35, true);
+            
+            let scaleY;
+            if (balanceType === 'equal-arm') {
+                scaleY = pivotY + pointerLength;
+                ctx.arc(pivotX, pivotY, pointerLength + 20, Math.PI * 0.35, Math.PI * 0.65);
+                ctx.arc(pivotX, pivotY, pointerLength - 10, Math.PI * 0.65, Math.PI * 0.35, true);
+            } else {
+                scaleY = pivotY - pointerLength;
+                ctx.arc(pivotX, pivotY, pointerLength + 20, Math.PI * 1.35, Math.PI * 1.65);
+                ctx.arc(pivotX, pivotY, pointerLength - 10, Math.PI * 1.65, Math.PI * 1.35, true);
+            }
+            
             ctx.closePath(); ctx.fill(); ctx.stroke();
 
             ctx.strokeStyle = '#1e293b'; ctx.fillStyle = '#1e293b'; ctx.font = '14px sans-serif';
             for (let a = -0.15; a <= 0.151; a += 0.03) {
-                let sx = pivotX + Math.sin(a) * pointerLength;
-                let sy = pivotY + Math.cos(a) * pointerLength;
-                let ex = pivotX + Math.sin(a) * (pointerLength + 10);
-                let ey = pivotY + Math.cos(a) * (pointerLength + 10);
+                let sx, sy, ex, ey;
+                if (balanceType === 'equal-arm') {
+                    sx = pivotX + Math.sin(a) * pointerLength;
+                    sy = pivotY + Math.cos(a) * pointerLength;
+                    ex = pivotX + Math.sin(a) * (pointerLength + 10);
+                    ey = pivotY + Math.cos(a) * (pointerLength + 10);
+                } else {
+                    sx = pivotX + Math.sin(a) * pointerLength;
+                    sy = pivotY - Math.cos(a) * pointerLength; 
+                    ex = pivotX + Math.sin(a) * (pointerLength + 10);
+                    ey = pivotY - Math.cos(a) * (pointerLength + 10);
+                }
+                
                 ctx.lineWidth = Math.abs(a) < 0.01 ? 3 : 1;
                 ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
-                if (Math.abs(a) < 0.01) ctx.fillText("0", ex, ey + 18);
+                
+                if (Math.abs(a) < 0.01) {
+                    let textY = balanceType === 'equal-arm' ? ey + 18 : ey - 8;
+                    ctx.fillText("0", ex, textY);
+                }
             }
         }
 
         function drawPan(x, y, side) {
-            const panDrop = 180;
-            const panWidth = 110;
+            const panWidth = 120;
+            let pY;
             
-            ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(x, y); ctx.lineTo(x - panWidth/2, y + panDrop);
-            ctx.moveTo(x, y); ctx.lineTo(x + panWidth/2, y + panDrop);
+            
+            if (balanceType === 'equal-arm') {
+                const panDrop = 150;
+                ctx.moveTo(x, y); ctx.lineTo(x - panWidth/2, y + panDrop);
+                ctx.moveTo(x, y); ctx.lineTo(x + panWidth/2, y + panDrop);
+                pY = y + panDrop;
+            } else {
+                const panRise = 90;
+                ctx.moveTo(x, y); ctx.lineTo(x, y - panRise);
+                ctx.moveTo(x - panWidth/2, y - panRise); ctx.lineTo(x + panWidth/2, y - panRise);
+                pY = y - panRise;
+            }
             ctx.stroke();
 
-            let pY = y + panDrop;
             ctx.fillStyle = '#e2e8f0'; ctx.strokeStyle = '#475569'; ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.ellipse(x, pY, panWidth/2, 12, 0, 0, Math.PI * 2);
@@ -677,14 +844,17 @@
                 ctx.strokeRect(x - 20, pY - objH, 40, objH);
                 ctx.fillStyle = '#ffffff'; ctx.font = '16px sans-serif'; ctx.textAlign = 'center';
                 ctx.fillText("?", x, pY - objH/2 + 6);
-            } else if (side === 'right') {
+            } 
+            else if (side === 'right') {
                 let layout = [];
                 let currentRow = [];
                 let currentRowWidth = 0;
                 
+                // 智慧排列演算法：將當前砝碼分行
                 rightPanWeights.forEach((w, idx) => {
-                    let wW = 20 + w * 0.4;
-                    if (currentRowWidth + wW > 85 && currentRow.length > 0) {
+                    let wW = 22 + w * 0.4;
+                    // 當前行寬度若大於 90px，強迫換行到上一層
+                    if (currentRowWidth + wW > 90 && currentRow.length > 0) {
                         layout.push(currentRow);
                         currentRow = [];
                         currentRowWidth = 0;
@@ -694,8 +864,9 @@
                 });
                 if (currentRow.length > 0) layout.push(currentRow);
 
+                // 從底層(第一行)開始往上畫
                 let currentDrawY = pY - 15;
-                layout.reverse().forEach(row => {
+                layout.forEach(row => {
                     let rowTotalWidth = row.reduce((sum, item) => sum + item.width, 0) + (row.length - 1) * 4;
                     let drawX = x - rowTotalWidth / 2;
                     
@@ -703,15 +874,19 @@
                         ctx.fillStyle = '#cbd5e1'; ctx.strokeStyle = '#334155';
                         ctx.fillRect(drawX, currentDrawY, item.width, 15);
                         ctx.strokeRect(drawX, currentDrawY, item.width, 15);
-                        ctx.fillStyle = '#000'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-                        ctx.fillText(item.mass, drawX + item.width/2, currentDrawY + 12);
+                        
+                        let label = item.mass < 1 ? `.${item.mass * 10}` : item.mass;
+                        ctx.fillStyle = '#000'; 
+                        ctx.font = '10px sans-serif'; 
+                        ctx.textAlign = 'center';
+                        ctx.fillText(label, drawX + item.width/2, currentDrawY + 11);
                         
                         drawnWeightsHitboxes.push({
                             x: drawX, y: currentDrawY, w: item.width, h: 15, index: item.index
                         });
                         drawX += item.width + 4;
                     });
-                    currentDrawY -= 16; 
+                    currentDrawY -= 16; // 往上一層堆疊
                 });
             }
         }
@@ -725,7 +900,7 @@
             if (isBalanced) {
                 dot.className = 'status-indicator balanced';
                 if (currentMode === 'zero') {
-                    if (riderValue === 0) {
+                    if (balanceType === 'top-pan' || riderValue === 0) {
                         txt.innerText = "歸零成功！天平已完美平衡。";
                         txt.style.color = "var(--success)";
                     } else {
@@ -740,11 +915,20 @@
             } else {
                 dot.className = 'status-indicator';
                 txt.style.color = "var(--text-main)";
-                if (netTorque > 0) txt.innerText = "未平衡：右側較重 (指針偏左)";
-                else txt.innerText = "未平衡：左側較重 (指針偏右)";
+                
+                if (netTorque > 0) {
+                    txt.innerText = balanceType === 'equal-arm' 
+                        ? "未平衡：右側較重 (指針偏左)" 
+                        : "未平衡：右側較重 (指針偏右)";
+                } else {
+                    txt.innerText = balanceType === 'equal-arm' 
+                        ? "未平衡：左側較重 (指針偏右)" 
+                        : "未平衡：左側較重 (指針偏左)";
+                }
             }
         }
 
+        setBalanceType('equal-arm');
         switchMode('zero');
         animate();
     </script>
