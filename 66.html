@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>虛擬物理實驗室：慣性定律 - 小粘製作</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --accent: #e74c3c;
+            --bg: #ecf0f1;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: var(--primary);
+            text-align: center;
+        }
+        h1 { margin-bottom: 5px; color: #2c3e50; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+        .author-tag { color: #e74c3c; font-weight: bold; font-size: 0.9em; background: #fadbd8; padding: 5px 15px; border-radius: 20px; display: inline-block; margin-bottom: 15px;}
+        .subtitle { color: #7f8c8d; margin-bottom: 20px; font-size: 1.1em; }
+        
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        .tab-btn {
+            padding: 10px 20px; font-size: 16px; cursor: pointer;
+            border: 2px solid var(--secondary); background-color: white;
+            color: var(--secondary); border-radius: 8px; font-weight: bold; transition: 0.3s;
+        }
+        .tab-btn:hover { background-color: #ebf5fb; }
+        .tab-btn.active { background-color: var(--secondary); color: white; }
+
+        .module-container {
+            background: white; padding: 20px; border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1); display: inline-block;
+            max-width: 900px; width: 100%;
+        }
+        
+        .canvas-wrapper { position: relative; display: inline-block; }
+        canvas {
+            background: #87CEEB; border-radius: 8px; border: 1px solid #bdc3c7;
+            display: block; margin: 0 auto; max-width: 100%; box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        #gameOverUI {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); color: white; border-radius: 8px;
+            flex-direction: column; justify-content: center; align-items: center; z-index: 10;
+        }
+        #gameOverUI h2 { color: #f1c40f; margin-top: 0; font-size: 32px;}
+        .input-area input { padding: 8px; font-size: 16px; border-radius: 4px; border: none; margin-right: 10px; outline: none; text-align: center; }
+        .leaderboard-list { text-align: left; font-size: 18px; margin: 15px 0; padding: 0; list-style: none; }
+        .leaderboard-list li { margin: 8px 0; background: rgba(255,255,255,0.1); padding: 8px 20px; border-radius: 4px; display: flex; justify-content: space-between; width: 200px; }
+        .leaderboard-list li span:nth-child(2) { color: #f1c40f; font-weight: bold; }
+
+        .controls { margin-top: 20px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; }
+        .control-btn {
+            padding: 10px 20px; font-size: 16px; background-color: var(--accent);
+            color: white; border: none; border-radius: 6px; cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.1s; user-select: none;
+        }
+        .control-btn:active { transform: translateY(2px); }
+        .btn-green { background-color: #27ae60; }
+        .btn-blue { background-color: #3498db; }
+        
+        .description {
+            margin-top: 15px; font-size: 1.1em; color: #34495e; background: #fdfefe;
+            padding: 15px; border-left: 5px solid var(--secondary); text-align: left; line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎪 虛擬物理實驗室：慣性定律</h1>
+    <div class="author-tag">💡 本程式由 小粘 製作</div>
+    <div class="subtitle">「靜者恆靜，動者恆作等速度直線運動。」</div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab(1)">1. 公車乘客</button>
+        <button class="tab-btn" onclick="switchTab(2)">2. 行進間拋物</button>
+        <button class="tab-btn" onclick="switchTab(3)">3. 水平投彈</button>
+        <button class="tab-btn" onclick="switchTab(4)">4. 無盡馬戲團挑戰</button>
+    </div>
+
+    <div class="module-container">
+        <div class="canvas-wrapper">
+            <canvas id="simCanvas" width="800" height="400"></canvas>
+            
+            <div id="gameOverUI">
+                <h2>💥 撞到了！ 💥</h2>
+                <p style="font-size: 20px;">本次得分：<span id="finalScore" style="color: #f1c40f; font-weight: bold; font-size: 24px;">0</span> 分</p>
+                
+                <div id="nameInputArea" class="input-area">
+                    <input type="text" id="playerName" placeholder="請輸入你的姓名" maxlength="10">
+                    <button class="control-btn btn-blue" onclick="submitScore()">登錄分數</button>
+                </div>
+
+                <div id="leaderboardArea" style="display: none; display: flex; flex-direction: column; align-items: center;">
+                    <h3 style="margin-bottom: 5px; color: #3498db;">🏆 最高分排行榜 🏆</h3>
+                    <ul id="leaderboardList" class="leaderboard-list"></ul>
+                    <button class="control-btn btn-green" onclick="restartGame()">再玩一次</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls" id="controlsBox"></div>
+        <div class="description" id="descBox"></div>
+    </div>
+
+<script>
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const controlsBox = document.getElementById('controlsBox');
+const descBox = document.getElementById('descBox');
+
+let currentTab = 1;
+let globalTime = 0;
+const GRAVITY = 0.25; 
+let simState = {};
+
+/** ====== 模組 1：公車乘客實驗 ====== */
+const initMod1 = () => { 
+    simState = { busX: 100, busV: 0, busA: 0, manAngle: 0 };
+    controlsBox.innerHTML = `
+        <button class="control-btn" onclick="mod1Action('start')">突然啟動</button>
+        <button class="control-btn" onclick="mod1Action('stop')">突然煞車</button>
+        <button class="control-btn" style="background-color:#7f8c8d;" onclick="initMod1()">重置</button>
+    `;
+    descBox.innerHTML = "<strong>物理意義：</strong> 啟動時乘客的腳跟著車子前進，但身體想維持靜止，因此向後仰。煞車時身體想維持原本向前的速度，因此向前傾倒。";
+};
+const mod1Action = (action) => {
+    if (action === 'start') { simState.busV = 0; simState.busA = 0.15; } 
+    else if (action === 'stop') { simState.busV = 5; simState.busA = -0.15; }
+};
+const updateMod1 = () => {
+    simState.busV += simState.busA; 
+    if (simState.busV < 0) { simState.busV=0; simState.busA=0; } 
+    else if (simState.busV > 5) { simState.busV=5; simState.busA=0; }
+    simState.busX += simState.busV;
+    if (simState.busX > 900) simState.busX = -200;
+
+    let targetAngle = -simState.busA * 3;
+    simState.manAngle += (targetAngle - simState.manAngle) * 0.1;
+    
+    ctx.clearRect(0,0,800,400); 
+    ctx.fillStyle='#95a5a6'; ctx.fillRect(0,300,800,100);
+    ctx.fillStyle='#f1c40f'; ctx.fillRect(simState.busX,150,200,120);
+    ctx.fillStyle='#333'; 
+    ctx.beginPath(); ctx.arc(simState.busX+40,270,25,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(simState.busX+160,270,25,0,Math.PI*2); ctx.fill();
+
+    ctx.save(); ctx.translate(simState.busX+100, 250); ctx.rotate(simState.manAngle);
+    ctx.strokeStyle='#2c3e50'; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-60); ctx.stroke();
+    ctx.fillStyle='#e74c3c'; ctx.beginPath(); ctx.arc(0,-75,15,0,Math.PI*2); ctx.fill(); ctx.restore();
+};
+
+/** ====== 模組 2：行進間拋體(硬幣) ====== */
+const initMod2 = () => {
+    simState = {
+        busX: 50, busV: 3, busA: 0,
+        coin: { active: false, x: 0, y: 0, vx: 0, vy: 0, path: [] }
+    };
+    controlsBox.innerHTML = `
+        <button class="control-btn btn-blue" onclick="mod2Toss()">拋起硬幣</button>
+        <button class="control-btn" onclick="simState.busA = 0.1">公車加速</button>
+        <button class="control-btn" onclick="simState.busA = -0.15">公車煞車</button>
+        <button class="control-btn" style="background-color:#7f8c8d;" onclick="initMod2()">重置</button>
+    `;
+    descBox.innerHTML = "<strong>物理意義：</strong> 硬幣離開手之後，在水平方向不受力，因此<strong>保有與公車瞬間相同的水平速度</strong>。若公車等速，硬幣落回手中；公車加速落於後方；公車煞車落於前方。";
+};
+const mod2Toss = () => {
+    if (simState.coin.active) return;
+    simState.coin.active = true;
+    simState.coin.vx = simState.busV; // 慣性：繼承公車速度
+    simState.coin.vy = -7.5; 
+    simState.coin.x = simState.busX + 100;
+    simState.coin.y = 210;
+    simState.coin.path = [];
+};
+const updateMod2 = () => {
+    simState.busV += simState.busA;
+    if (simState.busV < 0) { simState.busV = 0; simState.busA = 0; }
+    simState.busX += simState.busV;
+    if (simState.busX > 900) simState.busX = -200;
+
+    let c = simState.coin;
+    if (c.active) {
+        c.path.push({x: c.x, y: c.y});
+        c.vy += GRAVITY; 
+        c.y += c.vy;
+        c.x += c.vx; 
+        if (c.y > 250) c.active = false;
+    }
+
+    ctx.clearRect(0, 0, 800, 400);
+    ctx.fillStyle = '#95a5a6'; ctx.fillRect(0, 300, 800, 100);
+    ctx.fillStyle = 'rgba(231, 76, 60, 0.5)'; ctx.fillRect(simState.busX, 150, 200, 120);
+    ctx.fillStyle = '#333'; 
+    ctx.beginPath(); ctx.arc(simState.busX + 40, 270, 25, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(simState.busX + 160, 270, 25, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#2c3e50'; ctx.fillRect(simState.busX + 90, 210, 20, 50);
+
+    if (c.path.length > 0) {
+        ctx.strokeStyle = 'gold'; ctx.lineWidth = 2; ctx.beginPath();
+        ctx.moveTo(c.path[0].x, c.path[0].y);
+        for(let p of c.path) ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+    }
+    if (c.active || c.path.length > 0) {
+        ctx.fillStyle = 'gold'; ctx.beginPath();
+        let drawY = c.active ? c.y : c.path[c.path.length-1].y;
+        let drawX = c.active ? c.x : c.path[c.path.length-1].x;
+        ctx.arc(drawX, drawY, 8, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    }
+};
+
+/** ====== 模組 3：水平拋體(轟炸機) ====== */
+const initMod3 = () => {
+    simState = {
+        planeX: 0, planeV: 4, planeY: 60,
+        bomb: { active: false, x: 0, y: 0, vx: 0, vy: 0, path: [] }
+    };
+    controlsBox.innerHTML = `
+        <button class="control-btn btn-blue" onclick="mod3Drop()">投下炸彈</button>
+        <button class="control-btn" style="background-color:#7f8c8d;" onclick="initMod3()">重置</button>
+    `;
+    descBox.innerHTML = "<strong>物理意義：</strong> 從等速飛行的飛機上投下物體時，物體具有與飛機相同的「水平初速度」。請觀察白色虛線，炸彈在落下時始終保持在飛機的正下方。";
+};
+const mod3Drop = () => {
+    if (simState.bomb.active) return;
+    simState.bomb.active = true;
+    simState.bomb.vx = simState.planeV; 
+    simState.bomb.vy = 0; 
+    simState.bomb.x = simState.planeX + 40;
+    simState.bomb.y = simState.planeY + 20;
+    simState.bomb.path = [];
+};
+const updateMod3 = () => {
+    simState.planeX += simState.planeV;
+    if (simState.planeX > 800) simState.planeX = -100;
+
+    let b = simState.bomb;
+    if (b.active) {
+        if (globalTime % 3 === 0) b.path.push({x: b.x, y: b.y}); 
+        b.vy += GRAVITY;
+        b.x += b.vx; 
+        b.y += b.vy;
+        if (b.y > 300) b.active = false; 
+    }
+
+    ctx.clearRect(0, 0, 800, 400);
+    ctx.fillStyle = '#27ae60'; ctx.fillRect(0, 300, 800, 100);
+    ctx.fillStyle = '#c0392b'; ctx.fillRect(400, 280, 40, 20); 
+
+    if (b.path.length > 0) {
+        ctx.fillStyle = 'black';
+        for(let p of b.path) {
+            ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill();
+        }
+    }
+    if (b.active) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'; ctx.setLineDash([5, 5]); ctx.beginPath();
+        ctx.moveTo(simState.planeX + 40, simState.planeY + 20); ctx.lineTo(b.x, b.y); ctx.stroke();
+        ctx.setLineDash([]); 
+        ctx.fillStyle = '#34495e'; ctx.beginPath(); ctx.arc(b.x, b.y, 8, 0, Math.PI*2); ctx.fill();
+    }
+
+    ctx.fillStyle = '#bdc3c7'; ctx.beginPath();
+    ctx.moveTo(simState.planeX, simState.planeY); ctx.lineTo(simState.planeX + 80, simState.planeY);
+    ctx.lineTo(simState.planeX + 90, simState.planeY + 10); ctx.lineTo(simState.planeX + 10, simState.planeY + 20); ctx.fill();
+    ctx.fillStyle = '#7f8c8d'; ctx.fillRect(simState.planeX + 30, simState.planeY - 10, 20, 30);
+};
+
+/** ====== 模組 4：無盡馬戲團挑戰 (小粘製作 升級版) ====== */
+let keys = { space: false }; 
+
+const initMod4 = () => {
+    document.getElementById('gameOverUI').style.display = 'none';
+    simState = {
+        speed: 6,           
+        bgOffset: 0,        
+        jockey: { y: 220, vy: 0, isJumping: false },
+        obstacles: [],      
+        score: 0, gameOver: false, uiShown: false
+    };
+    controlsBox.innerHTML = `<button class="control-btn btn-green" id="jumpBtn" style="padding: 15px 40px; font-size: 20px;">🚀 [長按] 跳躍 (Space)</button>`;
+    descBox.innerHTML = "<strong>物理意義 (相對運動)：</strong> 騎士保持在畫面中央。地面向左移動等同於馬向右前進。當騎士跳起時，水平方向因為慣性與馬保持相對靜止。 <br><br><strong>💡 小粘的遊戲提示：</strong> 按住空白鍵越久，對抗重力的時間越長，跳得越高！快來挑戰排行榜吧！";
+
+    const btn = document.getElementById('jumpBtn');
+    if(btn) {
+        btn.addEventListener('mousedown', handleJumpStart);
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); handleJumpStart(); });
+        btn.addEventListener('mouseup', handleJumpEnd);
+        btn.addEventListener('mouseleave', handleJumpEnd);
+        btn.addEventListener('touchend', handleJumpEnd);
+    }
+};
+
+const handleJumpStart = () => {
+    if (simState.gameOver) return;
+    keys.space = true;
+    if (!simState.jockey.isJumping) {
+        simState.jockey.isJumping = true; simState.jockey.vy = -7.5; 
+    }
+};
+const handleJumpEnd = () => { keys.space = false; };
+window.addEventListener('keydown', (e) => {
+    if (currentTab === 4 && e.code === 'Space') { e.preventDefault(); if (!keys.space) handleJumpStart(); }
+});
+window.addEventListener('keyup', (e) => { if (currentTab === 4 && e.code === 'Space') handleJumpEnd(); });
+
+const updateMod4 = () => {
+    if (simState.gameOver) {
+        drawMod4Scene();
+        if (!simState.uiShown) { showGameOverScreen(); simState.uiShown = true; }
+        return;
+    }
+    simState.bgOffset = (simState.bgOffset + simState.speed) % 100;
+    if (simState.obstacles.length === 0 || simState.obstacles[simState.obstacles.length - 1].x < canvas.width - (300 + Math.random() * 400)) {
+        simState.obstacles.push({ x: canvas.width + 50, w: 25, h: 30 + Math.random() * 40, passed: false });
+    }
+
+    let j = simState.jockey;
+    if (j.isJumping) {
+        if (keys.space && j.vy < 0) j.vy += GRAVITY * 0.5; else j.vy += GRAVITY * 1.5; 
+        j.y += j.vy; if (j.y >= 220) { j.y = 220; j.isJumping = false; j.vy = 0; }
+    }
+
+    let jockeyX = 400, jockeyW = 20;
+    for (let i = simState.obstacles.length - 1; i >= 0; i--) {
+        let obs = simState.obstacles[i];
+        obs.x -= simState.speed; 
+        let hitX = obs.x < jockeyX + jockeyW && obs.x + obs.w > jockeyX - jockeyW;
+        let hitY = j.y > 270 - obs.h - 15; 
+        if (hitX && hitY) simState.gameOver = true; 
+        if (!obs.passed && obs.x < jockeyX - jockeyW) {
+            obs.passed = true; simState.score += 10;
+            if(simState.speed < 12) simState.speed += 0.15; 
+        }
+        if (obs.x < -50) simState.obstacles.splice(i, 1);
+    }
+    drawMod4Scene();
+};
+
+const drawMod4Scene = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#f39c12'; ctx.fillRect(0, 270, canvas.width, 130);
+    ctx.fillStyle = '#e67e22';
+    for(let i = -100; i < canvas.width + 100; i+=100) ctx.fillRect(i - simState.bgOffset, 280, 50, 20); 
+
+    ctx.fillStyle = '#c0392b';
+    simState.obstacles.forEach(obs => {
+        ctx.fillRect(obs.x, 270 - obs.h, obs.w, obs.h);
+        ctx.fillStyle = '#f1c40f'; ctx.fillRect(obs.x - 2, 270 - obs.h - 5, obs.w + 4, 10);
+        ctx.fillStyle = '#c0392b';
+    });
+
+    let horseX = 400; ctx.fillStyle = '#8e44ad';
+    ctx.fillRect(horseX - 35, 240, 70, 30); ctx.fillRect(horseX + 25, 210, 20, 30); 
+    let legOffset = (globalTime % 10 < 5 && !simState.gameOver) ? 12 : -12;
+    ctx.fillRect(horseX - 25 + legOffset, 270, 8, 20); ctx.fillRect(horseX - 15 - legOffset, 270, 8, 20);
+    ctx.fillRect(horseX + 15 + legOffset, 270, 8, 20); ctx.fillRect(horseX + 25 - legOffset, 270, 8, 20);
+
+    let j = simState.jockey; ctx.fillStyle = '#2980b9';
+    ctx.beginPath(); ctx.arc(horseX, j.y - 15, 12, 0, Math.PI*2); ctx.fill(); 
+    ctx.fillRect(horseX - 10, j.y, 20, 25); 
+    if(j.isJumping) ctx.fillRect(horseX - 15, j.y + 5, 30, 8); 
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(20, 20, 160, 50);
+    ctx.fillStyle = 'white'; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'left';
+    ctx.fillText(`分數: ${simState.score}`, 40, 55);
+};
+
+/** ====== 排行榜系統 ====== */
+const showGameOverScreen = () => {
+    document.getElementById('gameOverUI').style.display = 'flex';
+    document.getElementById('nameInputArea').style.display = 'block';
+    document.getElementById('leaderboardArea').style.display = 'none';
+    document.getElementById('finalScore').innerText = simState.score;
+    document.getElementById('playerName').value = '';
+    document.getElementById('playerName').focus();
+};
+
+const submitScore = () => {
+    let rawName = document.getElementById('playerName').value.trim();
+    let name = rawName === "" ? "神秘物理學家" : rawName;
+    let leaderboard = JSON.parse(localStorage.getItem('circusLeaderboard')) || [];
+    leaderboard.push({ name: name, score: simState.score });
+    leaderboard.sort((a, b) => b.score - a.score);
+    leaderboard = leaderboard.slice(0, 5);
+    localStorage.setItem('circusLeaderboard', JSON.stringify(leaderboard));
+    
+    document.getElementById('nameInputArea').style.display = 'none';
+    document.getElementById('leaderboardArea').style.display = 'flex';
+    document.getElementById('leaderboardList').innerHTML = leaderboard.map((entry, index) => {
+        let medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : (index === 2 ? "🥉" : "🔹"));
+        return `<li><span>${medal} ${entry.name}</span> <span>${entry.score}</span></li>`;
+    }).join('');
+};
+
+const restartGame = () => initMod4();
+
+/** ====== 主循環與切換 ====== */
+const renderLoop = () => {
+    globalTime++;
+    if (currentTab === 1) updateMod1();
+    else if (currentTab === 2) updateMod2();
+    else if (currentTab === 3) updateMod3();
+    else if (currentTab === 4) updateMod4();
+    requestAnimationFrame(renderLoop);
+};
+
+const switchTab = (tabIndex) => {
+    currentTab = tabIndex;
+    document.getElementById('gameOverUI').style.display = 'none'; 
+    document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
+        btn.className = (idx === tabIndex - 1) ? 'tab-btn active' : 'tab-btn';
+    });
+    if (tabIndex === 1) initMod1(); else if (tabIndex === 2) initMod2();
+    else if (tabIndex === 3) initMod3(); else if (tabIndex === 4) initMod4();
+};
+
+// 初始化啟動 (預設開啟第一個頁籤)
+switchTab(1); 
+renderLoop();
+</script>
+</body>
+</html>
