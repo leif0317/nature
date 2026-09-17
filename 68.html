@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>國中理化：波的特性互動模擬</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { 
+            color: #333; 
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .signature {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
+            color: #d63031;
+            font-size: 0.55em;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 2px solid #ff7675;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            background-color: #ddd;
+            border-radius: 5px;
+            transition: 0.3s;
+        }
+        .tab-btn.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .panel {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .panel.active { display: block; }
+        canvas {
+            border: 1px solid #ccc;
+            background-color: #fff;
+            margin-top: 15px;
+            cursor: crosshair;
+        }
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 8px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 3px;
+        }
+        button:hover { background-color: #0b7dda; }
+        button.toggle-on { background-color: #ff9800; }
+        .btn-step { background-color: #9b59b6; }
+        .btn-step:hover { background-color: #8e44ad; }
+        input[type="range"] { vertical-align: middle; }
+    </style>
+</head>
+<body>
+
+    <h1>波的特性互動模擬 <span class="signature">小粘製作</span></h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab(1)">介面一：橫波 (繩波)</button>
+        <button class="tab-btn" onclick="switchTab(2)">介面二：縱波 (聲波)</button>
+        <button class="tab-btn" onclick="switchTab(3)">介面三：手動操作模式</button>
+    </div>
+
+    <!-- 介面一：橫波 -->
+    <div id="panel1" class="panel active">
+        <h3>橫波 (繩波) 展示</h3>
+        <p>觀察紅色質點，它只會在原地上下震動，並不會隨著波前進。</p>
+        <canvas id="canvas1" width="800" height="300"></canvas>
+        <div class="controls">
+            <button onclick="ctrl1.start()">啟動</button>
+            <button onclick="ctrl1.pause()">暫停</button>
+            <button onclick="ctrl1.stop()">結束 (重置)</button>
+            <button class="btn-step" onclick="ctrl1.step()">慢動作 (動一下靜止)</button>
+        </div>
+        <div class="controls">
+            <button id="btn-crest" onclick="ctrl1.toggle('crest')">顯示波峰</button>
+            <button id="btn-trough" onclick="ctrl1.toggle('trough')">顯示波谷</button>
+            <button id="btn-amp" onclick="ctrl1.toggle('amplitude')">顯示振幅</button>
+            <button id="btn-wave" onclick="ctrl1.toggle('wavelength')">顯示波長 (滑鼠可移動)</button>
+        </div>
+    </div>
+
+    <!-- 介面二：縱波 -->
+    <div id="panel2" class="panel">
+        <h3>縱波 (聲波/疏密波) 展示</h3>
+        <p>介質震動方向與波前進方向平行，形成疏部與密部。</p>
+        <canvas id="canvas2" width="800" height="300"></canvas>
+        <div class="controls">
+            <button onclick="ctrl2.start()">啟動</button>
+            <button onclick="ctrl2.pause()">暫停</button>
+            <button onclick="ctrl2.stop()">結束 (重置)</button>
+            <button class="btn-step" onclick="ctrl2.step()">慢動作 (動一下靜止)</button>
+        </div>
+    </div>
+
+    <!-- 介面三：手動操作模式 -->
+    <div id="panel3" class="panel">
+        <h3>手動操作模式</h3>
+        <p>在畫布內<b>上下移動滑鼠</b>來控制左側波源，製造出屬於你自己的連續波！</p>
+        <canvas id="canvas3" width="800" height="300"></canvas>
+        <div class="controls">
+            <button onclick="ctrl3.pause()">暫停 / 繼續</button>
+            <button onclick="ctrl3.reset()">重置</button>
+            <label>波速調整: 
+                <input type="range" id="speed-slider" min="1" max="10" value="5" onchange="ctrl3.updateSpeed()">
+            </label>
+        </div>
+    </div>
+
+<script>
+    // --- 頁籤切換邏輯 ---
+    function switchTab(tabIndex) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('panel' + tabIndex).classList.add('active');
+        document.querySelectorAll('.tab-btn')[tabIndex - 1].classList.add('active');
+    }
+
+    // --- 共用變數 ---
+    const width = 800;
+    const height = 300;
+    const midY = height / 2;
+
+    // ==========================================
+    // 介面一：橫波 (Transverse Wave)
+    // ==========================================
+    const ctx1 = document.getElementById('canvas1').getContext('2d');
+    let time1 = 0;
+    let anim1 = null;
+    let isPlaying1 = false;
+    let mouseX1 = width / 2;
+
+    // 讓波長標籤跟隨滑鼠，並確保在暫停狀態下也會重繪畫面
+    document.getElementById('canvas1').addEventListener('mousemove', (e) => {
+        const rect = e.target.getBoundingClientRect();
+        mouseX1 = e.clientX - rect.left;
+        if (!isPlaying1) draw1(true); 
+    });
+
+    const ctrl1 = {
+        features: { crest: false, trough: false, amplitude: false, wavelength: false },
+        start: function() { if(!isPlaying1) { isPlaying1 = true; draw1(); } },
+        pause: function() { isPlaying1 = false; cancelAnimationFrame(anim1); },
+        stop: function() { isPlaying1 = false; cancelAnimationFrame(anim1); time1 = 0; draw1(true); },
+        step: function() { 
+            isPlaying1 = false; 
+            cancelAnimationFrame(anim1); 
+            time1 += 0.2; // 慢動作前進一小格
+            draw1(true); 
+        },
+        toggle: function(feature) {
+            this.features[feature] = !this.features[feature];
+            const btnMap = {crest: 'btn-crest', trough: 'btn-trough', amplitude: 'btn-amp', wavelength: 'btn-wave'};
+            document.getElementById(btnMap[feature]).classList.toggle('toggle-on');
+            if(!isPlaying1) draw1(true);
+        }
+    };
+
+    function draw1(singleFrame = false) {
+        ctx1.clearRect(0, 0, width, height);
+        
+        // 畫平衡位置
+        ctx1.beginPath();
+        ctx1.moveTo(0, midY);
+        ctx1.lineTo(width, midY);
+        ctx1.strokeStyle = '#ccc';
+        ctx1.setLineDash([5, 5]);
+        ctx1.stroke();
+        ctx1.setLineDash([]);
+
+        const amplitude = 60;
+        const wavelength = 200;
+        const k = 2 * Math.PI / wavelength;
+        
+        // 波的前緣距離 (依時間推算波走到哪裡)
+        const waveFront = time1 / k;
+        
+        // 畫繩波
+        ctx1.beginPath();
+        ctx1.lineWidth = 3;
+        ctx1.strokeStyle = '#3498db';
+        for (let x = 0; x <= width; x++) {
+            let y = midY;
+            // 只有在波前緣左側的介質才會震動
+            if (x <= waveFront) {
+                y = midY + amplitude * Math.sin(k * x - time1);
+            }
+            if (x === 0) ctx1.moveTo(x, y);
+            else ctx1.lineTo(x, y);
+        }
+        ctx1.stroke();
+
+        // 畫介質明顯點 (固定在 x = 300)
+        let targetX = 300;
+        let targetY = midY;
+        if (targetX <= waveFront) {
+            targetY = midY + amplitude * Math.sin(k * targetX - time1);
+        }
+        ctx1.beginPath();
+        ctx1.arc(targetX, targetY, 8, 0, 2 * Math.PI);
+        ctx1.fillStyle = '#e74c3c';
+        ctx1.fill();
+
+        // 特徵顯示 (僅在波傳遞到的地方顯示)
+        if (ctrl1.features.crest) {
+            for (let x = 0; x <= width; x++) {
+                if (x <= waveFront && Math.sin(k * x - time1) < -0.99) {
+                    ctx1.fillStyle = 'green';
+                    ctx1.fillText("波峰", x - 12, midY - amplitude - 10);
+                    ctx1.beginPath(); ctx1.arc(x, midY - amplitude, 4, 0, Math.PI*2); ctx1.fill();
+                }
+            }
+        }
+        if (ctrl1.features.trough) {
+            for (let x = 0; x <= width; x++) {
+                if (x <= waveFront && Math.sin(k * x - time1) > 0.99) {
+                    ctx1.fillStyle = 'purple';
+                    ctx1.fillText("波谷", x - 12, midY + amplitude + 20);
+                    ctx1.beginPath(); ctx1.arc(x, midY + amplitude, 4, 0, Math.PI*2); ctx1.fill();
+                }
+            }
+        }
+        if (ctrl1.features.amplitude) {
+            let x = 100; // 預設找一個固定位置
+            if (x <= waveFront) {
+                while(Math.sin(k * x - time1) > -0.99) x++;
+                ctx1.beginPath();
+                ctx1.moveTo(x, midY);
+                ctx1.lineTo(x, midY - amplitude);
+                ctx1.strokeStyle = 'orange';
+                ctx1.lineWidth = 2;
+                ctx1.stroke();
+                ctx1.fillStyle = 'orange';
+                ctx1.fillText("振幅", x + 5, midY - amplitude/2);
+            }
+        }
+        if (ctrl1.features.wavelength) {
+            // 滑鼠控制的波長線 (即時跟隨)
+            ctx1.beginPath();
+            ctx1.moveTo(mouseX1, midY - amplitude - 30);
+            ctx1.lineTo(mouseX1 + wavelength, midY - amplitude - 30);
+            ctx1.strokeStyle = 'red';
+            ctx1.lineWidth = 3;
+            ctx1.stroke();
+            
+            // 畫箭頭與文字
+            ctx1.moveTo(mouseX1, midY - amplitude - 25);
+            ctx1.lineTo(mouseX1, midY - amplitude - 35);
+            ctx1.moveTo(mouseX1 + wavelength, midY - amplitude - 25);
+            ctx1.lineTo(mouseX1 + wavelength, midY - amplitude - 35);
+            ctx1.stroke();
+            ctx1.fillStyle = 'red';
+            ctx1.fillText("1 個波長 (可跟隨滑鼠移動)", mouseX1 + 10, midY - amplitude - 40);
+        }
+
+        if (isPlaying1) {
+            time1 += 0.1;
+            anim1 = requestAnimationFrame(draw1);
+        }
+    }
+    draw1(true); // 初始化畫面為平衡狀態
+
+    // ==========================================
+    // 介面二：縱波 (Longitudinal Wave)
+    // ==========================================
+    const ctx2 = document.getElementById('canvas2').getContext('2d');
+    let time2 = 0;
+    let anim2 = null;
+    let isPlaying2 = false;
+
+    const ctrl2 = {
+        start: function() { if(!isPlaying2) { isPlaying2 = true; draw2(); } },
+        pause: function() { isPlaying2 = false; cancelAnimationFrame(anim2); },
+        stop: function() { isPlaying2 = false; cancelAnimationFrame(anim2); time2 = 0; draw2(true); },
+        step: function() { 
+            isPlaying2 = false; 
+            cancelAnimationFrame(anim2); 
+            time2 += 0.2; 
+            draw2(true); 
+        }
+    };
+
+    function draw2(singleFrame = false) {
+        ctx2.clearRect(0, 0, width, height);
+        
+        const numParticles = 80;
+        const amplitude = 15;
+        const wavelength = 200;
+        const k = 2 * Math.PI / wavelength;
+        
+        // 算出波的前緣，讓波從左邊慢慢傳遞過去
+        const waveFront = time2 / k;
+        
+        ctx2.fillStyle = '#2c3e50';
+        for (let row = -2; row <= 2; row++) {
+            for (let i = 0; i < numParticles; i++) {
+                let baseX = i * (width / numParticles);
+                let x = baseX;
+                
+                // 只有被波傳遞到的介質才會發生位移
+                if (baseX <= waveFront) {
+                    x = baseX + amplitude * Math.sin(k * baseX - time2);
+                }
+                let y = midY + row * 20;
+                
+                ctx2.beginPath();
+                ctx2.arc(x, y, 3, 0, 2 * Math.PI);
+                ctx2.fill();
+            }
+        }
+
+        if (isPlaying2) {
+            time2 += 0.1;
+            anim2 = requestAnimationFrame(draw2);
+        }
+    }
+    draw2(true); // 初始化畫面為平衡狀態
+
+    // ==========================================
+    // 介面三：手動操作模式 (Interactive Wave)
+    // ==========================================
+    const ctx3 = document.getElementById('canvas3').getContext('2d');
+    let anim3 = null;
+    let isPlaying3 = true;
+    let waveSpeed = 5; 
+    let points = Array(width).fill(midY);
+    let targetHandY = midY;
+
+    document.getElementById('canvas3').addEventListener('mousemove', (e) => {
+        const rect = e.target.getBoundingClientRect();
+        targetHandY = e.clientY - rect.top;
+        if(targetHandY < 20) targetHandY = 20;
+        if(targetHandY > height - 20) targetHandY = height - 20;
+    });
+
+    const ctrl3 = {
+        pause: function() {
+            isPlaying3 = !isPlaying3;
+            if(isPlaying3) draw3();
+            else cancelAnimationFrame(anim3);
+        },
+        reset: function() {
+            points = Array(width).fill(midY);
+            targetHandY = midY;
+            if(!isPlaying3) { isPlaying3 = true; draw3(); }
+        },
+        updateSpeed: function() {
+            waveSpeed = parseInt(document.getElementById('speed-slider').value);
+        }
+    };
+
+    function draw3() {
+        ctx3.clearRect(0, 0, width, height);
+
+        // 畫平衡線
+        ctx3.beginPath();
+        ctx3.moveTo(0, midY);
+        ctx3.lineTo(width, midY);
+        ctx3.strokeStyle = '#eee';
+        ctx3.stroke();
+        
+        for (let s = 0; s < waveSpeed; s++) {
+            for (let i = width - 1; i > 0; i--) {
+                points[i] = points[i - 1];
+            }
+            points[0] = targetHandY;
+        }
+
+        // 畫繩波
+        ctx3.beginPath();
+        ctx3.lineWidth = 4;
+        ctx3.strokeStyle = '#9b59b6';
+        for (let x = 0; x < width; x++) {
+            if (x === 0) ctx3.moveTo(x, points[x]);
+            else ctx3.lineTo(x, points[x]);
+        }
+        ctx3.stroke();
+
+        // 波源(手)
+        ctx3.beginPath();
+        ctx3.arc(0, points[0], 12, 0, 2 * Math.PI);
+        ctx3.fillStyle = '#f1c40f';
+        ctx3.fill();
+        ctx3.stroke();
+
+        if (isPlaying3) {
+            anim3 = requestAnimationFrame(draw3);
+        }
+    }
+    draw3(); // 自動啟動
+
+</script>
+</body>
+</html>
