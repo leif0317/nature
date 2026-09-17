@@ -269,23 +269,43 @@
                 ctx1.fillText("振幅", x + 5, midY - amplitude/2);
             }
         }
+        
+        // 【修改點】波長線段出現在波的圖形上
         if (ctrl1.features.wavelength) {
-            // 滑鼠控制的波長線 (即時跟隨)
+            // 計算滑鼠位置對應的波形高度 (Y座標)
+            let waveY = midY;
+            if (mouseX1 <= waveFront) {
+                waveY = midY + amplitude * Math.sin(k * mouseX1 - time1);
+            }
+            
+            // 畫水平波長線段 (貼齊波浪)
             ctx1.beginPath();
-            ctx1.moveTo(mouseX1, midY - amplitude - 30);
-            ctx1.lineTo(mouseX1 + wavelength, midY - amplitude - 30);
+            ctx1.moveTo(mouseX1, waveY);
+            ctx1.lineTo(mouseX1 + wavelength, waveY);
             ctx1.strokeStyle = 'red';
             ctx1.lineWidth = 3;
             ctx1.stroke();
             
-            // 畫箭頭與文字
-            ctx1.moveTo(mouseX1, midY - amplitude - 25);
-            ctx1.lineTo(mouseX1, midY - amplitude - 35);
-            ctx1.moveTo(mouseX1 + wavelength, midY - amplitude - 25);
-            ctx1.lineTo(mouseX1 + wavelength, midY - amplitude - 35);
+            // 畫線段兩端的端點小豎線
+            ctx1.beginPath();
+            ctx1.moveTo(mouseX1, waveY - 10);
+            ctx1.lineTo(mouseX1, waveY + 10);
+            ctx1.moveTo(mouseX1 + wavelength, waveY - 10);
+            ctx1.lineTo(mouseX1 + wavelength, waveY + 10);
+            ctx1.lineWidth = 2;
             ctx1.stroke();
+            
+            // 畫端點圓圈使其更明顯
+            ctx1.beginPath();
+            ctx1.arc(mouseX1, waveY, 5, 0, Math.PI*2);
+            ctx1.arc(mouseX1 + wavelength, waveY, 5, 0, Math.PI*2);
             ctx1.fillStyle = 'red';
-            ctx1.fillText("1 個波長 (可跟隨滑鼠移動)", mouseX1 + 10, midY - amplitude - 40);
+            ctx1.fill();
+            
+            // 文字位置：如果波浪偏上方，字就寫下面；波浪偏下方，字就寫上面，避免重疊
+            let textY = waveY > midY ? waveY - 15 : waveY + 20;
+            ctx1.font = "14px sans-serif";
+            ctx1.fillText("1 個波長", mouseX1 + (wavelength / 2) - 25, textY);
         }
 
         if (isPlaying1) {
